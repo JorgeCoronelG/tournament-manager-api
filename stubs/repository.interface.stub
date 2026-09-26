@@ -1,0 +1,14 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Core\Contracts\BaseRepositoryInterface;
+use {{ model }};
+
+/**
+ * @extends BaseRepositoryInterface<{{ modelName }}>
+ */
+interface {{ class }} extends BaseRepositoryInterface
+{
+    //
+}

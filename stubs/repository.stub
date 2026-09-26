@@ -1,0 +1,18 @@
+<?php
+
+namespace {{ namespace }};
+
+use {{ interface }};
+use App\Core\BaseRepository;
+use {{ model }};
+
+/**
+ * @extends BaseRepository<{{ modelName }}>
+ */
+class {{ class }} extends BaseRepository implements {{ interfaceName }}
+{
+    public function __construct({{ modelName }} $entity)
+    {
+        parent::__construct($entity);
+    }
+}

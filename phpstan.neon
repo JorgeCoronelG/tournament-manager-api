@@ -1,0 +1,24 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        # Modelos de prueba que usan los traits (Larastan analiza los traits en el contexto de la clase que los usa)
+        # y comprobación de tipos de los genéricos.
+        - tests/Support/GenericsTypeCheck.php
+        - tests/Support/Item.php
+        - tests/Support/ItemWithoutSorts.php
+    level: 9
+
+    ignoreErrors:
+        # BaseRepository asume que los modelos usan los traits AdvancedFilter y Sortable
+        # (scopes filter() y applySort()), que PHPStan no puede inferir desde Model.
+        -
+            message: '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder<TModel of Illuminate\\Database\\Eloquent\\Model>::filter\(\)#'
+            path: app/Core/BaseRepository.php
+            count: 1
+        # Los traits de app/Core/Traits los usan los modelos de cada proyecto, no esta base.
+        -
+            identifier: trait.unused
+            path: app/Core/Traits/*
