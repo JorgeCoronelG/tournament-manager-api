@@ -12,7 +12,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
 
     /** @var array<string, string> Interfaz => implementación (nombres relativos a Contracts y Services) */
     protected array $services = [
-        //
+        'AuthServiceInterface' => 'AuthService',
     ];
 
     /**
