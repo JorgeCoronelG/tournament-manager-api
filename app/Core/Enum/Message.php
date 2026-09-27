@@ -7,6 +7,10 @@ class Message
     // Mensajes de validaciones
     public const CREDENTIALS_INVALID = 'Credenciales inválidas.';
 
+    public const CODE_INVALID_OR_EXPIRED = 'Código inválido o expirado.';
+
+    public const TOO_MANY_CODE_ATTEMPTS = 'Demasiados intentos fallidos. Solicite un nuevo código.';
+
     public const INVALID_QUERY_PARAMETER = 'Parámetro de consulta inválido.';
 
     public const INVALID_ID_PARAMETER_WITH_ID_BODY = 'El id es diferente al id del parámetro de ruta.';
