@@ -30,6 +30,14 @@ class AuthRepository implements AuthRepositoryInterface
         $user->tokens()->delete();
     }
 
+    public function revokeOtherTokens(User $user): void
+    {
+        /** @var PersonalAccessToken $currentToken */
+        $currentToken = $user->currentAccessToken();
+
+        $user->tokens()->where('id', '!=', $currentToken->id)->delete();
+    }
+
     public function updatePassword(User $user, string $password): void
     {
         $user->forceFill(['password' => $password])->save();

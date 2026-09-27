@@ -14,5 +14,7 @@ interface AuthRepositoryInterface
 
     public function revokeAllTokens(User $user): void;
 
+    public function revokeOtherTokens(User $user): void;
+
     public function updatePassword(User $user, string $password): void;
 }

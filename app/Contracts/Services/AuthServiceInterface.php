@@ -2,6 +2,7 @@
 
 namespace App\Contracts\Services;
 
+use App\Data\Auth\ChangePasswordData;
 use App\Data\Auth\LoginData;
 use App\Models\User;
 
@@ -13,4 +14,6 @@ interface AuthServiceInterface
     public function login(LoginData $data): array;
 
     public function logout(User $user): void;
+
+    public function changePassword(User $user, ChangePasswordData $data): void;
 }

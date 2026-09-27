@@ -7,6 +7,8 @@ class Message
     // Mensajes de validaciones
     public const CREDENTIALS_INVALID = 'Credenciales inválidas.';
 
+    public const CURRENT_PASSWORD_INVALID = 'Contraseña actual incorrecta.';
+
     public const CODE_INVALID_OR_EXPIRED = 'Código inválido o expirado.';
 
     public const TOO_MANY_CODE_ATTEMPTS = 'Demasiados intentos fallidos. Solicite un nuevo código.';

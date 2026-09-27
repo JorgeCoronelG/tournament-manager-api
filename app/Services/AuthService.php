@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\Repositories\AuthRepositoryInterface;
 use App\Contracts\Services\AuthServiceInterface;
 use App\Core\Enum\Message;
+use App\Data\Auth\ChangePasswordData;
 use App\Data\Auth\LoginData;
 use App\Exceptions\CustomErrorException;
 use App\Models\User;
@@ -36,5 +37,18 @@ class AuthService implements AuthServiceInterface
     public function logout(User $user): void
     {
         $this->authRepository->revokeCurrentToken($user);
+    }
+
+    /**
+     * @throws CustomErrorException
+     */
+    public function changePassword(User $user, ChangePasswordData $data): void
+    {
+        if (! Hash::check($data->current_password, $user->password)) {
+            throw new CustomErrorException(Message::CURRENT_PASSWORD_INVALID, Response::HTTP_UNAUTHORIZED);
+        }
+
+        $this->authRepository->updatePassword($user, $data->password);
+        $this->authRepository->revokeOtherTokens($user);
     }
 }

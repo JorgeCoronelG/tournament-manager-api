@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\Services\AuthServiceInterface;
 use App\Core\BaseApiController;
+use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\Auth\LoginResource;
 use App\Http\Resources\Auth\UserResource;
@@ -39,5 +40,15 @@ class AuthController extends BaseApiController
         $user = $request->user();
 
         return $this->showOne(new UserResource($user));
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->authService->changePassword($user, $request->toData());
+
+        return response()->json(['message' => 'Contraseña actualizada correctamente.']);
     }
 }
