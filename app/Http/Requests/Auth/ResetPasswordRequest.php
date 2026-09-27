@@ -25,6 +25,18 @@ class ResetPasswordRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'email' => 'correo electrónico',
+            'code' => 'código',
+            'password' => 'nueva contraseña',
+        ];
+    }
+
     public function toData(): ResetPasswordData
     {
         return ResetPasswordData::from($this->validated());

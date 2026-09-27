@@ -23,6 +23,17 @@ class LoginRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'email' => 'correo electrónico',
+            'password' => 'contraseña',
+        ];
+    }
+
     public function toData(): LoginData
     {
         return LoginData::from($this->validated());

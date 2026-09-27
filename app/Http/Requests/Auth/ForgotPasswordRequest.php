@@ -22,6 +22,16 @@ class ForgotPasswordRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'email' => 'correo electrónico',
+        ];
+    }
+
     public function toData(): ForgotPasswordData
     {
         return ForgotPasswordData::from($this->validated());
