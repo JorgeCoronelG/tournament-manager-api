@@ -14,7 +14,7 @@ class RoleRelationTest extends TestCase
 
     public function test_roles_table_has_the_expected_columns(): void
     {
-        $this->assertTrue(Schema::hasColumns('roles', ['id', 'nombre']));
+        $this->assertTrue(Schema::hasColumns('roles', ['id', 'name']));
         $this->assertFalse(Schema::hasColumn('roles', 'created_at'));
         $this->assertFalse(Schema::hasColumn('users', 'role_id'));
         $this->assertTrue(Schema::hasColumns('role_user', ['role_id', 'user_id']));
@@ -22,12 +22,12 @@ class RoleRelationTest extends TestCase
 
     public function test_user_belongs_to_many_roles(): void
     {
-        $role = Role::factory()->create(['nombre' => 'Administrador']);
+        $role = Role::factory()->create(['name' => 'Administrador']);
         $user = User::factory()->create();
         $user->roles()->attach($role);
 
         $this->assertTrue($user->roles->contains($role));
-        $this->assertSame('Administrador', $user->fresh()->roles->first()->nombre);
+        $this->assertSame('Administrador', $user->fresh()->roles->first()->name);
     }
 
     public function test_role_has_many_users(): void
