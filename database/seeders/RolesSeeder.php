@@ -17,6 +17,7 @@ class RolesSeeder extends Seeder
             'Super Administrador',
             'Administrador Liga',
             'Árbitro',
+            'Director Técnico',
             'Jugador',
         ];
 
