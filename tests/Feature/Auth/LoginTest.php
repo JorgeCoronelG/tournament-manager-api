@@ -23,7 +23,7 @@ class LoginTest extends TestCase
             ->assertJsonPath('user.id', $user->id)
             ->assertJsonPath('user.email', $user->email)
             ->assertJsonPath('token_type', 'Bearer')
-            ->assertJsonStructure(['user' => ['id', 'name', 'email'], 'token', 'token_type']);
+            ->assertJsonStructure(['user' => ['id', 'first_name', 'last_name', 'email'], 'token', 'token_type']);
 
         $this->assertDatabaseCount('personal_access_tokens', 1);
     }

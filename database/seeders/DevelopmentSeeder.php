@@ -16,7 +16,7 @@ class DevelopmentSeeder extends Seeder
     {
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin@example.com'],
-            ['name' => 'Admin', 'surnames' => 'Demo', 'password' => 'password', 'photo_url' => 'https://via.placeholder.com/150']
+            ['first_name' => 'Admin', 'last_name' => 'Demo', 'password' => 'password', 'photo_url' => 'https://via.placeholder.com/150']
         );
         $admin->roles()->sync(Role::query()->where('name', 'Super Administrador')->pluck('id'));
 
