@@ -31,7 +31,7 @@ class UserResource extends JsonResource
     /**
      * Roles del catálogo que la app conoce; ignora cualquier otro id.
      *
-     * @return list<array{id: int, code: string, name: string}>
+     * @return array<int, array{id: int, code: string, name: string}>
      */
     private function roles(): array
     {
@@ -41,7 +41,7 @@ class UserResource extends JsonResource
 
                 return $known === null
                     ? null
-                    : ['id' => $known->value, 'code' => $known->code(), 'name' => $role->name];
+                    : ['id' => (int) $known->value, 'code' => $known->code(), 'name' => $role->name];
             })
             ->filter()
             ->values()
