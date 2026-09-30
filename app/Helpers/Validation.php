@@ -32,8 +32,9 @@ class Validation
             return [];
         }
 
-        $json = urldecode($queryParam);
-        $filters = json_decode($json, true);
+        // PHP ya decodificó el query string; volver a hacer urldecode() corrompe
+        // valores con "%" seguido de dos hex (p. ej. "100%41").
+        $filters = json_decode($queryParam, true);
 
         if (! is_array($filters) || ! is_array($filters[QueryParam::FILTERS_FIELD_KEY] ?? null)) {
             throw new CustomErrorException(Message::INVALID_QUERY_PARAMETER, Response::HTTP_BAD_REQUEST);

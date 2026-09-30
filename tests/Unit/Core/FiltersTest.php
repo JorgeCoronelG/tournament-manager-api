@@ -39,9 +39,11 @@ class FiltersTest extends TestCase
 
     public function test_get_filters_parses_json(): void
     {
+        // PHP ya decodifica el query string antes de llegar aquí; getFilters no debe
+        // volver a hacer urldecode() (rompería valores con "%" + 2 hex, p. ej. "100%41").
         $json = json_encode(['filters' => [['field' => 'name', 'value' => 'Ana', 'operator' => '=']]]);
 
-        $filters = Validation::getFilters(urlencode($json));
+        $filters = Validation::getFilters($json);
 
         $this->assertCount(1, $filters);
         $this->assertSame('name', $filters[0]->field);
