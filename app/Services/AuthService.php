@@ -31,6 +31,8 @@ class AuthService implements AuthServiceInterface
 
         $token = $this->authRepository->createToken($user);
 
+        $user->load('roles');
+
         return ['user' => $user, 'token' => $token];
     }
 

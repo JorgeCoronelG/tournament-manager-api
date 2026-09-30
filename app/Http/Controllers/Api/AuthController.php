@@ -39,6 +39,8 @@ class AuthController extends BaseApiController
         /** @var User $user */
         $user = $request->user();
 
+        $user->loadMissing('roles');
+
         return $this->showOne(new UserResource($user));
     }
 

@@ -20,4 +20,19 @@ enum Role: int
             self::PLAYER => 'Jugador',
         };
     }
+
+    /**
+     * Identificador estable que consume el front; no cambia aunque se
+     * renombre la etiqueta en la tabla `roles`.
+     */
+    public function code(): string
+    {
+        return match ($this) {
+            self::SUPERADMIN => 'superadmin',
+            self::LEAGUE_ADMIN => 'league_admin',
+            self::REFEREE => 'referee',
+            self::MANAGER => 'manager',
+            self::PLAYER => 'player',
+        };
+    }
 }

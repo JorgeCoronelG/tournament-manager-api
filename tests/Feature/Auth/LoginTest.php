@@ -3,6 +3,8 @@
 namespace Tests\Feature\Auth;
 
 use App\Core\Enum\Message;
+use App\Core\Enum\Role as RoleEnum;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,9 +25,28 @@ class LoginTest extends TestCase
             ->assertJsonPath('user.id', $user->id)
             ->assertJsonPath('user.email', $user->email)
             ->assertJsonPath('token_type', 'Bearer')
-            ->assertJsonStructure(['user' => ['id', 'first_name', 'last_name', 'email'], 'token', 'token_type']);
+            ->assertJsonStructure(['user' => ['id', 'first_name', 'last_name', 'email', 'roles'], 'token', 'token_type']);
 
         $this->assertDatabaseCount('personal_access_tokens', 1);
+    }
+
+    public function test_login_returns_the_roles_of_the_user(): void
+    {
+        $user = User::factory()->create(['email' => 'jorge@test.com']);
+        $role = Role::query()->forceCreate([
+            'id' => RoleEnum::SUPERADMIN->value,
+            'name' => RoleEnum::SUPERADMIN->label(),
+        ]);
+        $user->roles()->attach($role);
+
+        $this->postJson('/api/login', [
+            'email' => 'jorge@test.com',
+            'password' => 'password',
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.roles', [
+                ['id' => 1, 'code' => 'superadmin', 'name' => 'Super Administrador'],
+            ]);
     }
 
     public function test_login_fails_with_wrong_password(): void

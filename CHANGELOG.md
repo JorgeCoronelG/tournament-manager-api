@@ -9,6 +9,10 @@ Historial de este proyecto base. Al final se conserva, sin cambios, el historial
 - **Roles:** la relación `User` ↔ `Role` pasó de uno a muchos a muchos a muchos. Se eliminó `users.role_id` y se agregó la tabla pivote `role_user`. `User::role()` (un solo rol) se reemplazó por `User::roles()`; `Role::users()` ahora es `belongsToMany`. El middleware `permission` autoriza si el usuario tiene **alguno** de los roles indicados.
 - **Eliminación lógica:** `users` y `roles` usan `SoftDeletes` (columna `deleted_at`). `delete()`, `bulkDelete()` y las consultas de listado ya no eliminan la fila físicamente; queda oculta por el scope global y se puede consultar con `withTrashed()` o restaurar con `restore()`.
 
+### Novedades
+
+- **Auth:** `POST /api/login` y `GET /api/user` incluyen `roles`, una lista de `{id, code, name}` con los roles del usuario. `code` es el identificador estable (`superadmin`, `league_admin`, `referee`, `manager`, `player`, ver `App\Core\Enum\Role::code()`); `name` es la etiqueta de la tabla `roles`. Los roles fuera del catálogo del enum se omiten.
+
 ## [2.0.0] - 2026-09-18
 
 Primera versión numerada. Actualiza el proyecto de Laravel 10 a Laravel 13 e incluye cambios que **rompen compatibilidad** con proyectos creados a partir de la versión anterior.
