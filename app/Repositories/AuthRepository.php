@@ -42,4 +42,9 @@ class AuthRepository implements AuthRepositoryInterface
     {
         $user->forceFill(['password' => $password])->save();
     }
+
+    public function markEmailVerified(User $user): void
+    {
+        $user->forceFill(['email_verified_at' => now()])->save();
+    }
 }

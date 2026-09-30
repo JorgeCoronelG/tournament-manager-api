@@ -120,6 +120,21 @@ class ResetPasswordTest extends TestCase
             ->assertExactJson(['code' => 429, 'error' => Message::TOO_MANY_CODE_ATTEMPTS]);
     }
 
+    public function test_verifies_the_email_when_the_account_was_pending(): void
+    {
+        $user = User::factory()->unverified()->create();
+        $this->createCodeFor($user);
+
+        $this->postJson('/api/reset-password', [
+            'email' => $user->email,
+            'code' => '123456',
+            'password' => 'NuevaPassword123',
+            'password_confirmation' => 'NuevaPassword123',
+        ])->assertOk();
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+    }
+
     public function test_requires_code_email_and_matching_password_confirmation(): void
     {
         $this->postJson('/api/reset-password', [])

@@ -17,4 +17,6 @@ interface AuthRepositoryInterface
     public function revokeOtherTokens(User $user): void;
 
     public function updatePassword(User $user, string $password): void;
+
+    public function markEmailVerified(User $user): void;
 }

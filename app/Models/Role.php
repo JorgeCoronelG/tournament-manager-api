@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Core\Traits\AdvancedFilter;
+use App\Core\Traits\Sortable;
 use Database\Factories\RoleFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,9 +13,19 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Role extends Model
 {
     /** @use HasFactory<RoleFactory> */
-    use HasFactory, SoftDeletes;
+    use AdvancedFilter, HasFactory, SoftDeletes, Sortable;
 
     public $timestamps = false;
+
+    /**
+     * @var list<string>
+     */
+    public array $allowedFilters = ['id', 'name'];
+
+    /**
+     * @var list<string>
+     */
+    public array $allowedSorts = ['id', 'name'];
 
     /**
      * @var list<string>

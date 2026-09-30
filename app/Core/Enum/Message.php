@@ -34,6 +34,16 @@ class Message
 
     public const THROTTLE_REQUESTS_EXCEPTION = 'Muchos intentos realizados.';
 
+    public const SUPERADMIN_PROTECTED = 'No se puede gestionar una cuenta de superadministrador.';
+
+    public const CANNOT_MODIFY_SELF = 'No puede realizar esta acción sobre su propia cuenta.';
+
+    public const ACCOUNT_INACTIVE = 'La cuenta está desactivada.';
+
+    public const INVITATION_ALREADY_ACTIVE = 'La cuenta ya está activa.';
+
+    public const INVALID_ROLE = 'El rol indicado no es válido.';
+
     public static function getMessageHasNotAllowedSorts(string $class): string
     {
         return "Establezca la propiedad pública allowedSorts dentro de $class";

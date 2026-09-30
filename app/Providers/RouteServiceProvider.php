@@ -44,6 +44,14 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('activate-account', function (Request $request) {
+            return Limit::perMinute(5)->by($request->string('email').'|'.$request->ip());
+        });
+
+        RateLimiter::for('resend-invitation', function (Request $request) {
+            return Limit::perMinute(1)->by('resend-invitation:'.$request->route('id'));
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

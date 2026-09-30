@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\Services\PasswordResetServiceInterface;
 use App\Core\BaseApiController;
+use App\Http\Requests\Auth\ActivateAccountRequest;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,16 @@ class PasswordResetController extends BaseApiController
 
         return $this->successResponse(
             ['message' => 'Contraseña actualizada correctamente.'],
+            Response::HTTP_OK
+        );
+    }
+
+    public function activateAccount(ActivateAccountRequest $request): JsonResponse
+    {
+        $this->passwordResetService->activateAccount($request->toData());
+
+        return $this->successResponse(
+            ['message' => 'Cuenta activada correctamente.'],
             Response::HTTP_OK
         );
     }

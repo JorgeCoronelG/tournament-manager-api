@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Core\Traits\AdvancedFilter;
+use App\Core\Traits\Sortable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,7 +16,17 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use AdvancedFilter, HasApiTokens, HasFactory, Notifiable, SoftDeletes, Sortable;
+
+    /**
+     * @var list<string>
+     */
+    public array $allowedFilters = ['first_name', 'last_name', 'email', 'phone', 'user_code'];
+
+    /**
+     * @var list<string>
+     */
+    public array $allowedSorts = ['first_name', 'last_name', 'created_at'];
 
     /**
      * The attributes that are mass assignable.
@@ -25,8 +37,11 @@ class User extends Authenticatable
         'first_name',
         'last_name',
         'email',
+        'phone',
+        'user_code',
         'password',
         'photo_url',
+        'is_active',
     ];
 
     /**
@@ -47,6 +62,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'is_active' => 'boolean',
     ];
 
     /**

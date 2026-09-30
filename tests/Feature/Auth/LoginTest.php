@@ -7,6 +7,8 @@ use App\Core\Enum\Role as RoleEnum;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class LoginTest extends TestCase
@@ -61,6 +63,37 @@ class LoginTest extends TestCase
             ->assertExactJson(['code' => 401, 'error' => Message::CREDENTIALS_INVALID]);
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_login_fails_with_403_when_the_account_is_inactive(): void
+    {
+        User::factory()->create(['email' => 'jorge@test.com', 'is_active' => false]);
+
+        $this->postJson('/api/login', [
+            'email' => 'jorge@test.com',
+            'password' => 'password',
+        ])
+            ->assertStatus(403)
+            ->assertExactJson(['code' => 403, 'error' => Message::ACCOUNT_INACTIVE]);
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_login_fails_with_generic_error_when_the_account_is_pending(): void
+    {
+        // Un usuario recién invitado tiene una contraseña aleatoria no usable:
+        // nunca puede adivinarla, así que cae en el mismo error genérico.
+        User::factory()->unverified()->create([
+            'email' => 'jorge@test.com',
+            'password' => Hash::make(Str::random(32)),
+        ]);
+
+        $this->postJson('/api/login', [
+            'email' => 'jorge@test.com',
+            'password' => 'password',
+        ])
+            ->assertUnauthorized()
+            ->assertExactJson(['code' => 401, 'error' => Message::CREDENTIALS_INVALID]);
     }
 
     public function test_login_fails_with_unknown_email(): void

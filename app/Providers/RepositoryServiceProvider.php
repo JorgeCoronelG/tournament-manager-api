@@ -14,6 +14,8 @@ class RepositoryServiceProvider extends ServiceProvider
     protected array $repositories = [
         'AuthRepositoryInterface' => 'AuthRepository',
         'PasswordResetRepositoryInterface' => 'PasswordResetRepository',
+        'RoleRepositoryInterface' => 'RoleRepository',
+        'UserRepositoryInterface' => 'UserRepository',
     ];
 
     /**

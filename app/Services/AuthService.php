@@ -29,6 +29,10 @@ class AuthService implements AuthServiceInterface
             throw new CustomErrorException(Message::CREDENTIALS_INVALID, Response::HTTP_UNAUTHORIZED);
         }
 
+        if (! $user->is_active) {
+            throw new CustomErrorException(Message::ACCOUNT_INACTIVE, Response::HTTP_FORBIDDEN);
+        }
+
         $token = $this->authRepository->createToken($user);
 
         $user->load('roles');
