@@ -50,6 +50,24 @@ make shell                       # terminal dentro del contenedor
 make help                        # lista todos los comandos
 ```
 
+## Detener y limpiar Docker
+
+```
+make down                              # detiene y elimina los contenedores (conserva la base de datos)
+docker compose stop                    # solo detiene los contenedores, sin eliminarlos
+docker compose down -v                 # además elimina los volúmenes (BORRA la base de datos)
+docker compose down --rmi local -v     # además elimina la imagen construida del proyecto
+
+docker ps -a                           # lista todos los contenedores
+docker images                          # lista las imágenes
+docker container prune                 # elimina los contenedores detenidos
+docker image prune                     # elimina imágenes sin etiqueta (dangling)
+docker image prune -a                  # elimina todas las imágenes sin uso
+docker system prune -a --volumes       # limpieza total de Docker (afecta a todos tus proyectos)
+```
+
+Tras limpiar las imágenes, `make build` (o `make setup`) las vuelve a construir.
+
 ## Roles y permisos
 
 La tabla `roles` (`id` tinyint, `nombre`) y la tabla pivote `role_user` vienen en las migraciones. Es una relación de muchos a muchos: `User` tiene muchos `Role` (`$user->roles`) y `Role` tiene muchos `User` (`$role->users`).
