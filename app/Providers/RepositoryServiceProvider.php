@@ -13,6 +13,7 @@ class RepositoryServiceProvider extends ServiceProvider
     /** @var array<string, string> Interfaz => implementación (nombres relativos a Contracts y Repositories) */
     protected array $repositories = [
         'AuthRepositoryInterface' => 'AuthRepository',
+        'LeagueRepositoryInterface' => 'LeagueRepository',
         'PasswordResetRepositoryInterface' => 'PasswordResetRepository',
         'RoleRepositoryInterface' => 'RoleRepository',
         'UserRepositoryInterface' => 'UserRepository',

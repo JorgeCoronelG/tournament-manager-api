@@ -2,6 +2,7 @@
 
 use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
@@ -42,4 +43,10 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value])->
     Route::patch('/users/{id}/status', [UserController::class, 'updateStatus']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
     Route::post('/users/{id}/resend-invitation', [UserController::class, 'resendInvitation'])->middleware('throttle:resend-invitation');
+
+    Route::get('/leagues', [LeagueController::class, 'index']);
+    Route::post('/leagues', [LeagueController::class, 'store']);
+    Route::get('/leagues/{id}', [LeagueController::class, 'show']);
+    Route::put('/leagues/{id}', [LeagueController::class, 'update']);
+    Route::delete('/leagues/{id}', [LeagueController::class, 'destroy']);
 });

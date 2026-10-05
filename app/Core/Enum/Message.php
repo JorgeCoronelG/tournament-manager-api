@@ -44,6 +44,13 @@ class Message
 
     public const INVALID_ROLE = 'El rol indicado no es válido.';
 
+    public static function getMessageUserAdministersLeagues(int $leagues, string $action): string
+    {
+        $subject = $leagues === 1 ? 'una liga' : "{$leagues} ligas";
+
+        return "No se puede {$action} porque administra {$subject}. Reasigne primero su encargado.";
+    }
+
     public static function getMessageHasNotAllowedSorts(string $class): string
     {
         return "Establezca la propiedad pública allowedSorts dentro de $class";

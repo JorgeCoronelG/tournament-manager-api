@@ -3,11 +3,13 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Core\Enum\UserAccountStatus;
 use App\Core\Traits\AdvancedFilter;
 use App\Core\Traits\Sortable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -71,5 +73,24 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class)->withTimestamps();
+    }
+
+    /**
+     * Ligas que administra (el usuario es su encargado).
+     *
+     * @return HasMany<League, $this>
+     */
+    public function leagues(): HasMany
+    {
+        return $this->hasMany(League::class, 'admin_user_id');
+    }
+
+    public function accountStatus(): UserAccountStatus
+    {
+        if ($this->email_verified_at === null) {
+            return UserAccountStatus::PENDING;
+        }
+
+        return $this->is_active ? UserAccountStatus::ACTIVE : UserAccountStatus::INACTIVE;
     }
 }

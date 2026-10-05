@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources\Users;
 
-use App\Core\Enum\UserAccountStatus;
 use App\Core\Traits\MapsUserRoles;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -30,18 +29,9 @@ class UserResource extends JsonResource
             'photo_url' => $this->resource->photo_url,
             'is_active' => $this->resource->is_active,
             'email_verified_at' => $this->resource->email_verified_at,
-            'status' => $this->status()->value,
+            'status' => $this->resource->accountStatus()->value,
             'roles' => $this->mapRoles($this->resource->roles),
             'created_at' => $this->resource->created_at,
         ];
-    }
-
-    private function status(): UserAccountStatus
-    {
-        if ($this->resource->email_verified_at === null) {
-            return UserAccountStatus::PENDING;
-        }
-
-        return $this->resource->is_active ? UserAccountStatus::ACTIVE : UserAccountStatus::INACTIVE;
     }
 }

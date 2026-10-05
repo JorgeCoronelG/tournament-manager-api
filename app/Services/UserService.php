@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\Repositories\AuthRepositoryInterface;
+use App\Contracts\Repositories\LeagueRepositoryInterface;
 use App\Contracts\Repositories\PasswordResetRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Contracts\Services\UserServiceInterface;
@@ -37,6 +38,7 @@ class UserService extends BaseService implements UserServiceInterface
         protected UserRepositoryInterface $userRepository,
         protected PasswordResetRepositoryInterface $passwordResetRepository,
         protected AuthRepositoryInterface $authRepository,
+        protected LeagueRepositoryInterface $leagueRepository,
     ) {
         parent::__construct($userRepository);
     }
@@ -75,6 +77,11 @@ class UserService extends BaseService implements UserServiceInterface
         $user->load('roles');
 
         $this->guardNotSuperadmin($user);
+
+        if ($user->roles->contains('id', RoleEnum::LEAGUE_ADMIN->value)
+            && ! in_array(RoleEnum::LEAGUE_ADMIN->value, $data->roles, true)) {
+            $this->guardNotLeagueAdmin($user, 'quitar el rol de administrador de liga');
+        }
 
         $wasPending = $user->email_verified_at === null;
         $wasActive = $user->is_active;
@@ -146,6 +153,7 @@ class UserService extends BaseService implements UserServiceInterface
         }
 
         $this->guardNotSuperadmin($user);
+        $this->guardNotLeagueAdmin($user, 'eliminar al usuario');
 
         $this->authRepository->revokeAllTokens($user);
         $this->userRepository->delete($id);
@@ -173,6 +181,21 @@ class UserService extends BaseService implements UserServiceInterface
     {
         if ($user->roles->contains('id', RoleEnum::SUPERADMIN->value)) {
             throw new CustomErrorException(Message::SUPERADMIN_PROTECTED, Response::HTTP_FORBIDDEN);
+        }
+    }
+
+    /**
+     * @throws CustomErrorException
+     */
+    private function guardNotLeagueAdmin(User $user, string $action): void
+    {
+        $leagues = $this->leagueRepository->countByAdmin($user->id);
+
+        if ($leagues > 0) {
+            throw new CustomErrorException(
+                Message::getMessageUserAdministersLeagues($leagues, $action),
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
     }
 
