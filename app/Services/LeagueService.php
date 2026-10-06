@@ -6,8 +6,10 @@ use App\Contracts\Repositories\LeagueRepositoryInterface;
 use App\Contracts\Services\LeagueServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\Role as RoleEnum;
 use App\Data\Leagues\LeagueData;
 use App\Models\League;
+use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\LaravelData\Data;
 
@@ -47,6 +49,13 @@ class LeagueService extends BaseService implements LeagueServiceInterface
         ]);
 
         return $league->load('admin');
+    }
+
+    public function paginateAccessible(ListQuery $query, User $user, ?string $search): LengthAwarePaginator
+    {
+        $isSuperadmin = $user->roles->contains('id', RoleEnum::SUPERADMIN->value);
+
+        return $this->leagueRepository->paginateAccessible($query, $isSuperadmin ? null : $user->id, $search);
     }
 
     public function paginate(ListQuery $query, ?int $adminUserId, ?string $search): LengthAwarePaginator

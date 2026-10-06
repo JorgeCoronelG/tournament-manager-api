@@ -3,6 +3,7 @@
 use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\LeagueController;
+use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
@@ -31,6 +32,16 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/user', [AuthController::class, 'me']);
 
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:change-password');
+});
+
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','.RoleEnum::LEAGUE_ADMIN->value])->group(function (): void {
+    Route::get('/my-leagues', [MyLeagueController::class, 'index']);
+
+    // Recursos de una liga (torneos, árbitros, canchas, equipos...): siempre anidados bajo
+    // /leagues/{league}/... y filtrados por esa liga, nunca por un league_id del body.
+    Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
+        //
+    });
 });
 
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value])->group(function (): void {

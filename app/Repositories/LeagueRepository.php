@@ -42,6 +42,16 @@ class LeagueRepository extends BaseRepository implements LeagueRepositoryInterfa
             ->withQueryString();
     }
 
+    public function paginateAccessible(ListQuery $query, ?int $adminUserId, ?string $search): LengthAwarePaginator
+    {
+        return $this->entity->newQuery()
+            ->applySort($query->sort)
+            ->when($adminUserId !== null, fn (Builder $builder) => $builder->where('admin_user_id', $adminUserId))
+            ->when($search !== null, fn (Builder $builder) => $builder->where('name', 'LIKE', "%{$search}%"))
+            ->paginate($query->perPage)
+            ->withQueryString();
+    }
+
     public function countByAdmin(int $adminUserId): int
     {
         return $this->entity->newQuery()->where('admin_user_id', $adminUserId)->count();

@@ -81,6 +81,21 @@ Route::middleware(['auth:sanctum', 'permission:1,2'])->get('/reports', ...);    
 
 Los roles no vienen sembrados: se crean en un seeder o en la migración de cada proyecto.
 
+## Recursos dentro de una liga
+
+Una liga tiene un solo encargado (`leagues.admin_user_id`), pero un encargado puede tener varias. Todo lo que vive dentro de una liga (torneos, árbitros, canchas, equipos) se anida bajo `/api/leagues/{league}/...` dentro del grupo de `routes/api.php` que ya trae `auth:sanctum`, `permission:1,2` y `league.access`:
+
+```php
+Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
+    Route::get('/tournaments', [TournamentController::class, 'index']);
+});
+```
+
+- `league.access` resuelve `{league}` con route model binding (inexistente o eliminada → 404) y aplica `LeaguePolicy::access`: pasa el superadmin o el encargado de esa liga; cualquier otro, 403.
+- El controller recibe `League $league`; el servicio y el repositorio **siempre filtran por esa liga** y nunca confían en un `league_id` del body.
+- `GET /api/my-leagues` lista las ligas accesibles para el usuario (`id`, `name`) y alimenta el selector del front.
+- Las rutas `/api/leagues/{id}` del CRUD del superadmin son del grupo `permission:1` y no usan este middleware.
+
 ## Eliminación lógica
 
 `User` y `Role` usan `SoftDeletes`: `delete()` no borra la fila, solo llena `deleted_at`. Los métodos de `BaseRepository` (`delete`, `bulkDelete`, `findAll`, `findById`, etc.) ya funcionan así sin cambios adicionales. Para incluir o filtrar los eliminados: `User::withTrashed()`, `User::onlyTrashed()`, y `$user->restore()` para deshacer el borrado.
