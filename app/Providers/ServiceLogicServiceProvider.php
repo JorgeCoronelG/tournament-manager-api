@@ -18,6 +18,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'RoleServiceInterface' => 'RoleService',
         'UserServiceInterface' => 'UserService',
         'TournamentServiceInterface' => 'TournamentService',
+        'LeagueRefereeServiceInterface' => 'LeagueRefereeService',
     ];
 
     /**

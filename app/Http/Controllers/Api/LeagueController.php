@@ -77,11 +77,4 @@ class LeagueController extends BaseApiController
 
         return (int) $value;
     }
-
-    private function parseSearch(Request $request): ?string
-    {
-        $search = trim((string) $request->string('search'));
-
-        return $search === '' ? null : $search;
-    }
 }

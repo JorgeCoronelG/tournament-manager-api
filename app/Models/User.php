@@ -85,6 +85,16 @@ class User extends Authenticatable
         return $this->hasMany(League::class, 'admin_user_id');
     }
 
+    /**
+     * Vínculos de este usuario como árbitro con ligas.
+     *
+     * @return HasMany<LeagueReferee, $this>
+     */
+    public function leagueReferees(): HasMany
+    {
+        return $this->hasMany(LeagueReferee::class);
+    }
+
     public function accountStatus(): UserAccountStatus
     {
         if ($this->email_verified_at === null) {

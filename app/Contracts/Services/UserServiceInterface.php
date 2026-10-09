@@ -23,4 +23,10 @@ interface UserServiceInterface extends BaseServiceInterface
     public function deleteUser(int $id, User $actingUser): void;
 
     public function resendInvitation(int $id): User;
+
+    /**
+     * Cambia solo datos personales (no roles ni estado). Si la cuenta está pendiente y el correo
+     * cambia, invalida el código anterior y reenvía la invitación.
+     */
+    public function updateProfile(User $user, string $firstName, string $lastName, string $email, ?string $phone): User;
 }

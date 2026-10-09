@@ -76,6 +76,8 @@ class Kernel extends HttpKernel
     /**
      * Orden de ejecución: `permission` (rol) se evalúa antes de resolver {league} (así un rol
      * sin permiso recibe 403 y no 404), y `league.access` después, cuando la liga ya está resuelta.
+     * `throttle` va al final para que quien no tiene permiso ni acceso a la liga no consuma el
+     * límite de otros (p. ej. el reenvío de invitación de un árbitro ajeno).
      *
      * @var list<class-string>
      */
@@ -86,12 +88,12 @@ class Kernel extends HttpKernel
         StartSession::class,
         ShareErrorsFromSession::class,
         AuthenticatesRequests::class,
-        ThrottleRequests::class,
-        ThrottleRequestsWithRedis::class,
         AuthenticatesSessions::class,
         Permission::class,
         SubstituteBindings::class,
         LeagueAccess::class,
+        ThrottleRequests::class,
+        ThrottleRequestsWithRedis::class,
         Authorize::class,
     ];
 

@@ -52,6 +52,12 @@ class Message
 
     public const TOURNAMENT_DELETE_ONLY_PLANNING = 'Solo se puede eliminar un torneo en planeación.';
 
+    public const REFEREE_DUPLICATE_USER = 'Ya existe un usuario con este dato.';
+
+    public const REFEREE_ALREADY_IN_LEAGUE = 'El árbitro ya está activo en esta liga.';
+
+    public const REFEREE_EDIT_NOT_ALLOWED = 'Solo el propio árbitro puede cambiar sus datos: su cuenta ya está activada o pertenece a otras ligas.';
+
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {
         return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → finalizado.";

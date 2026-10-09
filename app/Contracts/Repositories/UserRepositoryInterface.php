@@ -19,6 +19,12 @@ interface UserRepositoryInterface extends BaseRepositoryInterface
     public function existsByUserCode(string $code): bool;
 
     /**
+     * Usuario no eliminado, activo (`is_active`) y con rol referee cuyo user_code coincide
+     * exactamente, sin distinguir mayúsculas.
+     */
+    public function findEligibleReferee(string $userCode): ?User;
+
+    /**
      * Nunca incluye superadmin ni eliminados.
      *
      * @return LengthAwarePaginator<int, User>

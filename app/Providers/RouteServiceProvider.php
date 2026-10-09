@@ -52,7 +52,12 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('resend-invitation', function (Request $request) {
-            return Limit::perMinute(1)->by('resend-invitation:'.$request->route('id'));
+            // `id` en /users/{id}; `user` en /leagues/{league}/referees/{user}.
+            return Limit::perMinute(1)->by('resend-invitation:'.($request->route('id') ?? $request->route('user')));
+        });
+
+        RateLimiter::for('referee-lookup', function (Request $request) {
+            return Limit::perMinute(20)->by('referee-lookup:'.($request->user()?->id ?: $request->ip()));
         });
 
         $this->routes(function () {

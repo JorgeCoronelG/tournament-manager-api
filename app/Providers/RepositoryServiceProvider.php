@@ -18,6 +18,7 @@ class RepositoryServiceProvider extends ServiceProvider
         'RoleRepositoryInterface' => 'RoleRepository',
         'UserRepositoryInterface' => 'UserRepository',
         'TournamentRepositoryInterface' => 'TournamentRepository',
+        'LeagueRefereeRepositoryInterface' => 'LeagueRefereeRepository',
     ];
 
     /**

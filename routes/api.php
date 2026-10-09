@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TournamentController;
 use App\Http\Controllers\Api\UserController;
@@ -41,6 +42,16 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
     // Recursos de una liga (torneos, árbitros, canchas, equipos...): siempre anidados bajo
     // /leagues/{league}/... y filtrados por esa liga, nunca por un league_id del body.
     Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
+        Route::get('/referees', [RefereeController::class, 'index']);
+        Route::post('/referees', [RefereeController::class, 'store']);
+        Route::get('/referees/lookup', [RefereeController::class, 'lookup'])->middleware('throttle:referee-lookup');
+        Route::post('/referees/attach', [RefereeController::class, 'attach'])->middleware('throttle:referee-lookup');
+        Route::put('/referees/{user}', [RefereeController::class, 'update'])->whereNumber('user');
+        Route::patch('/referees/{user}/status', [RefereeController::class, 'updateStatus'])->whereNumber('user');
+        Route::delete('/referees/{user}', [RefereeController::class, 'destroy'])->whereNumber('user');
+        Route::post('/referees/{user}/resend-invitation', [RefereeController::class, 'resendInvitation'])
+            ->whereNumber('user')->middleware('throttle:resend-invitation');
+
         Route::scopeBindings()->group(function (): void {
             Route::get('/tournaments', [TournamentController::class, 'index']);
             Route::post('/tournaments', [TournamentController::class, 'store']);

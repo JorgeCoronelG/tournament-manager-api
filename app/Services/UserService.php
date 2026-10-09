@@ -174,6 +174,28 @@ class UserService extends BaseService implements UserServiceInterface
         return $user;
     }
 
+    public function updateProfile(User $user, string $firstName, string $lastName, string $email, ?string $phone): User
+    {
+        $oldEmail = $user->email;
+        $reinvite = $user->email_verified_at === null && $oldEmail !== $email;
+
+        /** @var User $user */
+        $user = $this->userRepository->update($user->id, [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'email' => $email,
+            'phone' => $phone,
+        ]);
+
+        if ($reinvite) {
+            // El código es por correo: se invalida el del correo anterior antes de emitir el nuevo.
+            $this->passwordResetRepository->delete($oldEmail);
+            $this->issueActivationInvitation($user);
+        }
+
+        return $user;
+    }
+
     /**
      * @throws CustomErrorException
      */

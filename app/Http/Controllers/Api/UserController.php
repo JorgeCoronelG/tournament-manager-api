@@ -124,11 +124,4 @@ class UserController extends BaseApiController
 
         return $roleId;
     }
-
-    private function parseSearch(Request $request): ?string
-    {
-        $search = trim((string) $request->string('search'));
-
-        return $search === '' ? null : $search;
-    }
 }

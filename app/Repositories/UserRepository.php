@@ -26,6 +26,15 @@ class UserRepository extends BaseRepository implements UserRepositoryInterface
         return $this->entity->newQuery()->withTrashed()->where('user_code', $code)->exists();
     }
 
+    public function findEligibleReferee(string $userCode): ?User
+    {
+        return $this->entity->newQuery()
+            ->whereRaw('UPPER(user_code) = ?', [mb_strtoupper($userCode)])
+            ->where('is_active', true)
+            ->whereHas('roles', fn (Builder $roles) => $roles->where('roles.id', RoleEnum::REFEREE->value))
+            ->first();
+    }
+
     public function paginateManaged(ListQuery $query, ?int $roleId, ?UserAccountStatus $status, ?string $search): LengthAwarePaginator
     {
         return $this->entity->newQuery()
