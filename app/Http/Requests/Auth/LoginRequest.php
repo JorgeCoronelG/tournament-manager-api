@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Core\Enum\LoginClient;
 use App\Data\Auth\LoginData;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class LoginRequest extends FormRequest
 {
@@ -20,6 +22,7 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            'client' => ['required', Rule::enum(LoginClient::class)],
         ];
     }
 
@@ -31,6 +34,7 @@ class LoginRequest extends FormRequest
         return [
             'email' => 'correo electrónico',
             'password' => 'contraseña',
+            'client' => 'cliente',
         ];
     }
 

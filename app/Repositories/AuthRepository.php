@@ -13,9 +13,9 @@ class AuthRepository implements AuthRepositoryInterface
         return User::query()->where('email', $email)->first();
     }
 
-    public function createToken(User $user): string
+    public function createToken(User $user, string $name = 'auth_token'): string
     {
-        return $user->createToken('auth_token')->plainTextToken;
+        return $user->createToken($name)->plainTextToken;
     }
 
     public function revokeCurrentToken(User $user): void

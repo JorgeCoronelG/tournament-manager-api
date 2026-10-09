@@ -10,6 +10,19 @@ enum Role: int
     case MANAGER = 4;
     case PLAYER = 5;
 
+    /**
+     * Roles que pueden iniciar sesión en cada cliente. Con varios roles basta que uno cumpla.
+     *
+     * @return list<self>
+     */
+    public static function allowedForClient(LoginClient $client): array
+    {
+        return match ($client) {
+            LoginClient::WEB => [self::SUPERADMIN, self::LEAGUE_ADMIN],
+            LoginClient::MOBILE => [self::REFEREE, self::MANAGER, self::PLAYER],
+        };
+    }
+
     public function label(): string
     {
         return match ($this) {

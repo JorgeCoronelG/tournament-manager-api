@@ -204,7 +204,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Uso desde la terminal:
 
 ```
-curl -s -H Accept:application/json -d '{"email":"admin@example.com","password":"password"}' localhost:8000/api/login
+curl -s -H Accept:application/json -d '{"email":"admin@example.com","password":"password","client":"web"}' localhost:8000/api/login
 curl -s -H Accept:application/json -H "Authorization: Bearer <token>" \
   "localhost:8000/api/products?per_page=2&sort=-precio&q=%7B%22filters%22%3A%5B%5D%7D"
 ```

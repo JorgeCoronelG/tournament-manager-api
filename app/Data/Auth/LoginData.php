@@ -2,6 +2,7 @@
 
 namespace App\Data\Auth;
 
+use App\Core\Enum\LoginClient;
 use Spatie\LaravelData\Data;
 
 class LoginData extends Data
@@ -9,5 +10,6 @@ class LoginData extends Data
     public function __construct(
         public string $email,
         public string $password,
+        public LoginClient $client,
     ) {}
 }

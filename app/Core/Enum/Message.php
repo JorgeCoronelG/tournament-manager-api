@@ -38,6 +38,10 @@ class Message
 
     public const CANNOT_MODIFY_SELF = 'No puede realizar esta acción sobre su propia cuenta.';
 
+    public const ACCESS_ONLY_ADMINS = 'Este acceso es solo para administradores. Usa la app móvil.';
+
+    public const ACCESS_ONLY_MOBILE_USERS = 'Este acceso es solo para árbitros y jugadores. Usa el panel web.';
+
     public const ACCOUNT_INACTIVE = 'La cuenta está desactivada.';
 
     public const INVITATION_ALREADY_ACTIVE = 'La cuenta ya está activa.';

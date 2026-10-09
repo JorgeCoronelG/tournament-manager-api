@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Contracts\Repositories\AuthRepositoryInterface;
 use App\Contracts\Services\AuthServiceInterface;
 use App\Core\Enum\Message;
+use App\Core\Enum\Role as RoleEnum;
 use App\Data\Auth\ChangePasswordData;
 use App\Data\Auth\LoginData;
 use App\Exceptions\CustomErrorException;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -33,9 +35,16 @@ class AuthService implements AuthServiceInterface
             throw new CustomErrorException(Message::ACCOUNT_INACTIVE, Response::HTTP_FORBIDDEN);
         }
 
-        $token = $this->authRepository->createToken($user);
-
         $user->load('roles');
+
+        // Después de validar la contraseña, para no revelar los roles de una cuenta sin credenciales.
+        $allowed = array_map(fn (RoleEnum $role) => $role->value, RoleEnum::allowedForClient($data->client));
+
+        if ($user->roles->doesntContain(fn (Role $role) => in_array($role->id, $allowed, true))) {
+            throw new CustomErrorException($data->client->deniedMessage(), Response::HTTP_FORBIDDEN);
+        }
+
+        $token = $this->authRepository->createToken($user, $data->client->value);
 
         return ['user' => $user, 'token' => $token];
     }

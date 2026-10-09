@@ -8,6 +8,7 @@ Historial de este proyecto base. Al final se conserva, sin cambios, el historial
 
 - **Roles:** la relación `User` ↔ `Role` pasó de uno a muchos a muchos a muchos. Se eliminó `users.role_id` y se agregó la tabla pivote `role_user`. `User::role()` (un solo rol) se reemplazó por `User::roles()`; `Role::users()` ahora es `belongsToMany`. El middleware `permission` autoriza si el usuario tiene **alguno** de los roles indicados.
 - **Eliminación lógica:** `users` y `roles` usan `SoftDeletes` (columna `deleted_at`). `delete()`, `bulkDelete()` y las consultas de listado ya no eliminan la fila físicamente; queda oculta por el scope global y se puede consultar con `withTrashed()` o restaurar con `restore()`.
+- **Login por cliente:** `POST /api/login` exige `client` (`web` o `mobile`); faltante o distinto responde 422. Los clientes existentes deben enviarlo. `web` requiere al menos un rol `superadmin` o `league_admin`; `mobile`, al menos uno `referee`, `manager` o `player` (`Role::allowedForClient()`); con varios roles basta que uno cumpla. Se valida después de las credenciales (401) y del estado de la cuenta (403 `ACCOUNT_INACTIVE`) para no revelar los roles de una cuenta sin credenciales; si no corresponde responde 403 («Este acceso es solo para administradores. Usa la app móvil.» / «Este acceso es solo para árbitros y jugadores. Usa el panel web.») y no se crea token. El token se llama como el cliente (`web`/`mobile`) para auditoría.
 
 ### Novedades
 

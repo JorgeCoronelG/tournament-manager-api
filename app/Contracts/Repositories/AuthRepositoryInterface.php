@@ -8,7 +8,10 @@ interface AuthRepositoryInterface
 {
     public function findByEmail(string $email): ?User;
 
-    public function createToken(User $user): string;
+    /**
+     * El nombre del token guarda el cliente (web o mobile) para auditoría.
+     */
+    public function createToken(User $user, string $name = 'auth_token'): string;
 
     public function revokeCurrentToken(User $user): void;
 
