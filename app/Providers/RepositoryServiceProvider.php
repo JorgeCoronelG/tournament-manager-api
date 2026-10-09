@@ -17,6 +17,7 @@ class RepositoryServiceProvider extends ServiceProvider
         'PasswordResetRepositoryInterface' => 'PasswordResetRepository',
         'RoleRepositoryInterface' => 'RoleRepository',
         'UserRepositoryInterface' => 'UserRepository',
+        'TournamentRepositoryInterface' => 'TournamentRepository',
     ];
 
     /**

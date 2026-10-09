@@ -17,6 +17,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'PasswordResetServiceInterface' => 'PasswordResetService',
         'RoleServiceInterface' => 'RoleService',
         'UserServiceInterface' => 'UserService',
+        'TournamentServiceInterface' => 'TournamentService',
     ];
 
     /**

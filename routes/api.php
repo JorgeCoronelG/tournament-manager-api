@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\TournamentController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -40,7 +41,14 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
     // Recursos de una liga (torneos, árbitros, canchas, equipos...): siempre anidados bajo
     // /leagues/{league}/... y filtrados por esa liga, nunca por un league_id del body.
     Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
-        //
+        Route::scopeBindings()->group(function (): void {
+            Route::get('/tournaments', [TournamentController::class, 'index']);
+            Route::post('/tournaments', [TournamentController::class, 'store']);
+            Route::get('/tournaments/{tournament}', [TournamentController::class, 'show']);
+            Route::put('/tournaments/{tournament}', [TournamentController::class, 'update']);
+            Route::patch('/tournaments/{tournament}/status', [TournamentController::class, 'updateStatus']);
+            Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);
+        });
     });
 });
 

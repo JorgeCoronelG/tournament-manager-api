@@ -44,6 +44,19 @@ class Message
 
     public const INVALID_ROLE = 'El rol indicado no es válido.';
 
+    public const TOURNAMENT_NAME_TAKEN = 'El nombre ya está en uso en esta liga.';
+
+    public const TOURNAMENT_FINISHED_NOT_EDITABLE = 'Un torneo finalizado no se puede editar.';
+
+    public const TOURNAMENT_IN_PROGRESS_ONLY_NAME = 'Un torneo en curso solo permite cambiar el nombre.';
+
+    public const TOURNAMENT_DELETE_ONLY_PLANNING = 'Solo se puede eliminar un torneo en planeación.';
+
+    public static function getMessageInvalidTournamentTransition(string $from, string $to): string
+    {
+        return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → finalizado.";
+    }
+
     public static function getMessageUserAdministersLeagues(int $leagues, string $action): string
     {
         $subject = $leagues === 1 ? 'una liga' : "{$leagues} ligas";

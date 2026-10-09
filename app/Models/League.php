@@ -8,6 +8,7 @@ use Database\Factories\LeagueFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class League extends Model
@@ -39,5 +40,13 @@ class League extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_user_id');
+    }
+
+    /**
+     * @return HasMany<Tournament, $this>
+     */
+    public function tournaments(): HasMany
+    {
+        return $this->hasMany(Tournament::class);
     }
 }

@@ -16,4 +16,16 @@ enum TournamentStatus: string
             self::FINISHED => 'Finalizado',
         };
     }
+
+    /**
+     * Único estado al que se puede avanzar desde este (null si es el último).
+     */
+    public function next(): ?self
+    {
+        return match ($this) {
+            self::PLANNING => self::IN_PROGRESS,
+            self::IN_PROGRESS => self::FINISHED,
+            self::FINISHED => null,
+        };
+    }
 }
