@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Core\Enum\LoginClient;
+use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\UserAccountStatus;
 use App\Core\Traits\AdvancedFilter;
 use App\Core\Traits\Sortable;
@@ -93,6 +95,16 @@ class User extends Authenticatable
     public function leagueReferees(): HasMany
     {
         return $this->hasMany(LeagueReferee::class);
+    }
+
+    /**
+     * Si alguno de sus roles puede iniciar sesión en el cliente (ver Role::allowedForClient()).
+     */
+    public function hasRoleForClient(LoginClient $client): bool
+    {
+        $allowed = array_map(fn (RoleEnum $role) => $role->value, RoleEnum::allowedForClient($client));
+
+        return $this->roles->contains(fn (Role $role) => in_array($role->id, $allowed, true));
     }
 
     public function accountStatus(): UserAccountStatus

@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Contracts\Repositories\AuthRepositoryInterface;
 use App\Contracts\Repositories\PasswordResetRepositoryInterface;
 use App\Contracts\Services\PasswordResetServiceInterface;
+use App\Core\Enum\LoginClient;
 use App\Core\Enum\Message;
 use App\Data\Auth\ActivateAccountData;
 use App\Data\Auth\ForgotPasswordData;
 use App\Data\Auth\ResetPasswordData;
 use App\Exceptions\CustomErrorException;
+use App\Models\User;
 use App\Notifications\PasswordResetCodeNotification;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -26,13 +28,15 @@ class PasswordResetService implements PasswordResetServiceInterface
     ) {}
 
     /**
-     * No revela si el correo existe: si no hay usuario, simplemente no hace nada.
+     * Solo para el panel web: usuario activo, con cuenta ya activada y con rol de administrador.
+     * No revela nada: si no cumple, simplemente no hace nada (sin código ni correo), igual que
+     * cuando el correo no existe. Los pendientes usan la invitación.
      */
     public function forgotPassword(ForgotPasswordData $data): void
     {
         $user = $this->authRepository->findByEmail($data->email);
 
-        if ($user === null) {
+        if ($user === null || ! $this->canResetPassword($user)) {
             return;
         }
 
@@ -56,16 +60,14 @@ class PasswordResetService implements PasswordResetServiceInterface
 
         $user = $this->authRepository->findByEmail($data->email);
 
-        if ($user === null) {
+        // El usuario pudo perder el rol o ser desactivado después de pedir el código.
+        if ($user === null || ! $this->canResetPassword($user)) {
+            $this->passwordResetRepository->delete($data->email);
+
             throw new CustomErrorException(Message::CODE_INVALID_OR_EXPIRED, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $this->authRepository->updatePassword($user, $data->password);
-
-        if ($user->email_verified_at === null) {
-            $this->authRepository->markEmailVerified($user);
-        }
-
         $this->authRepository->revokeAllTokens($user);
         $this->passwordResetRepository->delete($data->email);
     }
@@ -91,6 +93,15 @@ class PasswordResetService implements PasswordResetServiceInterface
         $this->authRepository->markEmailVerified($user);
         $this->authRepository->revokeAllTokens($user);
         $this->passwordResetRepository->delete($data->email);
+    }
+
+    private function canResetPassword(User $user): bool
+    {
+        $user->loadMissing('roles');
+
+        return $user->is_active
+            && $user->email_verified_at !== null
+            && $user->hasRoleForClient(LoginClient::WEB);
     }
 
     /**
