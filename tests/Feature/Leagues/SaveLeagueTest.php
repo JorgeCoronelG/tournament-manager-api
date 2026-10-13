@@ -83,6 +83,17 @@ class SaveLeagueTest extends TestCase
             ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
     }
 
+    public function test_same_name_is_allowed_for_a_different_admin(): void
+    {
+        $first = $this->createLeagueAdmin();
+        $second = $this->createLeagueAdmin();
+        League::factory()->create(['admin_user_id' => $first->id, 'name' => 'Test 1']);
+
+        $this->store(['name' => 'Test 1', 'admin_user_id' => $second->id])->assertCreated();
+        $this->store(['name' => 'Test 1', 'admin_user_id' => $first->id])
+            ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
+    }
+
     public function test_name_of_a_deleted_league_can_be_reused(): void
     {
         $admin = $this->createLeagueAdmin();

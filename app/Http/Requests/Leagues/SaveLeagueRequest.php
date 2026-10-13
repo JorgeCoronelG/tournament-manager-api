@@ -48,7 +48,8 @@ class SaveLeagueRequest extends FormRequest
     }
 
     /**
-     * Único entre ligas no eliminadas, sin distinguir mayúsculas ni espacios en los extremos.
+     * Único entre las ligas no eliminadas del mismo encargado, sin distinguir
+     * mayúsculas ni espacios en los extremos. Encargados distintos pueden repetir nombre.
      */
     private function uniqueName(): Closure
     {
@@ -57,7 +58,14 @@ class SaveLeagueRequest extends FormRequest
                 return;
             }
 
+            $adminId = $this->input('admin_user_id');
+
+            if ($adminId === null || $adminId === '') {
+                return;
+            }
+
             $exists = League::query()
+                ->where('admin_user_id', $adminId)
                 ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($value))])
                 ->when($this->route('id') !== null, fn ($query) => $query->where('id', '!=', $this->route('id')))
                 ->exists();
