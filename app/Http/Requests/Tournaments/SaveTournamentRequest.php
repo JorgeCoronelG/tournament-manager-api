@@ -59,7 +59,9 @@ class SaveTournamentRequest extends FormRequest
     }
 
     /**
-     * Único dentro de la liga entre torneos no eliminados ni finalizados, sin distinguir mayúsculas ni espacios en los extremos.
+     * Único dentro de la liga y del género entre torneos no eliminados ni finalizados, sin
+     * distinguir mayúsculas ni espacios en los extremos. Un mismo nombre puede existir en
+     * varonil y femenil.
      */
     private function uniqueNameInLeague(): Closure
     {
@@ -68,12 +70,15 @@ class SaveTournamentRequest extends FormRequest
             $current = $this->route('tournament');
             $ignoreId = $current instanceof Tournament ? $current->id : null;
 
-            if (! is_string($value) || ! $league instanceof League) {
+            $gender = TournamentGender::tryFrom((string) $this->input('gender'));
+
+            if (! is_string($value) || ! $league instanceof League || $gender === null) {
                 return;
             }
 
             $exists = Tournament::query()
                 ->where('league_id', $league->id)
+                ->where('gender', $gender)
                 ->where('status', '!=', TournamentStatus::FINISHED)
                 ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($value))])
                 ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))

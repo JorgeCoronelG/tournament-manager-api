@@ -44,7 +44,7 @@ class SaveTournamentTest extends TestCase
     public function test_name_must_be_unique_within_the_league_ignoring_case_and_spaces(): void
     {
         [$league, $header] = $this->leagueWithAdminHeader();
-        Tournament::factory()->create(['league_id' => $league->id, 'name' => 'Copa Apertura']);
+        Tournament::factory()->create(['league_id' => $league->id, 'name' => 'Copa Apertura', 'gender' => 'male']);
         $url = "/api/leagues/{$league->id}/tournaments";
 
         $this->postJson($url, $this->payload(['name' => '  copa APERTURA ']), $header)
@@ -58,10 +58,21 @@ class SaveTournamentTest extends TestCase
         $this->postJson($url, $this->payload(), $header)->assertCreated();
     }
 
+    public function test_same_name_is_allowed_for_a_different_gender(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        Tournament::factory()->create(['league_id' => $league->id, 'name' => 'Copa Apertura', 'gender' => 'female']);
+        $url = "/api/leagues/{$league->id}/tournaments";
+
+        $this->postJson($url, $this->payload(['gender' => 'male']), $header)->assertCreated();
+        $this->postJson($url, $this->payload(['gender' => 'female']), $header)
+            ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
+    }
+
     public function test_name_of_a_finished_tournament_can_be_reused(): void
     {
         [$league, $header] = $this->leagueWithAdminHeader();
-        Tournament::factory()->status(TournamentStatus::FINISHED)->create(['league_id' => $league->id, 'name' => 'Copa Apertura']);
+        Tournament::factory()->status(TournamentStatus::FINISHED)->create(['league_id' => $league->id, 'name' => 'Copa Apertura', 'gender' => 'male']);
         $url = "/api/leagues/{$league->id}/tournaments";
 
         $this->postJson($url, $this->payload(), $header)->assertCreated();
