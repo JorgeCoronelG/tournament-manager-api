@@ -145,15 +145,25 @@ class SaveLeagueTest extends TestCase
             ->assertOk();
     }
 
-    public function test_update_rejects_another_leagues_name_and_invalid_admin(): void
+    public function test_update_rejects_another_leagues_name_for_the_same_admin(): void
     {
         $admin = $this->createLeagueAdmin();
         League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Norte']);
         $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Sur']);
 
-        $this->putJson("/api/leagues/{$league->id}", ['name' => 'Liga Norte', 'admin_user_id' => 9999], $this->authHeader($this->token))
+        $this->putJson("/api/leagues/{$league->id}", ['name' => 'Liga Norte', 'admin_user_id' => $admin->id], $this->authHeader($this->token))
             ->assertStatus(422)
-            ->assertJsonStructure(['error' => ['name', 'admin_user_id']]);
+            ->assertJsonStructure(['error' => ['name']]);
+    }
+
+    public function test_update_rejects_invalid_admin(): void
+    {
+        $admin = $this->createLeagueAdmin();
+        $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Sur']);
+
+        $this->putJson("/api/leagues/{$league->id}", ['name' => 'Liga Sur', 'admin_user_id' => 9999], $this->authHeader($this->token))
+            ->assertStatus(422)
+            ->assertJsonStructure(['error' => ['admin_user_id']]);
     }
 
     public function test_update_404s_for_missing_or_deleted_league(): void
