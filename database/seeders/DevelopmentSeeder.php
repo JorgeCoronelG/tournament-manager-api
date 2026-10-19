@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Core\Enum\Role as RoleEnum;
+use App\Models\Field;
 use App\Models\League;
 use App\Models\LeagueReferee;
 use App\Models\Tournament;
@@ -14,6 +15,10 @@ class DevelopmentSeeder extends Seeder
     private const REFEREES = 10;
 
     private const REFEREES_PER_LEAGUE = 3;
+
+    private const MIN_FIELDS_PER_LEAGUE = 1;
+
+    private const MAX_FIELDS_PER_LEAGUE = 3;
 
     private const MANAGERS = 15;
 
@@ -96,6 +101,10 @@ class DevelopmentSeeder extends Seeder
                     'start_date' => $startDate,
                 ]);
             }
+
+            // Las canchas son de la liga, no del torneo: entre 1 y 3 por liga.
+            Field::factory(random_int(self::MIN_FIELDS_PER_LEAGUE, self::MAX_FIELDS_PER_LEAGUE))
+                ->create(['league_id' => $league->id]);
         }
     }
 

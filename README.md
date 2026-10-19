@@ -93,6 +93,7 @@ Route::middleware('league.access')->prefix('/leagues/{league}')->group(function 
 
 - `league.access` resuelve `{league}` con route model binding (inexistente o eliminada → 404) y aplica `LeaguePolicy::access`: pasa el superadmin o el encargado de esa liga; cualquier otro, 403.
 - El controller recibe `League $league`; el servicio y el repositorio **siempre filtran por esa liga** y nunca confían en un `league_id` del body.
+- Canchas (`/api/leagues/{league}/fields`): `GET` (listado con `search`, `status`, `sort=name|created_at`, por defecto `name`), `POST`, `GET|PUT|DELETE /{field}` y `PATCH /{field}/status`. Una cancha de otra liga responde 404. Detalle en el CHANGELOG.
 - `GET /api/my-leagues` lista las ligas accesibles para el usuario (`id`, `name`) y alimenta el selector del front.
 - Las rutas `/api/leagues/{id}` del CRUD del superadmin son del grupo `permission:1` y no usan este middleware.
 

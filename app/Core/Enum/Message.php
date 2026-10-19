@@ -56,6 +56,8 @@ class Message
 
     public const TOURNAMENT_DELETE_ONLY_PLANNING = 'Solo se puede eliminar un torneo en planeación.';
 
+    public const FIELD_NAME_TAKEN = 'El nombre ya está en uso en esta liga.';
+
     public const REFEREE_DUPLICATE_USER = 'Ya existe un usuario con este dato.';
 
     public const REFEREE_ALREADY_IN_LEAGUE = 'El árbitro ya está activo en esta liga.';

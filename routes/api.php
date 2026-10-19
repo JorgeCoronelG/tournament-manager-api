@@ -2,6 +2,7 @@
 
 use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
@@ -59,6 +60,13 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::put('/tournaments/{tournament}', [TournamentController::class, 'update']);
             Route::patch('/tournaments/{tournament}/status', [TournamentController::class, 'updateStatus']);
             Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);
+
+            Route::get('/fields', [FieldController::class, 'index']);
+            Route::post('/fields', [FieldController::class, 'store']);
+            Route::get('/fields/{field}', [FieldController::class, 'show']);
+            Route::put('/fields/{field}', [FieldController::class, 'update']);
+            Route::patch('/fields/{field}/status', [FieldController::class, 'updateStatus']);
+            Route::delete('/fields/{field}', [FieldController::class, 'destroy']);
         });
     });
 });
