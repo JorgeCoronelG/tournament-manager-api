@@ -28,10 +28,15 @@ class UserRepository extends BaseRepository implements UserRepositoryInterface
 
     public function findEligibleReferee(string $userCode): ?User
     {
+        return $this->findEligibleByRole($userCode, RoleEnum::REFEREE);
+    }
+
+    public function findEligibleByRole(string $userCode, RoleEnum $role): ?User
+    {
         return $this->entity->newQuery()
             ->whereRaw('UPPER(user_code) = ?', [mb_strtoupper($userCode)])
             ->where('is_active', true)
-            ->whereHas('roles', fn (Builder $roles) => $roles->where('roles.id', RoleEnum::REFEREE->value))
+            ->whereHas('roles', fn (Builder $roles) => $roles->where('roles.id', $role->value))
             ->first();
     }
 

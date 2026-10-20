@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -67,6 +68,23 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::put('/fields/{field}', [FieldController::class, 'update']);
             Route::patch('/fields/{field}/status', [FieldController::class, 'updateStatus']);
             Route::delete('/fields/{field}', [FieldController::class, 'destroy']);
+
+            Route::get('/teams', [TeamController::class, 'index']);
+            Route::post('/teams', [TeamController::class, 'store']);
+            // Antes de /teams/{team}: si no, "manager-lookup" se tomaría como el id de un equipo.
+            Route::get('/teams/managers', [TeamController::class, 'managers']);
+            Route::get('/teams/manager-lookup', [TeamController::class, 'managerLookup'])->middleware('throttle:referee-lookup');
+            Route::get('/teams/{team}', [TeamController::class, 'show']);
+            Route::put('/teams/{team}', [TeamController::class, 'update']);
+            Route::patch('/teams/{team}/status', [TeamController::class, 'updateStatus']);
+            Route::delete('/teams/{team}', [TeamController::class, 'destroy']);
+            Route::post('/teams/{team}/logo', [TeamController::class, 'uploadLogo']);
+            Route::delete('/teams/{team}/logo', [TeamController::class, 'destroyLogo']);
+            Route::put('/teams/{team}/manager', [TeamController::class, 'assignManager']);
+            Route::patch('/teams/{team}/manager', [TeamController::class, 'updateManager']);
+            Route::delete('/teams/{team}/manager', [TeamController::class, 'destroyManager']);
+            Route::post('/teams/{team}/manager/resend-invitation', [TeamController::class, 'resendManagerInvitation'])
+                ->middleware('throttle:resend-invitation');
         });
     });
 });

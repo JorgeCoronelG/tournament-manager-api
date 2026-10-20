@@ -59,6 +59,14 @@ class League extends Model
     }
 
     /**
+     * @return HasMany<Team, $this>
+     */
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
+    /**
      * @return HasMany<LeagueReferee, $this>
      */
     public function referees(): HasMany

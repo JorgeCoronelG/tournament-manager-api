@@ -4,7 +4,9 @@ FROM php:8.5-cli
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip libzip-dev libsqlite3-dev \
-    && docker-php-ext-install pdo_mysql pdo_sqlite zip bcmath pcntl \
+        libpng-dev libjpeg-dev libwebp-dev \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install pdo_mysql pdo_sqlite zip bcmath pcntl gd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer

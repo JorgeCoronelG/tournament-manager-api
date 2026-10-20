@@ -4,6 +4,7 @@ namespace App\Contracts\Repositories;
 
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
+use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\UserAccountStatus;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -23,6 +24,11 @@ interface UserRepositoryInterface extends BaseRepositoryInterface
      * exactamente, sin distinguir mayúsculas.
      */
     public function findEligibleReferee(string $userCode): ?User;
+
+    /**
+     * Igual que findEligibleReferee() pero para cualquier rol (p. ej. el delegado de un equipo).
+     */
+    public function findEligibleByRole(string $userCode, RoleEnum $role): ?User;
 
     /**
      * Nunca incluye superadmin ni eliminados.

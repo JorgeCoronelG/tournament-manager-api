@@ -88,6 +88,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Equipos de los que es delegado (puede serlo en varias ligas).
+     *
+     * @return HasMany<Team, $this>
+     */
+    public function managedTeams(): HasMany
+    {
+        return $this->hasMany(Team::class, 'manager_user_id');
+    }
+
+    /**
      * Vínculos de este usuario como árbitro con ligas.
      *
      * @return HasMany<LeagueReferee, $this>

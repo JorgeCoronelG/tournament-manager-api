@@ -24,6 +24,26 @@ class BaseApiController extends Controller
     }
 
     /**
+     * Parámetro booleano de un listado (`true`/`false`, `1`/`0`); vacío se ignora y uno inválido responde 400.
+     *
+     * @throws CustomErrorException
+     */
+    protected function parseBool(Request $request, string $key): ?bool
+    {
+        if (! $request->filled($key)) {
+            return null;
+        }
+
+        $value = filter_var($request->query($key), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        if ($value === null) {
+            throw new CustomErrorException(Message::INVALID_QUERY_PARAMETER, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $value;
+    }
+
+    /**
      * Parámetro de un listado que debe ser un valor de un enum; vacío se ignora y uno inválido responde 400.
      *
      * @template T of \BackedEnum

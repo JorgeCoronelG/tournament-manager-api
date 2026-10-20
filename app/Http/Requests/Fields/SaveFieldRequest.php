@@ -2,11 +2,11 @@
 
 namespace App\Http\Requests\Fields;
 
+use App\Core\Enum\FieldStatus;
 use App\Core\Enum\Message;
 use App\Data\Fields\FieldData;
 use App\Models\Field;
 use App\Models\League;
-use App\Core\Enum\FieldStatus;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\Repositories\AuthRepositoryInterface;
 use App\Contracts\Repositories\LeagueRepositoryInterface;
 use App\Contracts\Repositories\PasswordResetRepositoryInterface;
+use App\Contracts\Repositories\TeamRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Contracts\Services\UserServiceInterface;
 use App\Core\BaseService;
@@ -39,6 +40,7 @@ class UserService extends BaseService implements UserServiceInterface
         protected PasswordResetRepositoryInterface $passwordResetRepository,
         protected AuthRepositoryInterface $authRepository,
         protected LeagueRepositoryInterface $leagueRepository,
+        protected TeamRepositoryInterface $teamRepository,
     ) {
         parent::__construct($userRepository);
     }
@@ -81,6 +83,11 @@ class UserService extends BaseService implements UserServiceInterface
         if ($user->roles->contains('id', RoleEnum::LEAGUE_ADMIN->value)
             && ! in_array(RoleEnum::LEAGUE_ADMIN->value, $data->roles, true)) {
             $this->guardNotLeagueAdmin($user, 'quitar el rol de administrador de liga');
+        }
+
+        if ($user->roles->contains('id', RoleEnum::MANAGER->value)
+            && ! in_array(RoleEnum::MANAGER->value, $data->roles, true)) {
+            $this->guardNotTeamManager($user, 'quitar el rol de delegado');
         }
 
         $wasPending = $user->email_verified_at === null;
@@ -154,6 +161,7 @@ class UserService extends BaseService implements UserServiceInterface
 
         $this->guardNotSuperadmin($user);
         $this->guardNotLeagueAdmin($user, 'eliminar al usuario');
+        $this->guardNotTeamManager($user, 'eliminar al usuario');
 
         $this->authRepository->revokeAllTokens($user);
         $this->userRepository->delete($id);
@@ -216,6 +224,21 @@ class UserService extends BaseService implements UserServiceInterface
         if ($leagues > 0) {
             throw new CustomErrorException(
                 Message::getMessageUserAdministersLeagues($leagues, $action),
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+    }
+
+    /**
+     * @throws CustomErrorException
+     */
+    private function guardNotTeamManager(User $user, string $action): void
+    {
+        $teams = $this->teamRepository->countByManager($user->id);
+
+        if ($teams > 0) {
+            throw new CustomErrorException(
+                Message::getMessageUserManagesTeams($teams, $action),
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
         }

@@ -11,6 +11,7 @@ help: ## Muestra los comandos disponibles
 setup: build install ## Primera vez: construye, instala dependencias, crea .env y migra
 	@test -f .env || cp .env.example .env
 	$(RUN) php artisan key:generate
+	$(RUN) php artisan storage:link
 	docker compose up -d mysql
 	docker compose run --rm app php artisan migrate
 

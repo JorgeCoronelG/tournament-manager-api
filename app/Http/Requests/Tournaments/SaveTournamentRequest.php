@@ -70,7 +70,7 @@ class SaveTournamentRequest extends FormRequest
             $current = $this->route('tournament');
             $ignoreId = $current instanceof Tournament ? $current->id : null;
 
-            $gender = TournamentGender::tryFrom((string) $this->input('gender'));
+            $gender = TournamentGender::tryFrom($this->string('gender')->toString());
 
             if (! is_string($value) || ! $league instanceof League || $gender === null) {
                 return;

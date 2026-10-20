@@ -17,7 +17,9 @@ Primera vez:
 make setup
 ```
 
-Construye la imagen, instala las dependencias, crea el `.env`, genera la clave y ejecuta las migraciones.
+Construye la imagen, instala las dependencias, crea el `.env`, genera la clave, crea el enlace `public/storage` (`storage:link`, necesario para servir los logos de los equipos) y ejecuta las migraciones.
+
+Si actualizas desde una versión anterior: reconstruye la imagen (`make build`, el Dockerfile ahora instala la extensión GD con soporte WebP), corre `make install` y `make artisan cmd="storage:link"`. Revisa también que `APP_URL` del `.env` sea la URL real de la API (p. ej. `http://localhost:8000`): las URL de los logos se arman con ella.
 
 El `.env` usa `DB_HOST=mysql` (el nombre del servicio de Docker). Si ya tenías un `.env` de una versión anterior con `DB_HOST=127.0.0.1`, cámbialo: `php artisan serve` no recibe las variables de Docker y lee este archivo.
 
@@ -94,6 +96,7 @@ Route::middleware('league.access')->prefix('/leagues/{league}')->group(function 
 - `league.access` resuelve `{league}` con route model binding (inexistente o eliminada → 404) y aplica `LeaguePolicy::access`: pasa el superadmin o el encargado de esa liga; cualquier otro, 403.
 - El controller recibe `League $league`; el servicio y el repositorio **siempre filtran por esa liga** y nunca confían en un `league_id` del body.
 - Canchas (`/api/leagues/{league}/fields`): `GET` (listado con `search`, `status`, `sort=name|created_at`, por defecto `name`), `POST`, `GET|PUT|DELETE /{field}` y `PATCH /{field}/status`. Una cancha de otra liga responde 404. Detalle en el CHANGELOG.
+- Equipos (`/api/leagues/{league}/teams`): CRUD con `search` (equipo o delegado), `status`, `has_manager`, `manager_user_id` y `sort=name|created_at`; `GET /teams/managers` (delegados de la liga, para filtrar); `PATCH /{team}/status`, logo (`POST|DELETE /{team}/logo`, multipart, campo `logo`) y delegado (`GET /teams/manager-lookup?user_code=`, `PUT|PATCH|DELETE /{team}/manager`, `POST /{team}/manager/resend-invitation`). El nombre es único por liga y delegado (mismo nombre con delegados distintos se permite; 422 con `TEAM_NAME_TAKEN_BY_MANAGER` / `TEAM_NAME_TAKEN_WITHOUT_MANAGER`). Un equipo de otra liga responde 404. Detalle en el CHANGELOG.
 - `GET /api/my-leagues` lista las ligas accesibles para el usuario (`id`, `name`) y alimenta el selector del front.
 - Las rutas `/api/leagues/{id}` del CRUD del superadmin son del grupo `permission:1` y no usan este middleware.
 

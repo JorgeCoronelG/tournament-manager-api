@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\League;
+use App\Models\Team;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
@@ -52,7 +53,14 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('resend-invitation', function (Request $request) {
-            // `id` en /users/{id}; `user` en /leagues/{league}/referees/{user}.
+            // `id` en /users/{id}; `user` en /leagues/{league}/referees/{user}; `team` en
+            // /leagues/{league}/teams/{team} (con su propio prefijo: los ids no se comparten).
+            $team = $request->route('team');
+
+            if ($team !== null) {
+                return Limit::perMinute(1)->by('resend-invitation:team:'.($team instanceof Team ? $team->id : (string) $team));
+            }
+
             return Limit::perMinute(1)->by('resend-invitation:'.($request->route('id') ?? $request->route('user')));
         });
 

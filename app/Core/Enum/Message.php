@@ -64,6 +64,20 @@ class Message
 
     public const REFEREE_EDIT_NOT_ALLOWED = 'Solo el propio árbitro puede cambiar sus datos: su cuenta ya está activada o pertenece a otras ligas.';
 
+    public const TEAM_NAME_TAKEN_BY_MANAGER = 'Este delegado ya tiene un equipo con ese nombre.';
+
+    public const TEAM_NAME_TAKEN_WITHOUT_MANAGER = 'Ya existe un equipo sin delegado con ese nombre. Asigna un delegado para distinguirlos.';
+
+    public const TEAM_MANAGER_DUPLICATE_USER = 'Ya existe un usuario con este dato.';
+
+    public const TEAM_MANAGER_BOTH_FORMS = 'Indique el delegado por su clave o con sus datos, no ambos.';
+
+    public const TEAM_MANAGER_REQUIRED = 'Indique el delegado por su clave o con sus datos.';
+
+    public const TEAM_MANAGER_EDIT_NOT_ALLOWED = 'Solo el propio delegado puede cambiar sus datos: su cuenta ya está activada o es delegado de equipos de otras ligas.';
+
+    public const TEAM_HAS_NO_MANAGER = 'El equipo no tiene delegado.';
+
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {
         return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → finalizado.";
@@ -74,6 +88,13 @@ class Message
         $subject = $leagues === 1 ? 'una liga' : "{$leagues} ligas";
 
         return "No se puede {$action} porque administra {$subject}. Reasigne primero su encargado.";
+    }
+
+    public static function getMessageUserManagesTeams(int $teams, string $action): string
+    {
+        $subject = $teams === 1 ? 'un equipo' : "{$teams} equipos";
+
+        return "No se puede {$action} porque es delegado de {$subject}. Reasigne primero el delegado.";
     }
 
     public static function getMessageHasNotAllowedSorts(string $class): string
