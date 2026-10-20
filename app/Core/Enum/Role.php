@@ -29,7 +29,7 @@ enum Role: int
             self::SUPERADMIN => 'Super Administrador',
             self::LEAGUE_ADMIN => 'Administrador Liga',
             self::REFEREE => 'Árbitro',
-            self::MANAGER => 'Director Técnico',
+            self::MANAGER => 'Delegado',
             self::PLAYER => 'Jugador',
         };
     }
