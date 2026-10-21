@@ -6,6 +6,7 @@ use App\Core\Enum\Message;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Data\Tournaments\TournamentData;
+use App\Helpers\Names;
 use App\Models\League;
 use App\Models\Tournament;
 use Closure;
@@ -35,6 +36,8 @@ class SaveTournamentRequest extends FormRequest
             'gender' => ['required', Rule::enum(TournamentGender::class)],
             'min_age' => [...$ageRules, $this->notGreaterThanMaxAge()],
             'max_age' => $ageRules,
+            'max_roster_size' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'min_matches_for_playoffs' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'start_date' => ['required', 'date_format:Y-m-d'],
         ];
     }
@@ -49,6 +52,8 @@ class SaveTournamentRequest extends FormRequest
             'gender' => 'género',
             'min_age' => 'edad mínima',
             'max_age' => 'edad máxima',
+            'max_roster_size' => 'máximo de jugadores por equipo',
+            'min_matches_for_playoffs' => 'partidos mínimos para la liguilla',
             'start_date' => 'fecha de inicio',
         ];
     }
@@ -60,7 +65,7 @@ class SaveTournamentRequest extends FormRequest
 
     /**
      * Único dentro de la liga y del género entre torneos no eliminados ni finalizados, sin
-     * distinguir mayúsculas ni espacios en los extremos. Un mismo nombre puede existir en
+     * distinguir mayúsculas, acentos ni espacios extra. Un mismo nombre puede existir en
      * varonil y femenil.
      */
     private function uniqueNameInLeague(): Closure
@@ -76,13 +81,15 @@ class SaveTournamentRequest extends FormRequest
                 return;
             }
 
-            $exists = Tournament::query()
-                ->where('league_id', $league->id)
-                ->where('gender', $gender)
-                ->where('status', '!=', TournamentStatus::FINISHED)
-                ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($value))])
-                ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
-                ->exists();
+            $exists = Names::anyMatches(
+                Tournament::query()
+                    ->where('league_id', $league->id)
+                    ->where('gender', $gender)
+                    ->where('status', '!=', TournamentStatus::FINISHED)
+                    ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
+                    ->pluck('name'),
+                $value
+            );
 
             if ($exists) {
                 $fail(Message::TOURNAMENT_NAME_TAKEN);

@@ -15,6 +15,10 @@ return new class extends Migration
             $table->enum('gender', ['male', 'female', 'mixed']);
             $table->unsignedTinyInteger('min_age')->nullable();
             $table->unsignedTinyInteger('max_age')->nullable();
+            // Máximo de jugadores por equipo (cuentan active y pending); NULL = sin límite.
+            $table->unsignedSmallInteger('max_roster_size')->nullable();
+            // Partidos mínimos con asistencia en la fase regular para jugar la liguilla; NULL = no aplica.
+            $table->unsignedSmallInteger('min_matches_for_playoffs')->nullable();
             $table->date('start_date');
             $table->enum('status', ['planning', 'in_progress', 'finished'])->default('planning');
             $table->timestamps();

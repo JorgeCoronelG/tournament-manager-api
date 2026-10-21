@@ -49,7 +49,8 @@ class PlayerService extends BaseService implements PlayerServiceInterface
                 );
             }
 
-            // TODO: al existir las solicitudes de roster, cancelar aquí las pendientes incompatibles con la nueva rama.
+            // Una solicitud pending incompatible no bloquea: se cancela para que el jugador no pueda aceptarla.
+            $this->playerRepository->cancelPendingRostersNotAccepting($locked->id, $gender);
             $this->playerRepository->updateGender($locked, $gender);
             $this->playerRepository->recordGenderChange($locked, $changedBy->id, $current, $gender);
 

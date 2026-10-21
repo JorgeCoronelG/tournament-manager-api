@@ -25,6 +25,8 @@ class TournamentResource extends JsonResource
             'gender' => $this->resource->gender->value,
             'min_age' => $this->resource->min_age,
             'max_age' => $this->resource->max_age,
+            'max_roster_size' => $this->resource->max_roster_size,
+            'min_matches_for_playoffs' => $this->resource->min_matches_for_playoffs,
             'start_date' => $this->resource->start_date->format('Y-m-d'),
             'status' => $this->resource->status->value,
             'created_at' => $this->resource->created_at,

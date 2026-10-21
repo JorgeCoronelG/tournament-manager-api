@@ -50,6 +50,10 @@ class SaveTournamentTest extends TestCase
         $this->postJson($url, $this->payload(['name' => '  copa APERTURA ']), $header)
             ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
 
+        Tournament::factory()->create(['league_id' => $league->id, 'name' => 'Copa Clausura Sánchez', 'gender' => 'male']);
+        $this->postJson($url, $this->payload(['name' => 'copa clausura  SANCHEZ']), $header)
+            ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
+
         // Permitido en otra liga y cuando el repetido está eliminado.
         $otherLeague = League::factory()->create(['admin_user_id' => $league->admin_user_id]);
         $this->postJson("/api/leagues/{$otherLeague->id}/tournaments", $this->payload(), $header)

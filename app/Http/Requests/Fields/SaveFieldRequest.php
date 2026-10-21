@@ -5,6 +5,7 @@ namespace App\Http\Requests\Fields;
 use App\Core\Enum\FieldStatus;
 use App\Core\Enum\Message;
 use App\Data\Fields\FieldData;
+use App\Helpers\Names;
 use App\Models\Field;
 use App\Models\League;
 use Closure;
@@ -66,7 +67,7 @@ class SaveFieldRequest extends FormRequest
 
     /**
      * Único en la liga entre canchas no eliminadas (el scope de SoftDeletes ya excluye las
-     * eliminadas), sin distinguir mayúsculas ni espacios en los extremos.
+     * eliminadas), sin distinguir mayúsculas, acentos ni espacios extra.
      */
     private function uniqueNameInLeague(): Closure
     {
@@ -79,11 +80,13 @@ class SaveFieldRequest extends FormRequest
                 return;
             }
 
-            $exists = Field::query()
-                ->where('league_id', $league->id)
-                ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($value))])
-                ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
-                ->exists();
+            $exists = Names::anyMatches(
+                Field::query()
+                    ->where('league_id', $league->id)
+                    ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
+                    ->pluck('name'),
+                $value
+            );
 
             if ($exists) {
                 $fail(Message::FIELD_NAME_TAKEN);

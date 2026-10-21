@@ -4,6 +4,7 @@ namespace App\Http\Requests\Leagues;
 
 use App\Core\Enum\Role as RoleEnum;
 use App\Data\Leagues\LeagueData;
+use App\Helpers\Names;
 use App\Models\League;
 use App\Models\User;
 use Closure;
@@ -49,7 +50,7 @@ class SaveLeagueRequest extends FormRequest
 
     /**
      * Único entre las ligas no eliminadas del mismo encargado, sin distinguir
-     * mayúsculas ni espacios en los extremos. Encargados distintos pueden repetir nombre.
+     * mayúsculas, acentos ni espacios extra. Encargados distintos pueden repetir nombre.
      */
     private function uniqueName(): Closure
     {
@@ -64,11 +65,13 @@ class SaveLeagueRequest extends FormRequest
                 return;
             }
 
-            $exists = League::query()
-                ->where('admin_user_id', $adminId)
-                ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($value))])
-                ->when($this->route('id') !== null, fn ($query) => $query->where('id', '!=', $this->route('id')))
-                ->exists();
+            $exists = Names::anyMatches(
+                League::query()
+                    ->where('admin_user_id', $adminId)
+                    ->when($this->route('id') !== null, fn ($query) => $query->where('id', '!=', $this->route('id')))
+                    ->pluck('name'),
+                $value
+            );
 
             if ($exists) {
                 $fail('El :attribute ya está en uso.');

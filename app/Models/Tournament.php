@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Tournament extends Model
 {
@@ -44,6 +45,8 @@ class Tournament extends Model
         'gender',
         'min_age',
         'max_age',
+        'max_roster_size',
+        'min_matches_for_playoffs',
         'start_date',
     ];
 
@@ -70,5 +73,16 @@ class Tournament extends Model
     public function registrations(): HasMany
     {
         return $this->hasMany(Registration::class);
+    }
+
+    /**
+     * Si el torneo ya entró a la liguilla (tiene llaves eliminatorias). Desde entonces las plantillas se cierran.
+     */
+    public function playoffsStarted(): bool
+    {
+        return DB::table('brackets')
+            ->join('tournament_groups', 'tournament_groups.id', '=', 'brackets.group_id')
+            ->where('tournament_groups.tournament_id', $this->id)
+            ->exists();
     }
 }

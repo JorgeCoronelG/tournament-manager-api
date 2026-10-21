@@ -30,6 +30,11 @@ interface PlayerRepositoryInterface extends BaseRepositoryInterface
      */
     public function openTournamentsWithActiveRoster(int $playerId): Collection;
 
+    /**
+     * Pasa a cancelled las solicitudes pending del jugador en torneos que no aceptan la rama indicada.
+     */
+    public function cancelPendingRostersNotAccepting(int $playerId, PlayerGender $gender): int;
+
     public function updateGender(Player $player, PlayerGender $gender): Player;
 
     public function recordGenderChange(Player $player, int $changedByUserId, PlayerGender $old, PlayerGender $new): void;

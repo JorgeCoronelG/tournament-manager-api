@@ -81,6 +81,10 @@ class SaveLeagueTest extends TestCase
             ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
         $this->store(['name' => '  Liga Norte  ', 'admin_user_id' => $admin->id])
             ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
+
+        League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Sánchez']);
+        $this->store(['name' => 'liga  SANCHEZ', 'admin_user_id' => $admin->id])
+            ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
     }
 
     public function test_same_name_is_allowed_for_a_different_admin(): void

@@ -100,6 +100,10 @@ class SaveFieldTest extends TestCase
             ->assertJsonStructure(['error' => ['name']])
             ->assertJsonPath('error.name.0', Message::FIELD_NAME_TAKEN);
 
+        Field::factory()->create(['league_id' => $league->id, 'name' => 'Cancha Sánchez']);
+        $this->postJson("/api/leagues/{$league->id}/fields", ['name' => 'CANCHA SANCHEZ'], $header)
+            ->assertStatus(422)->assertJsonPath('error.name.0', Message::FIELD_NAME_TAKEN);
+
         $this->putJson("/api/leagues/{$league->id}/fields/{$existing->id}", ['name' => 'cancha sur'], $header)
             ->assertStatus(422)->assertJsonStructure(['error' => ['name']]);
     }

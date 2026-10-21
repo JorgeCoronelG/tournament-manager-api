@@ -6,6 +6,7 @@ use App\Core\Enum\RosterStatus;
 use App\Models\Player;
 use App\Models\Registration;
 use App\Models\Roster;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -28,6 +29,8 @@ class RosterFactory extends Factory
             'player_id' => Player::factory(),
             'jersey_number' => fake()->numberBetween(1, 99),
             'status' => RosterStatus::ACTIVE,
+            'requested_by_user_id' => User::factory(),
+            'requested_at' => now(),
         ];
     }
 

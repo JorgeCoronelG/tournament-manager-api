@@ -25,6 +25,11 @@ class TeamNameUniquenessTest extends TestCase
         $this->postJson($url, ['name' => '  deportivo   HIDALGO ', 'manager_user_code' => $manager->user_code], $header)
             ->assertStatus(422)
             ->assertJsonPath('error.name.0', Message::TEAM_NAME_TAKEN_BY_MANAGER);
+
+        Team::factory()->create(['league_id' => $league->id, 'name' => 'Águilas', 'manager_user_id' => $manager->id]);
+        $this->postJson($url, ['name' => 'aguilas', 'manager_user_code' => $manager->user_code], $header)
+            ->assertStatus(422)
+            ->assertJsonPath('error.name.0', Message::TEAM_NAME_TAKEN_BY_MANAGER);
     }
 
     public function test_same_name_with_different_managers_is_allowed(): void

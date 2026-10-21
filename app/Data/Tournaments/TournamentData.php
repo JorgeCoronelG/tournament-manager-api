@@ -13,5 +13,7 @@ class TournamentData extends Data
         public string $start_date,
         public ?int $min_age = null,
         public ?int $max_age = null,
+        public ?int $max_roster_size = null,
+        public ?int $min_matches_for_playoffs = null,
     ) {}
 }

@@ -101,8 +101,8 @@ class StoreRegistrationTest extends TestCase
     public function test_repeated_name_with_different_managers_is_rejected_ignoring_case_and_spaces(): void
     {
         [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
-        $first = Team::factory()->create(['league_id' => $league->id, 'name' => 'Tigres', 'manager_user_id' => $this->createManagerUser()->id]);
-        $second = Team::factory()->create(['league_id' => $league->id, 'name' => '  TIGRES ', 'manager_user_id' => $this->createManagerUser()->id]);
+        $first = Team::factory()->create(['league_id' => $league->id, 'name' => 'Águilas', 'manager_user_id' => $this->createManagerUser()->id]);
+        $second = Team::factory()->create(['league_id' => $league->id, 'name' => '  AGUILAS ', 'manager_user_id' => $this->createManagerUser()->id]);
         Registration::factory()->create(['team_id' => $first->id, 'tournament_id' => $tournament->id]);
 
         $this->postJson($this->registrationsUrl($league, $tournament), ['team_ids' => [$second->id]], $header)

@@ -112,6 +112,34 @@ class ChangePlayerGenderTest extends TestCase
         $this->patchJson($this->url($league, $player), ['gender' => 'female'], $header)->assertOk();
     }
 
+    public function test_incompatible_pending_requests_are_cancelled_and_compatible_ones_kept(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        $player = Player::factory()->gender(PlayerGender::MALE)->create();
+        $incompatible = $this->rosterIn($this->tournament($league, TournamentGender::MALE, TournamentStatus::PLANNING, 'Varonil'), $player, RosterStatus::PENDING);
+        $mixed = $this->rosterIn($this->tournament($league, TournamentGender::MIXED, TournamentStatus::PLANNING, 'Mixto'), $player, RosterStatus::PENDING);
+        $female = $this->rosterIn($this->tournament($league, TournamentGender::FEMALE, TournamentStatus::PLANNING, 'Femenil'), $player, RosterStatus::PENDING);
+
+        $this->patchJson($this->url($league, $player), ['gender' => 'female'], $header)->assertOk();
+
+        $this->assertSame(RosterStatus::CANCELLED, $incompatible->fresh()->status);
+        $this->assertNotNull($incompatible->fresh()->responded_at);
+        $this->assertSame(RosterStatus::PENDING, $mixed->fresh()->status);
+        $this->assertSame(RosterStatus::PENDING, $female->fresh()->status);
+    }
+
+    public function test_a_rejected_change_leaves_pending_requests_untouched(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        $player = Player::factory()->gender(PlayerGender::MALE)->create();
+        $this->rosterIn($this->tournament($league, TournamentGender::MALE, TournamentStatus::PLANNING, 'Activo'), $player);
+        $pending = $this->rosterIn($this->tournament($league, TournamentGender::MALE, TournamentStatus::PLANNING, 'Pendiente'), $player, RosterStatus::PENDING);
+
+        $this->patchJson($this->url($league, $player), ['gender' => 'female'], $header)->assertStatus(422);
+
+        $this->assertSame(RosterStatus::PENDING, $pending->fresh()->status);
+    }
+
     public function test_a_finished_tournament_does_not_block(): void
     {
         [$league, $header] = $this->leagueWithAdminHeader();

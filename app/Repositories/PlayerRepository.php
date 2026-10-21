@@ -6,6 +6,7 @@ use App\Contracts\Repositories\PlayerRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\RosterStatus;
+use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Models\Player;
 use App\Models\PlayerGenderChange;
@@ -50,6 +51,17 @@ class PlayerRepository extends BaseRepository implements PlayerRepositoryInterfa
                 ->select('tournament_id'))
             ->orderBy('name')
             ->get();
+    }
+
+    public function cancelPendingRostersNotAccepting(int $playerId, PlayerGender $gender): int
+    {
+        return Roster::query()
+            ->where('player_id', $playerId)
+            ->where('status', RosterStatus::PENDING)
+            ->whereIn('tournament_id', Tournament::query()
+                ->whereNotIn('gender', [$gender->value, TournamentGender::MIXED->value])
+                ->select('id'))
+            ->update(['status' => RosterStatus::CANCELLED, 'responded_at' => now()]);
     }
 
     public function updateGender(Player $player, PlayerGender $gender): Player

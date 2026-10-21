@@ -25,6 +25,10 @@ class Roster extends Model
      */
     protected $casts = [
         'status' => RosterStatus::class,
+        'requested_at' => 'datetime',
+        'responded_at' => 'datetime',
+        'removed_at' => 'datetime',
+        'rejoin_authorized_at' => 'datetime',
     ];
 
     /**

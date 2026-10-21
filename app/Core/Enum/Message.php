@@ -105,6 +105,34 @@ class Message
         return "No se puede cambiar la rama porque el jugador está inscrito en: {$tournaments}. Primero da de baja al jugador de esos torneos.";
     }
 
+    public const TOURNAMENT_PLAYOFFS_STARTED_LOCKED = 'La liguilla ya inició: no se pueden modificar el máximo de jugadores ni los partidos mínimos.';
+
+    public const ROSTER_CLOSED = 'Las plantillas de este torneo están cerradas.';
+
+    public const ROSTER_FULL = 'El equipo ya alcanzó el máximo de jugadores del torneo.';
+
+    public const ROSTER_REQUEST_DUPLICATE = 'El jugador ya tiene una solicitud abierta con este equipo.';
+
+    public const ROSTER_JERSEY_TAKEN = 'Ese dorsal ya está en uso en el equipo.';
+
+    /** Un solo mensaje para veto, baja sin autorización o jugador ya activo en otro equipo: no revela cuál. */
+    public const ROSTER_PLAYER_UNAVAILABLE = 'No se puede enviar la solicitud a este jugador.';
+
+    public const ROSTER_NOT_PENDING = 'La solicitud ya no está pendiente.';
+
+    public const ROSTER_REMOVE_ONLY_ACTIVE = 'Solo se puede quitar a un jugador activo.';
+
+    public const ROSTER_REMOVE_TOURNAMENT_FINISHED = 'Solo se puede quitar a un jugador con el torneo en planeación o en curso.';
+
+    public const ROSTER_REMOVAL_REASON_REQUIRED = 'El motivo es obligatorio.';
+
+    public const ROSTER_REJOIN_ONLY_REMOVED = 'Solo se puede autorizar a un jugador que fue quitado.';
+
+    public static function getMessageMaxRosterBelowCurrent(int $max, string $team, int $players): string
+    {
+        return "No se puede fijar el máximo en {$max}: el equipo «{$team}» ya tiene {$players} jugadores (activos y pendientes).";
+    }
+
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {
         return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → finalizado.";

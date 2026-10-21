@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\Repositories\RegistrationRepositoryInterface;
+use App\Contracts\Repositories\RosterRepositoryInterface;
 use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Contracts\Services\TournamentServiceInterface;
 use App\Core\BaseService;
@@ -28,6 +29,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
     public function __construct(
         protected TournamentRepositoryInterface $tournamentRepository,
         protected RegistrationRepositoryInterface $registrationRepository,
+        protected RosterRepositoryInterface $rosterRepository,
     ) {
         parent::__construct($tournamentRepository);
     }
@@ -58,8 +60,21 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
                     throw new CustomErrorException(Message::TOURNAMENT_IN_PROGRESS_ONLY_NAME, Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
 
-                return $this->tournamentRepository->updateModel($tournament, ['name' => $data->name]);
+                // Los campos de plantilla se editan mientras la liguilla no haya iniciado.
+                if ($this->changesRosterFields($tournament, $data) && $tournament->playoffsStarted()) {
+                    throw new CustomErrorException(Message::TOURNAMENT_PLAYOFFS_STARTED_LOCKED, Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+
+                $this->assertRosterSizeFits($tournament, $data);
+
+                return $this->tournamentRepository->updateModel($tournament, [
+                    'name' => $data->name,
+                    'max_roster_size' => $data->max_roster_size,
+                    'min_matches_for_playoffs' => $data->min_matches_for_playoffs,
+                ]);
             default:
+                $this->assertRosterSizeFits($tournament, $data);
+
                 return $this->tournamentRepository->updateModel($tournament, $data->toArray());
         }
     }
@@ -101,6 +116,31 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
     {
         return $this->registrationRepository->countActiveByTournament($tournament->id)
             - $this->registrationRepository->countBannedTeamsByTournament($tournament->id);
+    }
+
+    private function changesRosterFields(Tournament $tournament, TournamentData $data): bool
+    {
+        return $tournament->max_roster_size !== $data->max_roster_size
+            || $tournament->min_matches_for_playoffs !== $data->min_matches_for_playoffs;
+    }
+
+    /**
+     * El máximo no puede quedar por debajo de los jugadores (activos y pendientes) que ya tiene algún equipo.
+     */
+    private function assertRosterSizeFits(Tournament $tournament, TournamentData $data): void
+    {
+        if ($data->max_roster_size === null) {
+            return;
+        }
+
+        $largest = $this->rosterRepository->largestOpenRoster($tournament->id);
+
+        if ($largest !== null && $largest['players'] > $data->max_roster_size) {
+            throw new CustomErrorException(
+                Message::getMessageMaxRosterBelowCurrent($data->max_roster_size, $largest['team'], $largest['players']),
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
     }
 
     private function changesLockedFields(Tournament $tournament, TournamentData $data): bool
