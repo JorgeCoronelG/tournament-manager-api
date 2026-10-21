@@ -6,6 +6,7 @@ use App\Contracts\Repositories\TeamRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\TeamStatus;
+use App\Helpers\Names;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -91,7 +92,7 @@ class TeamRepository extends BaseRepository implements TeamRepositoryInterface
 
     public function existsWithNameAndManager(int $leagueId, string $name, ?int $managerUserId, ?int $exceptTeamId = null): bool
     {
-        $wanted = $this->normalizeName($name);
+        $wanted = Names::normalize($name);
 
         return $this->entity->newQuery()
             ->where('league_id', $leagueId)
@@ -103,12 +104,7 @@ class TeamRepository extends BaseRepository implements TeamRepositoryInterface
             ->when($exceptTeamId !== null, fn (Builder $builder) => $builder->where('id', '!=', $exceptTeamId))
             ->lockForUpdate()
             ->pluck('name')
-            ->contains(fn (string $existing) => $this->normalizeName($existing) === $wanted);
-    }
-
-    private function normalizeName(string $name): string
-    {
-        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $name)));
+            ->contains(fn (string $existing) => Names::normalize($existing) === $wanted);
     }
 
     public function updateStatus(Team $team, TeamStatus $status): Team

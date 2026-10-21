@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('team_id')->constrained('teams');
             $table->foreignId('tournament_id')->constrained('tournaments');
             $table->foreignId('group_id')->nullable()->constrained('tournament_groups');
-            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->enum('status', ['active', 'withdrawn'])->default('active');
             $table->timestamps();
             $table->softDeletes();
 

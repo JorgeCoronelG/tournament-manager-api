@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\Repositories\RegistrationRepositoryInterface;
 use App\Contracts\Repositories\TeamRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Contracts\Services\LogoProcessorInterface;
@@ -40,6 +41,7 @@ class TeamService extends BaseService implements TeamServiceInterface
 
     public function __construct(
         protected TeamRepositoryInterface $teamRepository,
+        protected RegistrationRepositoryInterface $registrationRepository,
         protected UserRepositoryInterface $userRepository,
         protected UserServiceInterface $userService,
         protected LogoProcessorInterface $logoProcessor,
@@ -107,7 +109,10 @@ class TeamService extends BaseService implements TeamServiceInterface
 
     public function deleteTeam(Team $team): void
     {
-        // TODO: cuando exista registrations, rechazar con 422 si el equipo está inscrito en un torneo en curso.
+        if ($this->registrationRepository->teamHasActiveRegistrations($team->id)) {
+            throw new CustomErrorException(Message::TEAM_HAS_ACTIVE_REGISTRATIONS, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $this->delete($team->id);
     }
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\RefereeController;
+use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
@@ -61,6 +62,13 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::put('/tournaments/{tournament}', [TournamentController::class, 'update']);
             Route::patch('/tournaments/{tournament}/status', [TournamentController::class, 'updateStatus']);
             Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);
+
+            // available-teams antes de /{registration}: si no, se tomaría como el id de una inscripción.
+            Route::get('/tournaments/{tournament}/registrations', [RegistrationController::class, 'index']);
+            Route::post('/tournaments/{tournament}/registrations', [RegistrationController::class, 'store']);
+            Route::get('/tournaments/{tournament}/registrations/available-teams', [RegistrationController::class, 'availableTeams']);
+            Route::delete('/tournaments/{tournament}/registrations/{registration}', [RegistrationController::class, 'destroy'])
+                ->whereNumber('registration');
 
             Route::get('/fields', [FieldController::class, 'index']);
             Route::post('/fields', [FieldController::class, 'store']);

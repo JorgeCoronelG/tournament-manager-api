@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\Repositories\RegistrationRepositoryInterface;
 use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Contracts\Services\TournamentServiceInterface;
 use App\Core\BaseService;
@@ -14,6 +15,7 @@ use App\Exceptions\CustomErrorException;
 use App\Models\League;
 use App\Models\Tournament;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -21,8 +23,12 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class TournamentService extends BaseService implements TournamentServiceInterface
 {
-    public function __construct(protected TournamentRepositoryInterface $tournamentRepository)
-    {
+    private const MIN_TEAMS_TO_START = 2;
+
+    public function __construct(
+        protected TournamentRepositoryInterface $tournamentRepository,
+        protected RegistrationRepositoryInterface $registrationRepository,
+    ) {
         parent::__construct($tournamentRepository);
     }
 
@@ -67,18 +73,25 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             );
         }
 
-        // TODO: al existir equipos y partidos, validar aquí las precondiciones para iniciar (p. ej. equipos aprobados).
+        // TODO: al existir partidos, validar aquí el resto de precondiciones para iniciar.
+        if ($status === TournamentStatus::IN_PROGRESS
+            && $this->registrationRepository->countActiveByTournament($tournament->id) < self::MIN_TEAMS_TO_START) {
+            throw new CustomErrorException(Message::TOURNAMENT_START_NEEDS_TEAMS, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         return $this->tournamentRepository->updateStatus($tournament, $status);
     }
 
     public function deleteTournament(Tournament $tournament): void
     {
-        // TODO: al existir inscripciones, bloquear también si el torneo tiene equipos inscritos.
         if ($tournament->status !== TournamentStatus::PLANNING) {
             throw new CustomErrorException(Message::TOURNAMENT_DELETE_ONLY_PLANNING, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $this->delete($tournament->id);
+        DB::transaction(function () use ($tournament) {
+            $this->registrationRepository->deleteByTournament($tournament->id);
+            $this->delete($tournament->id);
+        });
     }
 
     private function changesLockedFields(Tournament $tournament, TournamentData $data): bool

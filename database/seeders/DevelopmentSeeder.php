@@ -6,6 +6,8 @@ use App\Core\Enum\Role as RoleEnum;
 use App\Models\Field;
 use App\Models\League;
 use App\Models\LeagueReferee;
+use App\Models\Registration;
+use App\Models\Team;
 use App\Models\Tournament;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -24,6 +26,16 @@ class DevelopmentSeeder extends Seeder
 
     private const PLAYERS = 100;
 
+    /** Inscritos por torneo: los primeros de TEAM_NAMES; el resto queda libre para probar la inscripción. */
+    private const TEAMS_PER_TOURNAMENT = 10;
+
+    /** Equipos por liga. */
+    private const TEAM_NAMES = [
+        'Halcones', 'Tigres', 'Águilas', 'Leones', 'Toros',
+        'Lobos', 'Pumas', 'Panteras', 'Rayos', 'Cometas',
+        'Dragones', 'Cóndores', 'Jaguares', 'Titanes',
+    ];
+
     /**
      * Datos de prueba para trabajar en local. Nunca se ejecuta en producción
      * (ver DatabaseSeeder). Seguro de correr varias veces: el admin usa updateOrCreate
@@ -38,6 +50,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedReferees($leagues);
 
         $this->seedUsersWithRole(RoleEnum::MANAGER, self::MANAGERS, 'DT');
+        $this->seedTeams($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
     }
 
@@ -135,6 +148,48 @@ class DevelopmentSeeder extends Seeder
                     'league_id' => $league->id,
                     'user_id' => $referee->id,
                 ]);
+            }
+        }
+    }
+
+    /**
+     * 14 equipos por liga, con los delegados existentes repartidos en círculo; los 10 primeros se inscriben en
+     * cada torneo de la liga y los otros 4 quedan disponibles. Un delegado puede llevar equipos de varias ligas.
+     * Solo crea los equipos que faltan por nombre, así que completa una base ya sembrada.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedTeams(array $leagues): void
+    {
+        $managerIds = User::query()
+            ->whereHas('roles', fn ($q) => $q->where('roles.id', RoleEnum::MANAGER->value))
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        $next = 0;
+
+        foreach ($leagues as $league) {
+            $existing = $league->teams()->pluck('name')->all();
+
+            foreach (array_diff(self::TEAM_NAMES, $existing) as $name) {
+                Team::factory()->create([
+                    'league_id' => $league->id,
+                    'name' => $name,
+                    'manager_user_id' => $managerIds === [] ? null : $managerIds[$next++ % count($managerIds)],
+                ]);
+            }
+
+            $teams = $league->teams()->whereIn('name', array_slice(self::TEAM_NAMES, 0, self::TEAMS_PER_TOURNAMENT))->get();
+
+            foreach ($league->tournaments()->get() as $tournament) {
+                if ($tournament->registrations()->exists()) {
+                    continue;
+                }
+
+                foreach ($teams as $team) {
+                    Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
+                }
             }
         }
     }

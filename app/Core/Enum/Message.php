@@ -78,6 +78,22 @@ class Message
 
     public const TEAM_HAS_NO_MANAGER = 'El equipo no tiene delegado.';
 
+    public const TEAM_HAS_ACTIVE_REGISTRATIONS = 'El equipo está inscrito en un torneo. Quítalo del torneo primero.';
+
+    public const TOURNAMENT_START_NEEDS_TEAMS = 'El torneo necesita al menos 2 equipos inscritos para iniciar.';
+
+    public const REGISTRATION_TOURNAMENT_NOT_PLANNING = 'Solo se pueden inscribir equipos en un torneo en planeación.';
+
+    public const REGISTRATION_REMOVE_ONLY_PLANNING = 'Solo se puede quitar la inscripción de un torneo en planeación.';
+
+    public const REGISTRATION_TEAM_NOT_IN_LEAGUE = 'El equipo no pertenece a esta liga.';
+
+    public const REGISTRATION_TEAM_BANNED = 'El equipo está vetado y no puede inscribirse.';
+
+    public const REGISTRATION_TEAM_ALREADY_REGISTERED = 'El equipo ya está inscrito en este torneo.';
+
+    public const REGISTRATION_TEAM_NAME_TAKEN = 'Ya hay un equipo con ese nombre en este torneo.';
+
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {
         return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → finalizado.";

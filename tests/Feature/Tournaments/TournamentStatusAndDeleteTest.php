@@ -3,7 +3,9 @@
 namespace Tests\Feature\Tournaments;
 
 use App\Core\Enum\Message;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TournamentStatus;
+use App\Models\Registration;
 use App\Models\Tournament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,11 +18,34 @@ class TournamentStatusAndDeleteTest extends TestCase
     {
         [$league, $header] = $this->leagueWithAdminHeader();
         $tournament = Tournament::factory()->create(['league_id' => $league->id]);
+        Registration::factory()->count(2)->create(['tournament_id' => $tournament->id]);
         $url = "/api/leagues/{$league->id}/tournaments/{$tournament->id}/status";
 
         $this->patchJson($url, ['status' => 'in_progress'], $header)->assertOk()->assertJsonPath('status', 'in_progress');
         $this->patchJson($url, ['status' => 'finished'], $header)->assertOk()->assertJsonPath('status', 'finished');
         $this->assertSame(TournamentStatus::FINISHED, $tournament->fresh()->status);
+    }
+
+    public function test_cannot_start_with_fewer_than_two_active_registrations(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        $tournament = Tournament::factory()->create(['league_id' => $league->id]);
+        $url = "/api/leagues/{$league->id}/tournaments/{$tournament->id}/status";
+
+        $this->patchJson($url, ['status' => 'in_progress'], $header)
+            ->assertStatus(422)->assertJsonPath('error', Message::TOURNAMENT_START_NEEDS_TEAMS);
+
+        // Una inscripción activa no basta; una eliminada o en baja tampoco cuenta.
+        Registration::factory()->create(['tournament_id' => $tournament->id]);
+        Registration::factory()->create(['tournament_id' => $tournament->id])->delete();
+        Registration::factory()->status(RegistrationStatus::WITHDRAWN)->create(['tournament_id' => $tournament->id]);
+
+        $this->patchJson($url, ['status' => 'in_progress'], $header)->assertStatus(422);
+        $this->assertSame(TournamentStatus::PLANNING, $tournament->fresh()->status);
+
+        Registration::factory()->create(['tournament_id' => $tournament->id]);
+
+        $this->patchJson($url, ['status' => 'in_progress'], $header)->assertOk()->assertJsonPath('status', 'in_progress');
     }
 
     /**

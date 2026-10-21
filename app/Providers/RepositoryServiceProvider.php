@@ -21,6 +21,7 @@ class RepositoryServiceProvider extends ServiceProvider
         'LeagueRefereeRepositoryInterface' => 'LeagueRefereeRepository',
         'FieldRepositoryInterface' => 'FieldRepository',
         'TeamRepositoryInterface' => 'TeamRepository',
+        'RegistrationRepositoryInterface' => 'RegistrationRepository',
     ];
 
     /**
