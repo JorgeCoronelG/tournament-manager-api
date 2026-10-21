@@ -22,6 +22,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'LeagueRefereeServiceInterface' => 'LeagueRefereeService',
         'TeamServiceInterface' => 'TeamService',
         'RegistrationServiceInterface' => 'RegistrationService',
+        'PlayerServiceInterface' => 'PlayerService',
         'LogoProcessorInterface' => 'LogoImageProcessor',
     ];
 

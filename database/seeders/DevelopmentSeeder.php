@@ -2,10 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Core\Enum\PlayerGender;
 use App\Core\Enum\Role as RoleEnum;
 use App\Models\Field;
 use App\Models\League;
 use App\Models\LeagueReferee;
+use App\Models\Player;
 use App\Models\Registration;
 use App\Models\Team;
 use App\Models\Tournament;
@@ -52,6 +54,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedUsersWithRole(RoleEnum::MANAGER, self::MANAGERS, 'DT');
         $this->seedTeams($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
+        $this->seedPlayers();
     }
 
     private function seedSuperAdmin(): void
@@ -207,5 +210,24 @@ class DevelopmentSeeder extends Seeder
             ->sequence(fn ($sequence) => ['user_code' => sprintf('%s%03d', $codePrefix, $existing + $sequence->index + 1)])
             ->create()
             ->each(fn (User $user) => $user->roles()->sync([$role->value]));
+    }
+
+    /**
+     * Perfil de jugador (fecha de nacimiento, rama y QR) para cada usuario con rol jugador que aún no lo tiene;
+     * la rama se alterna para tener de ambas.
+     */
+    private function seedPlayers(): void
+    {
+        $users = User::query()
+            ->whereHas('roles', fn ($q) => $q->where('roles.id', RoleEnum::PLAYER->value))
+            ->whereDoesntHave('player')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($users as $index => $user) {
+            Player::factory()
+                ->gender($index % 2 === 0 ? PlayerGender::MALE : PlayerGender::FEMALE)
+                ->create(['user_id' => $user->id]);
+        }
     }
 }

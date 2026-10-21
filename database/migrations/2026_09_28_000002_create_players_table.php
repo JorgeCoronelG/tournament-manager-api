@@ -12,6 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->unique()->constrained('users');
             $table->date('birth_date');
+            // Rama del jugador (male = Varonil, female = Femenil); mismos valores que tournaments.gender para compararlos directo.
+            $table->enum('gender', ['male', 'female']);
             // Valor aleatorio (no el id) para que no sea predecible; se puede regenerar si se filtra.
             $table->string('qr_code', 64)->unique();
             $table->timestamps();

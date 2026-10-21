@@ -84,6 +84,10 @@ class Message
 
     public const TOURNAMENT_SCHEDULE_HAS_BANNED_TEAMS = 'Quita o reactiva a los equipos vetados antes de continuar.';
 
+    public const PLAYER_NOT_ELIGIBLE = 'Este jugador no cumple los requisitos del torneo.';
+
+    public const PLAYER_NOT_FOUND = 'No existe el registro.';
+
     public const REGISTRATION_TOURNAMENT_NOT_PLANNING = 'Solo se pueden inscribir equipos en un torneo en planeación.';
 
     public const REGISTRATION_REMOVE_ONLY_PLANNING = 'Solo se puede quitar la inscripción de un torneo en planeación.';
@@ -95,6 +99,11 @@ class Message
     public const REGISTRATION_TEAM_ALREADY_REGISTERED = 'El equipo ya está inscrito en este torneo.';
 
     public const REGISTRATION_TEAM_NAME_TAKEN = 'Ya hay un equipo con ese nombre en este torneo.';
+
+    public static function getMessagePlayerGenderLocked(string $tournaments): string
+    {
+        return "No se puede cambiar la rama porque el jugador está inscrito en: {$tournaments}. Primero da de baja al jugador de esos torneos.";
+    }
 
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {

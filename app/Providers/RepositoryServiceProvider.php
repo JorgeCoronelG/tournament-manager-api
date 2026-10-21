@@ -22,6 +22,7 @@ class RepositoryServiceProvider extends ServiceProvider
         'FieldRepositoryInterface' => 'FieldRepository',
         'TeamRepositoryInterface' => 'TeamRepository',
         'RegistrationRepositoryInterface' => 'RegistrationRepository',
+        'PlayerRepositoryInterface' => 'PlayerRepository',
     ];
 
     /**

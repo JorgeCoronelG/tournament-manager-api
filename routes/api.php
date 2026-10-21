@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
@@ -54,6 +55,9 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
         Route::delete('/referees/{user}', [RefereeController::class, 'destroy'])->whereNumber('user');
         Route::post('/referees/{user}/resend-invitation', [RefereeController::class, 'resendInvitation'])
             ->whereNumber('user')->middleware('throttle:resend-invitation');
+
+        // Fuera de scopeBindings: el jugador no es hijo de la liga; el servicio comprueba que tenga roster en ella.
+        Route::patch('/players/{player}/gender', [PlayerController::class, 'updateGender'])->whereNumber('player');
 
         Route::scopeBindings()->group(function (): void {
             Route::get('/tournaments', [TournamentController::class, 'index']);
