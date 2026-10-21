@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Core\Enum\Sport;
 use App\Core\Enum\TeamStatus;
 use App\Core\Traits\AdvancedFilter;
 use App\Core\Traits\Sortable;
@@ -34,12 +35,13 @@ class Team extends Model
      *
      * @var list<string>
      */
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'sport'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
+        'sport' => Sport::class,
         'status' => TeamStatus::class,
     ];
 

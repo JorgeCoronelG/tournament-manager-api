@@ -12,6 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('league_id')->constrained('leagues');
             $table->string('name', 150);
+            // Un solo deporte por ahora; para agregar otro se amplía el enum (ver App\Core\Enum\Sport).
+            $table->enum('sport', ['football'])->default('football');
             $table->enum('gender', ['male', 'female', 'mixed']);
             $table->unsignedTinyInteger('min_age')->nullable();
             $table->unsignedTinyInteger('max_age')->nullable();

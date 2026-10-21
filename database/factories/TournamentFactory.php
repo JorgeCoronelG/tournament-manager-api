@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Core\Enum\Sport;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Models\League;
@@ -21,6 +22,7 @@ class TournamentFactory extends Factory
         return [
             'league_id' => League::factory(),
             'name' => 'Torneo '.fake()->unique()->words(2, true),
+            'sport' => Sport::default(),
             'gender' => TournamentGender::MIXED,
             'min_age' => null,
             'max_age' => null,

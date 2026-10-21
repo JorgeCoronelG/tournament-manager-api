@@ -12,6 +12,7 @@ use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\Message;
 use App\Core\Enum\Role as RoleEnum;
+use App\Core\Enum\Sport;
 use App\Core\Enum\TeamStatus;
 use App\Data\Teams\CreateTeamData;
 use App\Data\Teams\ManagerInputData;
@@ -75,12 +76,12 @@ class TeamService extends BaseService implements TeamServiceInterface
 
             // Un delegado recién creado no tiene equipos: no puede haber conflicto.
             if ($manager === null || ! $manager['created']) {
-                $this->assertNameAvailable($league->id, $data->name, $manager === null ? null : $manager['user']->id, null, true);
+                $this->assertNameAvailable($league->id, $data->sport ?? Sport::default(), $data->name, $manager === null ? null : $manager['user']->id, null, true);
             }
 
             return $this->teamRepository->createInLeague(
                 $league->id,
-                ['name' => $data->name],
+                ['name' => $data->name, 'sport' => ($data->sport ?? Sport::default())->value],
                 $manager === null ? null : $manager['user']->id
             );
         });
@@ -93,10 +94,16 @@ class TeamService extends BaseService implements TeamServiceInterface
 
     public function updateTeam(Team $team, TeamData $data): Team
     {
-        $team = DB::transaction(function () use ($team, $data) {
-            $this->assertNameAvailable($team->league_id, $data->name, $team->manager_user_id, $team->id, true);
+        if ($data->sport !== null
+            && $data->sport !== $team->sport
+            && $this->registrationRepository->teamHasActiveRegistrations($team->id)) {
+            throw new CustomErrorException(Message::TEAM_SPORT_LOCKED, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
-            return $this->teamRepository->updateModel($team, ['name' => $data->name]);
+        $team = DB::transaction(function () use ($team, $data) {
+            $this->assertNameAvailable($team->league_id, $data->sport ?? $team->sport, $data->name, $team->manager_user_id, $team->id, true);
+
+            return $this->teamRepository->updateModel($team, ['name' => $data->name, 'sport' => ($data->sport ?? $team->sport)->value]);
         });
 
         return $team->load('manager');
@@ -131,7 +138,7 @@ class TeamService extends BaseService implements TeamServiceInterface
             $notify = $manager['notify'] ? $manager['user'] : null;
 
             if (! $manager['created']) {
-                $this->assertNameAvailable($team->league_id, $team->name, $manager['user']->id, $team->id, false);
+                $this->assertNameAvailable($team->league_id, $team->sport, $team->name, $manager['user']->id, $team->id, false);
             }
 
             return $this->teamRepository->setManager($team, $manager['user']->id);
@@ -164,7 +171,7 @@ class TeamService extends BaseService implements TeamServiceInterface
     public function removeManager(Team $team): Team
     {
         $team = DB::transaction(function () use ($team) {
-            $this->assertNameAvailable($team->league_id, $team->name, null, $team->id, false);
+            $this->assertNameAvailable($team->league_id, $team->sport, $team->name, null, $team->id, false);
 
             return $this->teamRepository->setManager($team, null);
         });
@@ -248,15 +255,15 @@ class TeamService extends BaseService implements TeamServiceInterface
     }
 
     /**
-     * El nombre es único por liga y delegado (`null`: sin delegado). Con `$asField` el error es de
+     * El nombre es único por liga, deporte y delegado (`null`: sin delegado). Con `$asField` el error es de
      * validación del campo `name`; si no (acciones sobre el delegado), un error general 422.
      *
      * @throws CustomErrorException
      * @throws ValidationException
      */
-    private function assertNameAvailable(int $leagueId, string $name, ?int $managerUserId, ?int $exceptTeamId, bool $asField): void
+    private function assertNameAvailable(int $leagueId, Sport $sport, string $name, ?int $managerUserId, ?int $exceptTeamId, bool $asField): void
     {
-        if (! $this->teamRepository->existsWithNameAndManager($leagueId, $name, $managerUserId, $exceptTeamId)) {
+        if (! $this->teamRepository->existsWithNameAndManager($leagueId, $sport, $name, $managerUserId, $exceptTeamId)) {
             return;
         }
 

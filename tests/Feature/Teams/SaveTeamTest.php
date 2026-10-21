@@ -30,7 +30,7 @@ class SaveTeamTest extends TestCase
             ->assertJsonPath('manager', null);
 
         $this->assertSame(
-            ['id', 'league_id', 'name', 'status', 'logo_url', 'manager', 'created_at', 'updated_at'],
+            ['id', 'league_id', 'name', 'sport', 'sport_label', 'status', 'logo_url', 'manager', 'created_at', 'updated_at'],
             array_keys($response->json())
         );
         $this->assertDatabaseHas('teams', ['id' => $response->json('id'), 'manager_user_id' => null, 'logo_path' => null]);

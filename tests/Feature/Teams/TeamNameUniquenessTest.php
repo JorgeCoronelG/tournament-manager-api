@@ -6,6 +6,7 @@ use App\Core\Enum\Message;
 use App\Models\League;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class TeamNameUniquenessTest extends TestCase
@@ -30,6 +31,29 @@ class TeamNameUniquenessTest extends TestCase
         $this->postJson($url, ['name' => 'aguilas', 'manager_user_code' => $manager->user_code], $header)
             ->assertStatus(422)
             ->assertJsonPath('error.name.0', Message::TEAM_NAME_TAKEN_BY_MANAGER);
+    }
+
+    public function test_same_name_and_manager_in_another_sport_is_allowed(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        $manager = $this->createManagerUser();
+
+        // Solo existe football: se inserta crudo un equipo de otro deporte, sin la restricción del enum.
+        DB::statement('PRAGMA ignore_check_constraints = ON');
+        DB::table('teams')->insert([
+            'league_id' => $league->id, 'manager_user_id' => $manager->id, 'name' => 'Tigres',
+            'sport' => 'volleyball', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('teams')->insert([
+            'league_id' => $league->id, 'manager_user_id' => null, 'name' => 'Pumas',
+            'sport' => 'volleyball', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::statement('PRAGMA ignore_check_constraints = OFF');
+        $url = "/api/leagues/{$league->id}/teams";
+
+        $this->postJson($url, ['name' => 'Tigres', 'manager_user_code' => $manager->user_code], $header)->assertCreated();
+        $this->postJson($url, ['name' => 'Pumas'], $header)->assertCreated();
+        $this->postJson($url, ['name' => 'Tigres', 'manager_user_code' => $manager->user_code], $header)->assertStatus(422);
     }
 
     public function test_same_name_with_different_managers_is_allowed(): void

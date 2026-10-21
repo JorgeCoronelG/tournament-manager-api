@@ -22,6 +22,8 @@ class TeamResource extends JsonResource
             'id' => $this->resource->id,
             'league_id' => $this->resource->league_id,
             'name' => $this->resource->name,
+            'sport' => $this->resource->sport->value,
+            'sport_label' => $this->resource->sport->label(),
             'status' => $this->resource->status->value,
             'logo_url' => $this->resource->logoUrl(),
             'manager' => $manager === null ? null : [

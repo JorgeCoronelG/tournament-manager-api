@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Contracts\Repositories\TeamRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\Sport;
 use App\Core\Enum\TeamStatus;
 use App\Helpers\Names;
 use App\Models\Team;
@@ -90,12 +91,13 @@ class TeamRepository extends BaseRepository implements TeamRepositoryInterface
         return $team;
     }
 
-    public function existsWithNameAndManager(int $leagueId, string $name, ?int $managerUserId, ?int $exceptTeamId = null): bool
+    public function existsWithNameAndManager(int $leagueId, Sport $sport, string $name, ?int $managerUserId, ?int $exceptTeamId = null): bool
     {
         $wanted = Names::normalize($name);
 
         return $this->entity->newQuery()
             ->where('league_id', $leagueId)
+            ->where('sport', $sport)
             ->when(
                 $managerUserId === null,
                 fn (Builder $builder) => $builder->whereNull('manager_user_id'),

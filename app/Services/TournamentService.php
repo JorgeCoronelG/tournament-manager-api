@@ -9,6 +9,7 @@ use App\Contracts\Services\TournamentServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\Message;
+use App\Core\Enum\Sport;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Data\Tournaments\TournamentData;
@@ -46,11 +47,16 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
 
     public function createInLeague(League $league, TournamentData $data): Tournament
     {
-        return $this->tournamentRepository->createInLeague($league->id, $data->toArray());
+        return $this->tournamentRepository->createInLeague(
+            $league->id,
+            array_merge($data->toArray(), ['sport' => ($data->sport ?? Sport::default())->value])
+        );
     }
 
     public function updateTournament(Tournament $tournament, TournamentData $data): Tournament
     {
+        $this->assertSportUnchangedWithRegistrations($tournament, $data);
+
         switch ($tournament->status) {
             case TournamentStatus::FINISHED:
                 throw new CustomErrorException(Message::TOURNAMENT_FINISHED_NOT_EDITABLE, Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -75,7 +81,10 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             default:
                 $this->assertRosterSizeFits($tournament, $data);
 
-                return $this->tournamentRepository->updateModel($tournament, $data->toArray());
+                return $this->tournamentRepository->updateModel(
+                    $tournament,
+                    array_merge($data->toArray(), ['sport' => ($data->sport ?? $tournament->sport)->value])
+                );
         }
     }
 
@@ -116,6 +125,18 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
     {
         return $this->registrationRepository->countActiveByTournament($tournament->id)
             - $this->registrationRepository->countBannedTeamsByTournament($tournament->id);
+    }
+
+    /**
+     * Sin `sport` en el body se conserva el actual. Con equipos inscritos (activos o vetados) no cambia.
+     */
+    private function assertSportUnchangedWithRegistrations(Tournament $tournament, TournamentData $data): void
+    {
+        if ($data->sport !== null
+            && $data->sport !== $tournament->sport
+            && $this->registrationRepository->countActiveByTournament($tournament->id) > 0) {
+            throw new CustomErrorException(Message::TOURNAMENT_SPORT_LOCKED, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
     }
 
     private function changesRosterFields(Tournament $tournament, TournamentData $data): bool

@@ -105,6 +105,8 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
                 $errors[$key] = Message::REGISTRATION_TEAM_NOT_IN_LEAGUE;
             } elseif ($team->status === TeamStatus::BANNED) {
                 $errors[$key] = Message::REGISTRATION_TEAM_BANNED;
+            } elseif ($team->sport !== $tournament->sport) {
+                $errors[$key] = Message::REGISTRATION_SPORT_MISMATCH;
             } elseif (in_array($teamId, $registered, true)) {
                 $errors[$key] = Message::REGISTRATION_TEAM_ALREADY_REGISTERED;
             } elseif (isset($takenNames[Names::normalize($team->name)])) {

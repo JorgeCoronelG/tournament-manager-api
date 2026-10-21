@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('league_id')->constrained('leagues');
             $table->foreignId('manager_user_id')->nullable()->constrained('users');
             $table->string('name', 150);
+            $table->enum('sport', ['football'])->default('football');
             $table->string('logo_url')->nullable();
             $table->enum('status', ['active', 'banned'])->default('active');
             $table->timestamps();

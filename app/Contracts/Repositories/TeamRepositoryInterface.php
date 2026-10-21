@@ -4,6 +4,7 @@ namespace App\Contracts\Repositories;
 
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
+use App\Core\Enum\Sport;
 use App\Core\Enum\TeamStatus;
 use App\Models\Team;
 use App\Models\User;
@@ -51,11 +52,11 @@ interface TeamRepositoryInterface extends BaseRepositoryInterface
     public function updateModel(Team $team, array $data): Team;
 
     /**
-     * Si la liga ya tiene un equipo no eliminado con ese nombre y ese delegado (`null`: sin delegado),
+     * Si la liga ya tiene un equipo no eliminado de ese deporte con ese nombre y ese delegado (`null`: sin delegado),
      * sin distinguir mayúsculas ni espacios repetidos o en los extremos. Bloquea las filas leídas para
      * que la comprobación y la escritura de una misma transacción no se crucen con otra petición.
      */
-    public function existsWithNameAndManager(int $leagueId, string $name, ?int $managerUserId, ?int $exceptTeamId = null): bool;
+    public function existsWithNameAndManager(int $leagueId, Sport $sport, string $name, ?int $managerUserId, ?int $exceptTeamId = null): bool;
 
     public function updateStatus(Team $team, TeamStatus $status): Team;
 

@@ -98,6 +98,12 @@ class Message
 
     public const REGISTRATION_TEAM_ALREADY_REGISTERED = 'El equipo ya está inscrito en este torneo.';
 
+    public const REGISTRATION_SPORT_MISMATCH = 'El equipo y el torneo deben ser del mismo deporte.';
+
+    public const TOURNAMENT_SPORT_LOCKED = 'No se puede cambiar el deporte de un torneo con equipos inscritos.';
+
+    public const TEAM_SPORT_LOCKED = 'No se puede cambiar el deporte de un equipo con inscripciones activas.';
+
     public const REGISTRATION_TEAM_NAME_TAKEN = 'Ya hay un equipo con ese nombre en este torneo.';
 
     public static function getMessagePlayerGenderLocked(string $tournaments): string

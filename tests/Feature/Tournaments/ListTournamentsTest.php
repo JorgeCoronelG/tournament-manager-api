@@ -24,7 +24,7 @@ class ListTournamentsTest extends TestCase
             ->assertJsonPath('meta.total', 3);
 
         $this->assertSame(
-            ['id', 'league_id', 'name', 'gender', 'min_age', 'max_age', 'max_roster_size', 'min_matches_for_playoffs', 'start_date', 'status', 'created_at'],
+            ['id', 'league_id', 'name', 'sport', 'sport_label', 'gender', 'min_age', 'max_age', 'max_roster_size', 'min_matches_for_playoffs', 'start_date', 'status', 'created_at'],
             array_keys($response->json('data.0'))
         );
     }

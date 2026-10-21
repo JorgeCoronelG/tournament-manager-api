@@ -22,6 +22,8 @@ class TournamentResource extends JsonResource
             'id' => $this->resource->id,
             'league_id' => $this->resource->league_id,
             'name' => $this->resource->name,
+            'sport' => $this->resource->sport->value,
+            'sport_label' => $this->resource->sport->label(),
             'gender' => $this->resource->gender->value,
             'min_age' => $this->resource->min_age,
             'max_age' => $this->resource->max_age,

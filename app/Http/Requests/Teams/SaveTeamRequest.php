@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\Teams;
 
+use App\Core\Enum\Sport;
 use App\Data\Teams\CreateTeamData;
 use App\Data\Teams\TeamData;
+use Illuminate\Validation\Rule;
 
 /**
  * Alta y edición de equipos comparten el nombre. Solo el alta (POST) acepta delegado; en la
@@ -33,6 +35,7 @@ class SaveTeamRequest extends ManagerInputRequest
     {
         $rules = [
             'name' => ['required', 'string', 'max:150'],
+            'sport' => ['sometimes', Rule::enum(Sport::class)],
         ];
 
         return $this->isMethod('POST') ? $rules + $this->managerRules() : $rules;
@@ -51,16 +54,21 @@ class SaveTeamRequest extends ManagerInputRequest
      */
     public function attributes(): array
     {
-        return ['name' => 'nombre'] + $this->managerAttributes();
+        return ['name' => 'nombre', 'sport' => 'deporte'] + $this->managerAttributes();
     }
 
     public function toData(): TeamData
     {
-        return new TeamData($this->string('name')->toString());
+        return new TeamData($this->string('name')->toString(), $this->sport());
     }
 
     public function toCreateData(): CreateTeamData
     {
-        return new CreateTeamData($this->string('name')->toString(), $this->managerInput());
+        return new CreateTeamData($this->string('name')->toString(), $this->managerInput(), $this->sport());
+    }
+
+    private function sport(): ?Sport
+    {
+        return Sport::tryFrom($this->string('sport')->toString());
     }
 }

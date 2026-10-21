@@ -22,3 +22,10 @@ parameters:
         -
             identifier: trait.unused
             path: app/Core/Traits/*
+        # Mientras Sport tenga un solo caso, comparar deportes parece siempre falso. Quitar al agregar el segundo.
+        -
+            identifier: notIdentical.alwaysFalse
+            path: app/Services/*
+        -
+            identifier: booleanAnd.alwaysFalse
+            path: app/Services/*

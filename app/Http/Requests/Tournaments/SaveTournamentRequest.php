@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Tournaments;
 
 use App\Core\Enum\Message;
+use App\Core\Enum\Sport;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Data\Tournaments\TournamentData;
@@ -33,6 +34,7 @@ class SaveTournamentRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:150', $this->uniqueNameInLeague()],
+            'sport' => ['sometimes', Rule::enum(Sport::class)],
             'gender' => ['required', Rule::enum(TournamentGender::class)],
             'min_age' => [...$ageRules, $this->notGreaterThanMaxAge()],
             'max_age' => $ageRules,
@@ -49,6 +51,7 @@ class SaveTournamentRequest extends FormRequest
     {
         return [
             'name' => 'nombre',
+            'sport' => 'deporte',
             'gender' => 'género',
             'min_age' => 'edad mínima',
             'max_age' => 'edad máxima',

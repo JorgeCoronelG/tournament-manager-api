@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Core\Enum\Sport;
 use App\Core\Enum\TeamStatus;
 use App\Models\League;
 use App\Models\Team;
@@ -21,6 +22,7 @@ class TeamFactory extends Factory
             'league_id' => League::factory(),
             'manager_user_id' => null,
             'name' => fake()->unique()->words(2, true),
+            'sport' => Sport::default(),
             'logo_path' => null,
             'status' => TeamStatus::ACTIVE,
         ];

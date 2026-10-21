@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Core\Enum\Sport;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Core\Traits\AdvancedFilter;
@@ -42,6 +43,7 @@ class Tournament extends Model
      */
     protected $fillable = [
         'name',
+        'sport',
         'gender',
         'min_age',
         'max_age',
@@ -54,6 +56,7 @@ class Tournament extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'sport' => Sport::class,
         'gender' => TournamentGender::class,
         'status' => TournamentStatus::class,
         'start_date' => 'date',
