@@ -40,6 +40,21 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
         return $this->registrationRepository->paginateAvailableTeams($tournament->league_id, $tournament->id, $query, $search);
     }
 
+    public function countsByTournament(Tournament $tournament): array
+    {
+        return [
+            'registered' => $this->registrationRepository->countActiveByTournament($tournament->id),
+            'banned' => $this->registrationRepository->countBannedTeamsByTournament($tournament->id),
+        ];
+    }
+
+    public function assertNoBannedTeams(Tournament $tournament): void
+    {
+        if ($this->registrationRepository->countBannedTeamsByTournament($tournament->id) > 0) {
+            throw new CustomErrorException(Message::TOURNAMENT_SCHEDULE_HAS_BANNED_TEAMS, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+    }
+
     public function registerTeams(Tournament $tournament, array $teamIds): Collection
     {
         return DB::transaction(function () use ($tournament, $teamIds) {

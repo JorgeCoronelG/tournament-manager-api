@@ -6,6 +6,7 @@ use App\Contracts\Repositories\RegistrationRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\RegistrationStatus;
+use App\Core\Enum\TeamStatus;
 use App\Models\Registration;
 use App\Models\Team;
 use App\Models\Tournament;
@@ -115,6 +116,15 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
         return $this->entity->newQuery()
             ->where('tournament_id', $tournamentId)
             ->where('status', RegistrationStatus::ACTIVE)
+            ->count();
+    }
+
+    public function countBannedTeamsByTournament(int $tournamentId): int
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereHas('team', fn (Builder $team) => $team->where('status', TeamStatus::BANNED))
             ->count();
     }
 

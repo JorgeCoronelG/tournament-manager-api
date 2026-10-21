@@ -75,7 +75,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
 
         // TODO: al existir partidos, validar aquí el resto de precondiciones para iniciar.
         if ($status === TournamentStatus::IN_PROGRESS
-            && $this->registrationRepository->countActiveByTournament($tournament->id) < self::MIN_TEAMS_TO_START) {
+            && $this->participatingTeams($tournament) < self::MIN_TEAMS_TO_START) {
             throw new CustomErrorException(Message::TOURNAMENT_START_NEEDS_TEAMS, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -92,6 +92,15 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             $this->registrationRepository->deleteByTournament($tournament->id);
             $this->delete($tournament->id);
         });
+    }
+
+    /**
+     * Equipos inscritos que juegan: los vetados conservan su inscripción pero no cuentan.
+     */
+    private function participatingTeams(Tournament $tournament): int
+    {
+        return $this->registrationRepository->countActiveByTournament($tournament->id)
+            - $this->registrationRepository->countBannedTeamsByTournament($tournament->id);
     }
 
     private function changesLockedFields(Tournament $tournament, TournamentData $data): bool

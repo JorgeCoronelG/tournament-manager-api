@@ -32,7 +32,12 @@ class RegistrationController extends BaseApiController
             $this->parseEnum($request, 'status', RegistrationStatus::class)
         );
 
-        return $this->showAll(RegistrationResource::collection($registrations));
+        // `summary` cuenta todo el torneo, no solo la página ni la búsqueda.
+        return $this->successResponse(
+            $this->getPaginationCollection(RegistrationResource::collection($registrations))
+            + ['summary' => $this->registrationService->countsByTournament($tournament)],
+            Response::HTTP_OK
+        );
     }
 
     public function availableTeams(Request $request, League $league, Tournament $tournament): JsonResponse

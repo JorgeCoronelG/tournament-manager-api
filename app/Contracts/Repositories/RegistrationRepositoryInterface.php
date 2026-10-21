@@ -67,9 +67,14 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
     public function register(int $tournamentId, int $teamId): Registration;
 
     /**
-     * Inscripciones activas del torneo.
+     * Inscripciones activas del torneo, sin importar el estado del equipo.
      */
     public function countActiveByTournament(int $tournamentId): int;
+
+    /**
+     * Inscripciones activas del torneo cuyo equipo está vetado: conservan su lugar pero no participan.
+     */
+    public function countBannedTeamsByTournament(int $tournamentId): int;
 
     /**
      * Si el equipo tiene alguna inscripción activa, en cualquier torneo.

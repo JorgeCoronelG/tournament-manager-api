@@ -80,7 +80,9 @@ class Message
 
     public const TEAM_HAS_ACTIVE_REGISTRATIONS = 'El equipo está inscrito en un torneo. Quítalo del torneo primero.';
 
-    public const TOURNAMENT_START_NEEDS_TEAMS = 'El torneo necesita al menos 2 equipos inscritos para iniciar.';
+    public const TOURNAMENT_START_NEEDS_TEAMS = 'El torneo necesita al menos 2 equipos inscritos y no vetados para iniciar.';
+
+    public const TOURNAMENT_SCHEDULE_HAS_BANNED_TEAMS = 'Quita o reactiva a los equipos vetados antes de continuar.';
 
     public const REGISTRATION_TOURNAMENT_NOT_PLANNING = 'Solo se pueden inscribir equipos en un torneo en planeación.';
 
