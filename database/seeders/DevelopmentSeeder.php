@@ -4,11 +4,14 @@ namespace Database\Seeders;
 
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\Role as RoleEnum;
+use App\Core\Enum\RosterStatus;
+use App\Core\Enum\TournamentStatus;
 use App\Models\Field;
 use App\Models\League;
 use App\Models\LeagueReferee;
 use App\Models\Player;
 use App\Models\Registration;
+use App\Models\Roster;
 use App\Models\Team;
 use App\Models\Tournament;
 use App\Models\User;
@@ -55,6 +58,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedTeams($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
         $this->seedPlayers();
+        $this->seedRosters($leagues);
     }
 
     private function seedSuperAdmin(): void
@@ -228,6 +232,117 @@ class DevelopmentSeeder extends Seeder
             Player::factory()
                 ->gender($index % 2 === 0 ? PlayerGender::MALE : PlayerGender::FEMALE)
                 ->create(['user_id' => $user->id]);
+        }
+    }
+
+    /**
+     * Plantillas de la primera liga para probar el panel. Torneo Apertura (máximo de 12 jugadores): el primer equipo
+     * queda en 11 de 12 con filas en todos los estados y el segundo tiene un roster corto. Torneo Clausura: un equipo
+     * con todos los estados. Torneo Relámpago, en curso: dos equipos con plantilla activa. Los jugadores no se
+     * repiten dentro de un torneo. No hace nada si ya hay rosters.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedRosters(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || Roster::query()->exists()) {
+            return;
+        }
+
+        $players = Player::query()->orderBy('id')->get();
+        $admin = $league->admin;
+
+        if ($players->isEmpty() || $admin === null) {
+            return;
+        }
+
+        $cursor = 0;
+        $rows = function (Registration $registration, array $plan) use ($players, $admin, &$cursor): void {
+            $team = $registration->team;
+            $requestedBy = $team->manager_user_id ?? $admin->id;
+            $jersey = 0;
+
+            foreach ($plan as $entry) {
+                [$status, $count] = $entry;
+
+                for ($i = 0; $i < $count; $i++) {
+                    $row = new Roster;
+                    $row->forceFill([
+                        'registration_id' => $registration->id,
+                        'tournament_id' => $registration->tournament_id,
+                        'player_id' => $players[$cursor++ % $players->count()]->id,
+                        'jersey_number' => ++$jersey,
+                        'status' => $status,
+                        'requested_by_user_id' => $requestedBy,
+                        'requested_at' => now()->subDays(10),
+                        'responded_at' => $status === RosterStatus::PENDING ? null : now()->subDays(9),
+                    ]);
+
+                    if ($status === RosterStatus::REMOVED) {
+                        $row->forceFill([
+                            'removed_by_user_id' => $admin->id,
+                            'removed_at' => now()->subDays(2),
+                            'removal_reason' => $entry[2] ?? 'Baja solicitada por el delegado',
+                            // El segundo removido de la lista ya tiene el reingreso autorizado.
+                            'rejoin_authorized_at' => ($entry[3] ?? false) ? now()->subDay() : null,
+                        ]);
+                    }
+
+                    $row->save();
+                }
+            }
+        };
+
+        $all = [
+            [RosterStatus::REJECTED, 1],
+            [RosterStatus::CANCELLED, 1],
+            [RosterStatus::REMOVED, 1, 'Doble inscripción en otro equipo'],
+            [RosterStatus::REMOVED, 1, 'Cambio de ciudad', true],
+        ];
+
+        $apertura = $league->tournaments()->where('name', 'Torneo Apertura')->first();
+
+        if ($apertura !== null) {
+            $apertura->forceFill(['max_roster_size' => 12])->save();
+            $registrations = $apertura->registrations()->with('team')->orderBy('id')->get();
+
+            if ($registrations->count() >= 2) {
+                $rows($registrations[0], [[RosterStatus::ACTIVE, 8], [RosterStatus::PENDING, 3], ...$all]);
+                $rows($registrations[1], [[RosterStatus::ACTIVE, 3], [RosterStatus::PENDING, 1]]);
+            }
+        }
+
+        $clausura = $league->tournaments()->where('name', 'Torneo Clausura')->first();
+        $clausuraRegistration = $clausura?->registrations()->with('team')->orderBy('id')->first();
+
+        if ($clausuraRegistration !== null) {
+            $rows($clausuraRegistration, [[RosterStatus::ACTIVE, 6], [RosterStatus::PENDING, 2], ...$all]);
+        }
+
+        $this->seedTournamentInProgress($league, $rows);
+    }
+
+    /**
+     * Torneo en curso con dos equipos y plantilla activa.
+     *
+     * @param  callable(Registration, list<array<int, mixed>>): void  $rows
+     */
+    private function seedTournamentInProgress(League $league, callable $rows): void
+    {
+        $tournament = Tournament::factory()->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo Relámpago',
+            'start_date' => now()->subWeek()->toDateString(),
+            'status' => TournamentStatus::IN_PROGRESS,
+        ]);
+
+        $teams = $league->teams()->orderBy('id')->skip(10)->take(2)->get();
+
+        foreach ($teams as $team) {
+            $registration = Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
+            $rows($registration->load('team'), [[RosterStatus::ACTIVE, 7]]);
         }
     }
 }

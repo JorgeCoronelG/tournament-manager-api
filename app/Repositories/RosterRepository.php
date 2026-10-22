@@ -4,11 +4,15 @@ namespace App\Repositories;
 
 use App\Contracts\Repositories\RosterRepositoryInterface;
 use App\Core\BaseRepository;
+use App\Core\Classes\ListQuery;
 use App\Core\Enum\RosterStatus;
+use App\Core\Enum\TournamentStatus;
 use App\Models\Registration;
 use App\Models\Roster;
 use App\Models\Team;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -73,6 +77,87 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
         $players = $row->getAttribute('players');
 
         return ['team' => $team === null ? '' : $team->name, 'players' => is_numeric($players) ? (int) $players : 0];
+    }
+
+    public function paginateByRegistration(int $registrationId, ListQuery $query, ?string $search, ?RosterStatus $status): LengthAwarePaginator
+    {
+        $builder = $this->entity->newQuery()
+            ->where('registration_id', $registrationId)
+            ->when($status !== null, fn (Builder $builder) => $builder->where('status', $status))
+            ->when($search !== null, function (Builder $builder) use ($search) {
+                $builder->whereHas('player', fn (Builder $player) => $player->withTrashed()->whereHas('user', function (Builder $user) use ($search) {
+                    $user->where(function (Builder $group) use ($search) {
+                        $group->where('first_name', 'LIKE', "%{$search}%")
+                            ->orWhere('last_name', 'LIKE', "%{$search}%")
+                            ->orWhere('user_code', 'LIKE', "%{$search}%")
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"]);
+                    });
+                }));
+            })
+            ->when(
+                $query->sort === null,
+                fn (Builder $builder) => $builder
+                    ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
+                    ->orderBy('jersey_number'),
+                fn (Builder $builder) => $builder->applySort($query->sort)
+            )
+            ->orderBy('id')
+            ->with(['player' => fn ($player) => $player->withTrashed()->with('user'), 'requestedBy', 'removedBy']);
+
+        return $query->paginate($builder);
+    }
+
+    public function countOpenByRegistration(int $registrationId): array
+    {
+        $count = fn (RosterStatus $status): int => $this->entity->newQuery()
+            ->where('registration_id', $registrationId)
+            ->where('status', $status)
+            ->count();
+
+        return ['active' => $count(RosterStatus::ACTIVE), 'pending' => $count(RosterStatus::PENDING)];
+    }
+
+    public function hasNewerRowOfPlayer(Roster $roster): bool
+    {
+        return $this->entity->newQuery()
+            ->where('player_id', $roster->player_id)
+            ->where('tournament_id', $roster->tournament_id)
+            ->where('id', '>', $roster->id)
+            ->exists();
+    }
+
+    public function revokeRejoin(Roster $roster): Roster
+    {
+        $roster->forceFill(['rejoin_authorized_at' => null]);
+        $roster->saveOrFail();
+
+        return $roster;
+    }
+
+    public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): int
+    {
+        $openTournaments = fn ($query) => $query->select('id')
+            ->where('league_id', $leagueId)
+            ->whereIn('status', [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS]);
+
+        $removed = $this->entity->newQuery()
+            ->where('player_id', $playerId)
+            ->where('status', RosterStatus::ACTIVE)
+            ->whereIn('tournament_id', $openTournaments(DB::table('tournaments')))
+            ->update([
+                'status' => RosterStatus::REMOVED,
+                'removed_by_user_id' => $removedByUserId,
+                'removed_at' => now(),
+                'removal_reason' => $reason,
+            ]);
+
+        $cancelled = $this->entity->newQuery()
+            ->where('player_id', $playerId)
+            ->where('status', RosterStatus::PENDING)
+            ->whereIn('tournament_id', $openTournaments(DB::table('tournaments')))
+            ->update(['status' => RosterStatus::CANCELLED, 'responded_at' => now()]);
+
+        return $removed + $cancelled;
     }
 
     public function createRequest(int $registrationId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster

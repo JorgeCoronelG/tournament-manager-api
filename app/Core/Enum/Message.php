@@ -132,6 +132,12 @@ class Message
 
     public const ROSTER_REMOVAL_REASON_REQUIRED = 'El motivo es obligatorio.';
 
+    public const ROSTER_REMOVE_PLAYOFFS_STARTED = 'La liguilla ya inició: no se puede quitar a un jugador de la plantilla.';
+
+    public const ROSTER_REJOIN_NOT_AUTHORIZED = 'Este jugador no tiene un reingreso autorizado.';
+
+    public const ROSTER_REJOIN_ALREADY_USED = 'El jugador ya tiene una solicitud nueva en este torneo: no se puede revocar el reingreso.';
+
     public const ROSTER_REJOIN_ONLY_REMOVED = 'Solo se puede autorizar a un jugador que fue quitado.';
 
     public static function getMessageMaxRosterBelowCurrent(int $max, string $team, int $players): string

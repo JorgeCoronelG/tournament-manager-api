@@ -73,6 +73,43 @@ class ListRegistrationsTest extends TestCase
         $this->getJson($this->registrationsUrl($league, $tournament).'?status=pending', $header)->assertStatus(400);
     }
 
+    public function test_sorts_by_team_name_with_a_large_page(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        foreach (['Zorros', 'Aguilas', 'Mantas'] as $name) {
+            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => Team::factory()->create(['league_id' => $league->id, 'name' => $name])->id]);
+        }
+
+        $names = fn (string $sort) => array_column($this->getJson($this->registrationsUrl($league, $tournament)."?per_page=100&sort={$sort}", $header)
+            ->assertOk()->json('data'), 'team');
+
+        $this->assertSame(['Aguilas', 'Mantas', 'Zorros'], array_column($names('name'), 'name'));
+        $this->assertSame(['Zorros', 'Mantas', 'Aguilas'], array_column($names('-name'), 'name'));
+    }
+
+    public function test_skip_paging_returns_every_registration_in_one_page(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        Registration::factory()->count(7)->create(['tournament_id' => $tournament->id]);
+        $url = $this->registrationsUrl($league, $tournament);
+
+        $this->getJson($url.'?skip_paging=true&sort=name', $header)->assertOk()
+            ->assertJsonCount(7, 'data')
+            ->assertJsonPath('meta.total', 7)
+            ->assertJsonPath('meta.currentPage', 1)
+            ->assertJsonPath('meta.lastPage', 1)
+            ->assertJsonStructure(['data', 'links', 'meta', 'summary']);
+        $this->getJson($url.'?skip_paging=false', $header)->assertOk()->assertJsonCount(5, 'data');
+        $this->getJson($url.'?skip_paging=maybe', $header)->assertStatus(400);
+    }
+
+    public function test_skip_paging_with_no_registrations_is_an_empty_page(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+
+        $this->getJson($this->registrationsUrl($league, $tournament).'?skip_paging=1', $header)->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+    }
+
     public function test_sorts_and_rejects_an_unknown_sort(): void
     {
         [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
@@ -118,7 +155,7 @@ class ListRegistrationsTest extends TestCase
     public function test_available_teams_searches_and_paginates(): void
     {
         [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
-        Team::factory()->create(['league_id' => $league->id, 'name' => 'Águilas']);
+        Team::factory()->create(['league_id' => $league->id, 'name' => 'Aguilas']);
         Team::factory()->create(['league_id' => $league->id, 'name' => 'Lobos']);
         Team::factory()->create(['league_id' => $league->id, 'name' => 'Lobeznos']);
         $url = $this->registrationsUrl($league, $tournament, '/available-teams');

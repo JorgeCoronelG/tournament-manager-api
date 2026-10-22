@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\RosterController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
 use App\Http\Controllers\Api\UserController;
@@ -73,6 +74,16 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::get('/tournaments/{tournament}/registrations/available-teams', [RegistrationController::class, 'availableTeams']);
             Route::delete('/tournaments/{tournament}/registrations/{registration}', [RegistrationController::class, 'destroy'])
                 ->whereNumber('registration');
+
+            // Roster de una inscripción: solo consulta y moderación; las solicitudes son de la app.
+            Route::get('/tournaments/{tournament}/registrations/{registration}/roster', [RosterController::class, 'index'])
+                ->whereNumber('registration');
+            Route::patch('/tournaments/{tournament}/registrations/{registration}/roster/{roster}/remove', [RosterController::class, 'remove'])
+                ->whereNumber(['registration', 'roster']);
+            Route::post('/tournaments/{tournament}/registrations/{registration}/roster/{roster}/rejoin', [RosterController::class, 'authorizeRejoin'])
+                ->whereNumber(['registration', 'roster']);
+            Route::delete('/tournaments/{tournament}/registrations/{registration}/roster/{roster}/rejoin', [RosterController::class, 'revokeRejoin'])
+                ->whereNumber(['registration', 'roster']);
 
             Route::get('/fields', [FieldController::class, 'index']);
             Route::post('/fields', [FieldController::class, 'store']);

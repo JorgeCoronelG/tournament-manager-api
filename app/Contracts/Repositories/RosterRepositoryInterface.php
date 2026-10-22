@@ -2,9 +2,12 @@
 
 namespace App\Contracts\Repositories;
 
+use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
+use App\Core\Enum\RosterStatus;
 use App\Models\Roster;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * @extends BaseRepositoryInterface<Roster>
@@ -41,6 +44,34 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
      * @return array{team: string, players: int}|null
      */
     public function largestOpenRoster(int $tournamentId): ?array;
+
+    /**
+     * Roster paginado de la inscripción con jugador y responsables cargados. `$search` busca por nombre o clave del
+     * jugador. Sin `sort`: activos, pendientes y el resto, y por dorsal.
+     *
+     * @return LengthAwarePaginator<int, Roster>
+     */
+    public function paginateByRegistration(int $registrationId, ListQuery $query, ?string $search, ?RosterStatus $status): LengthAwarePaginator;
+
+    /**
+     * Filas activas y pendientes de la inscripción.
+     *
+     * @return array{active: int, pending: int}
+     */
+    public function countOpenByRegistration(int $registrationId): array;
+
+    /**
+     * Si el jugador tiene en el torneo una fila posterior a la indicada (una solicitud nueva).
+     */
+    public function hasNewerRowOfPlayer(Roster $roster): bool;
+
+    public function revokeRejoin(Roster $roster): Roster;
+
+    /**
+     * Veto: en los torneos en planeación o en curso de la liga, las filas active del jugador pasan a removed (con
+     * quién, cuándo y el motivo) y las pending a cancelled. Devuelve cuántas filas cambió.
+     */
+    public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): int;
 
     public function createRequest(int $registrationId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster;
 

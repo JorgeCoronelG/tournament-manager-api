@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\Repositories\RosterRepositoryInterface;
 use App\Contracts\Services\RosterServiceInterface;
 use App\Core\BaseService;
+use App\Core\Classes\ListQuery;
 use App\Core\Enum\Message;
 use App\Core\Enum\RosterStatus;
 use App\Core\Enum\TournamentStatus;
@@ -101,6 +102,10 @@ class RosterService extends BaseService implements RosterServiceInterface
                 throw new CustomErrorException(Message::ROSTER_REMOVE_TOURNAMENT_FINISHED, Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
+            if ($tournament->playoffsStarted()) {
+                throw new CustomErrorException(Message::ROSTER_REMOVE_PLAYOFFS_STARTED, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             return $this->rosterRepository->remove($roster, $actor->id, $reason);
         });
     }
@@ -117,6 +122,41 @@ class RosterService extends BaseService implements RosterServiceInterface
 
             return $this->rosterRepository->authorizeRejoin($roster);
         });
+    }
+
+    public function revokeRejoin(Roster $roster, User $actor): Roster
+    {
+        return DB::transaction(function () use ($roster, $actor) {
+            $roster = $this->rosterRepository->lockById($roster->id);
+            $this->assertLeagueAdmin($this->tournamentOf($roster), $actor);
+
+            if ($roster->rejoin_authorized_at === null) {
+                throw new CustomErrorException(Message::ROSTER_REJOIN_NOT_AUTHORIZED, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $this->rosterRepository->lockByPlayerInTournament($roster->player_id, $roster->tournament_id);
+
+            if ($this->rosterRepository->hasNewerRowOfPlayer($roster)) {
+                throw new CustomErrorException(Message::ROSTER_REJOIN_ALREADY_USED, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            return $this->rosterRepository->revokeRejoin($roster);
+        });
+    }
+
+    public function listForRegistration(Registration $registration, ListQuery $query, ?string $search, ?RosterStatus $status): array
+    {
+        $tournament = Tournament::query()->findOrFail($registration->tournament_id);
+
+        return [
+            'rows' => $this->rosterRepository->paginateByRegistration($registration->id, $query, $search, $status),
+            'summary' => $this->rosterRepository->countOpenByRegistration($registration->id) + ['max_roster_size' => $tournament->max_roster_size],
+        ];
+    }
+
+    public function releaseBannedPlayer(Player $player, League $league, User $actor, string $reason): int
+    {
+        return DB::transaction(fn () => $this->rosterRepository->releasePlayerInLeague($player->id, $league->id, $actor->id, trim($reason)));
     }
 
     public function closeRosters(Tournament $tournament): int

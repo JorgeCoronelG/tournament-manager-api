@@ -9,6 +9,7 @@ use Database\Factories\RegistrationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Registration extends Model
@@ -48,6 +49,14 @@ class Registration extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class)->withTrashed();
+    }
+
+    /**
+     * @return HasMany<Roster, $this>
+     */
+    public function rosters(): HasMany
+    {
+        return $this->hasMany(Roster::class);
     }
 
     /**

@@ -26,18 +26,39 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
 
     public function paginateByTournament(int $tournamentId, ListQuery $query, ?string $search, ?RegistrationStatus $status): LengthAwarePaginator
     {
-        return $this->entity->newQuery()
+        $builder = $this->entity->newQuery()
             ->where('tournament_id', $tournamentId)
             ->filter($query->filters)
             ->when($status !== null, fn (Builder $builder) => $builder->where('status', $status))
             ->when($search !== null, function (Builder $builder) use ($search) {
                 $builder->whereHas('team', fn (Builder $team) => $this->matchTeamOrManager($team, (string) $search));
             })
-            ->applySort($query->sort)
+            ->tap(fn (Builder $builder) => $this->applySort($builder, $query->sort))
             ->orderByDesc('id')
-            ->with('team.manager')
-            ->paginate($query->perPage)
-            ->withQueryString();
+            ->with('team.manager');
+
+        return $query->paginate($builder);
+    }
+
+    /**
+     * Además de los orden propios de la inscripción acepta `name` (nombre del equipo), que no es columna de la tabla.
+     *
+     * @param  Builder<Registration>  $builder
+     */
+    private function applySort(Builder $builder, ?string $sort): void
+    {
+        foreach ($sort === null ? [] : explode(',', $sort) as $field) {
+            $direction = str_starts_with($field, '-') ? 'desc' : 'asc';
+
+            if (ltrim($field, '-') === 'name') {
+                $builder->orderBy(
+                    Team::query()->withTrashed()->select('name')->whereColumn('teams.id', 'registrations.team_id'),
+                    $direction
+                );
+            } else {
+                $builder->applySort($field);
+            }
+        }
     }
 
     public function paginateAvailableTeams(int $leagueId, int $tournamentId, ListQuery $query, ?string $search): LengthAwarePaginator

@@ -31,6 +31,7 @@ class TournamentResource extends JsonResource
             'min_matches_for_playoffs' => $this->resource->min_matches_for_playoffs,
             'start_date' => $this->resource->start_date->format('Y-m-d'),
             'status' => $this->resource->status->value,
+            'playoffs_started' => $this->resource->playoffsStarted(),
             'created_at' => $this->resource->created_at,
         ];
     }
