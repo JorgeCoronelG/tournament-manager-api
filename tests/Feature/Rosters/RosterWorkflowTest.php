@@ -166,7 +166,7 @@ class RosterWorkflowTest extends TestCase
         [$registration, $manager] = $this->registrationWithManager($tournament);
         $player = $this->player();
         $banId = DB::table('player_league_bans')->insertGetId([
-            'player_id' => $player->id, 'league_id' => $tournament->league_id, 'reason' => 'x',
+            'player_id' => $player->id, 'league_id' => $tournament->league_id, 'reason' => 'x', 'banned_by_user_id' => User::factory()->create()->id,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -182,7 +182,7 @@ class RosterWorkflowTest extends TestCase
         [$registration, $manager] = $this->registrationWithManager($this->mixedTournament());
         $player = $this->player();
         DB::table('player_league_bans')->insert([
-            'player_id' => $player->id, 'league_id' => $this->mixedTournament()->league_id, 'reason' => 'x',
+            'player_id' => $player->id, 'league_id' => $this->mixedTournament()->league_id, 'reason' => 'x', 'banned_by_user_id' => User::factory()->create()->id,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 

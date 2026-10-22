@@ -69,9 +69,11 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
 
     /**
      * Veto: en los torneos en planeación o en curso de la liga, las filas active del jugador pasan a removed (con
-     * quién, cuándo y el motivo) y las pending a cancelled. Devuelve cuántas filas cambió.
+     * quién, cuándo y el motivo) y las pending a cancelled. Devuelve cuántas quitó y cuántas canceló.
+     *
+     * @return array{removed: int, cancelled: int}
      */
-    public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): int;
+    public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): array;
 
     public function createRequest(int $registrationId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster;
 

@@ -5,11 +5,13 @@ namespace Database\Seeders;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\RosterStatus;
+use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Models\Field;
 use App\Models\League;
 use App\Models\LeagueReferee;
 use App\Models\Player;
+use App\Models\PlayerLeagueBan;
 use App\Models\Registration;
 use App\Models\Roster;
 use App\Models\Team;
@@ -59,13 +61,22 @@ class DevelopmentSeeder extends Seeder
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
         $this->seedPlayers();
         $this->seedRosters($leagues);
+        $this->seedPlayerScenarios($leagues);
+    }
+
+    /**
+     * Teléfono de 10 dígitos numéricos, único porque la columna tiene índice único.
+     */
+    private function phone(): string
+    {
+        return fake()->unique()->numerify('##########');
     }
 
     private function seedSuperAdmin(): void
     {
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin@example.com'],
-            ['first_name' => 'Admin', 'last_name' => 'Demo', 'user_code' => 'ADMIN001', 'password' => 'password', 'photo_url' => 'https://placehold.co/400x400?text=AD']
+            ['first_name' => 'Admin', 'last_name' => 'Demo', 'user_code' => 'ADMIN001', 'phone' => '5500000000', 'password' => 'password', 'photo_url' => 'https://placehold.co/400x400?text=AD']
         );
         $admin->forceFill(['email_verified_at' => now()])->save();
         $admin->roles()->sync([RoleEnum::SUPERADMIN->value]);
@@ -84,8 +95,8 @@ class DevelopmentSeeder extends Seeder
 
         $admins = User::factory(2)
             ->sequence(
-                ['user_code' => 'LIGA001'],
-                ['user_code' => 'LIGA002'],
+                ['user_code' => 'LIGA001', 'phone' => $this->phone()],
+                ['user_code' => 'LIGA002', 'phone' => $this->phone()],
             )
             ->create();
 
@@ -140,7 +151,7 @@ class DevelopmentSeeder extends Seeder
         }
 
         $referees = User::factory(self::REFEREES)
-            ->sequence(fn ($sequence) => ['user_code' => sprintf('ARB%03d', $sequence->index + 1)])
+            ->sequence(fn ($sequence) => ['user_code' => sprintf('ARB%03d', $sequence->index + 1), 'phone' => $this->phone()])
             ->create();
 
         foreach ($referees as $referee) {
@@ -211,7 +222,10 @@ class DevelopmentSeeder extends Seeder
         }
 
         User::factory($missing)
-            ->sequence(fn ($sequence) => ['user_code' => sprintf('%s%03d', $codePrefix, $existing + $sequence->index + 1)])
+            ->sequence(fn ($sequence) => [
+                'user_code' => sprintf('%s%03d', $codePrefix, $existing + $sequence->index + 1),
+                'phone' => $this->phone(),
+            ])
             ->create()
             ->each(fn (User $user) => $user->roles()->sync([$role->value]));
     }
@@ -343,6 +357,105 @@ class DevelopmentSeeder extends Seeder
         foreach ($teams as $team) {
             $registration = Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
             $rows($registration->load('team'), [[RosterStatus::ACTIVE, 7]]);
+        }
+    }
+
+    /**
+     * Casos para probar el listado de jugadores, la rama y el veto, con los últimos jugadores sembrados (los
+     * rosters de arriba usan los primeros): uno vetado y uno con veto levantado en la primera liga; un varón con
+     * roster activo en un torneo varonil (bloquea cambiar la rama) y otro con roster solo en un torneo mixto; uno con
+     * rosters en dos ligas; edades distintas, algunos sin foto; y varones con solicitud pending (dos en la Copa Varonil y uno
+     * en un torneo mixto) para probar que al corregir la rama a femenil las pending del torneo varonil pasan a
+     * cancelled y la del mixto se conserva. No hace nada si ya hay vetos.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedPlayerScenarios(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+        $other = $leagues[1] ?? null;
+
+        if ($league === null || $other === null || PlayerLeagueBan::query()->exists()) {
+            return;
+        }
+
+        $players = Player::query()->with('user')->orderByDesc('id')->take(11)->get()->values();
+        $admin = $league->admin;
+        $registrations = fn (Tournament $tournament) => $tournament->registrations()->with('team')->orderBy('id')->get();
+
+        if ($players->count() < 11 || $admin === null) {
+            return;
+        }
+
+        [$banned, $lifted, $maleActive, $mixedOnly, $twoLeagues, $noPhoto, $older, $young, $pendingTigres, $pendingHalcones, $pendingMixed] = $players->all();
+
+        // Edades y fotos distintas.
+        foreach ([[$noPhoto, '2001-03-10'], [$older, '1978-08-21'], [$young, now()->subYears(19)->toDateString()]] as [$player, $birth]) {
+            $player->forceFill(['birth_date' => $birth])->save();
+        }
+        $noPhoto->user?->forceFill(['photo_url' => null])->save();
+        $older->user?->forceFill(['photo_url' => null])->save();
+
+        foreach ([$banned, $lifted] as $player) {
+            $ban = new PlayerLeagueBan;
+            $ban->forceFill(['player_id' => $player->id, 'league_id' => $league->id, 'banned_by_user_id' => $admin->id, 'reason' => 'Agresión al árbitro en la jornada 3'])->save();
+        }
+        PlayerLeagueBan::query()->where('player_id', $lifted->id)->update(['lifted_at' => now()->subDay(), 'lifted_by_user_id' => $admin->id]);
+
+        $maleActive->forceFill(['gender' => PlayerGender::MALE])->save();
+        $twoLeagues->forceFill(['gender' => PlayerGender::MALE])->save();
+
+        foreach ([$pendingTigres, $pendingHalcones, $pendingMixed] as $player) {
+            $player->forceFill(['gender' => PlayerGender::MALE])->save();
+        }
+
+        $varonil = Tournament::factory()->create([
+            'league_id' => $league->id,
+            'name' => 'Copa Varonil',
+            'gender' => TournamentGender::MALE,
+            'start_date' => now()->addMonth()->toDateString(),
+        ]);
+        $teams = $league->teams()->orderBy('id')->take(2)->get();
+
+        foreach ($teams as $team) {
+            Registration::factory()->create(['tournament_id' => $varonil->id, 'team_id' => $team->id]);
+        }
+
+        $varonilRegistration = $registrations($varonil)->first();
+        $leagueTournaments = $league->tournaments()->where('name', 'Torneo Clausura')->first();
+        $mixedRegistrations = $leagueTournaments === null ? collect() : $registrations($leagueTournaments);
+        $otherTournament = $other->tournaments()->orderBy('id')->first();
+        $otherRegistration = $otherTournament === null ? null : $registrations($otherTournament)->first();
+
+        $rows = [
+            [$varonilRegistration, $maleActive, 40],
+            [$registrations($varonil)->get(1), $pendingTigres, 50, RosterStatus::PENDING],
+            [$varonilRegistration, $pendingHalcones, 51, RosterStatus::PENDING],
+            [$mixedRegistrations->get(0), $pendingMixed, 52, RosterStatus::PENDING],
+            [$mixedRegistrations->get(1), $mixedOnly, 41],
+            [$mixedRegistrations->get(1), $twoLeagues, 42],
+            [$otherRegistration, $twoLeagues, 43],
+        ];
+
+        foreach ($rows as $entry) {
+            [$registration, $player, $jersey] = $entry;
+            $status = $entry[3] ?? RosterStatus::ACTIVE;
+
+            if ($registration === null) {
+                continue;
+            }
+
+            $row = new Roster;
+            $row->forceFill([
+                'registration_id' => $registration->id,
+                'tournament_id' => $registration->tournament_id,
+                'player_id' => $player->id,
+                'jersey_number' => $jersey,
+                'status' => $status,
+                'requested_by_user_id' => $registration->team->manager_user_id ?? $admin->id,
+                'requested_at' => now()->subDays(5),
+                'responded_at' => $status === RosterStatus::PENDING ? null : now()->subDays(4),
+            ])->save();
         }
     }
 }

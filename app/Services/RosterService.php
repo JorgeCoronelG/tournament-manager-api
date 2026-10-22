@@ -154,7 +154,7 @@ class RosterService extends BaseService implements RosterServiceInterface
         ];
     }
 
-    public function releaseBannedPlayer(Player $player, League $league, User $actor, string $reason): int
+    public function releaseBannedPlayer(Player $player, League $league, User $actor, string $reason): array
     {
         return DB::transaction(fn () => $this->rosterRepository->releasePlayerInLeague($player->id, $league->id, $actor->id, trim($reason)));
     }

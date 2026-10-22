@@ -48,6 +48,14 @@ class Player extends Model
     }
 
     /**
+     * @return HasMany<PlayerLeagueBan, $this>
+     */
+    public function leagueBans(): HasMany
+    {
+        return $this->hasMany(PlayerLeagueBan::class);
+    }
+
+    /**
      * @return HasMany<PlayerGenderChange, $this>
      */
     public function genderChanges(): HasMany

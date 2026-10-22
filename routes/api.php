@@ -58,6 +58,10 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             ->whereNumber('user')->middleware('throttle:resend-invitation');
 
         // Fuera de scopeBindings: el jugador no es hijo de la liga; el servicio comprueba que tenga roster en ella.
+        Route::get('/players', [PlayerController::class, 'index']);
+        Route::get('/players/{player}', [PlayerController::class, 'show'])->whereNumber('player');
+        Route::post('/players/{player}/ban', [PlayerController::class, 'ban'])->whereNumber('player');
+        Route::post('/players/{player}/unban', [PlayerController::class, 'unban'])->whereNumber('player');
         Route::patch('/players/{player}/gender', [PlayerController::class, 'updateGender'])->whereNumber('player');
 
         Route::scopeBindings()->group(function (): void {

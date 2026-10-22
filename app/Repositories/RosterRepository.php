@@ -134,7 +134,7 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
         return $roster;
     }
 
-    public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): int
+    public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): array
     {
         $openTournaments = fn ($query) => $query->select('id')
             ->where('league_id', $leagueId)
@@ -157,7 +157,7 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
             ->whereIn('tournament_id', $openTournaments(DB::table('tournaments')))
             ->update(['status' => RosterStatus::CANCELLED, 'responded_at' => now()]);
 
-        return $removed + $cancelled;
+        return ['removed' => $removed, 'cancelled' => $cancelled];
     }
 
     public function createRequest(int $registrationId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster

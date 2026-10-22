@@ -106,6 +106,10 @@ class Message
 
     public const REGISTRATION_TEAM_NAME_TAKEN = 'Ya hay un equipo con ese nombre en este torneo.';
 
+    public const PLAYER_ALREADY_BANNED = 'El jugador ya está vetado en esta liga.';
+
+    public const PLAYER_NOT_BANNED = 'El jugador no está vetado en esta liga.';
+
     public static function getMessagePlayerGenderLocked(string $tournaments): string
     {
         return "No se puede cambiar la rama porque el jugador está inscrito en: {$tournaments}. Primero da de baja al jugador de esos torneos.";

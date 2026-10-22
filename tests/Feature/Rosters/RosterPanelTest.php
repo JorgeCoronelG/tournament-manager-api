@@ -294,7 +294,7 @@ class RosterPanelTest extends TestCase
 
         $changed = app(RosterServiceInterface::class)->releaseBannedPlayer($player, $league, $admin, ' Agresión al árbitro ');
 
-        $this->assertSame(2, $changed);
+        $this->assertSame(['removed' => 1, 'cancelled' => 1], $changed);
         $this->assertSame(RosterStatus::REMOVED, $rows[0]->fresh()->status);
         $this->assertSame('Agresión al árbitro', $rows[0]->fresh()->removal_reason);
         $this->assertSame($admin->id, $rows[0]->fresh()->removed_by_user_id);

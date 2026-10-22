@@ -69,9 +69,11 @@ interface RosterServiceInterface extends BaseServiceInterface
      * Regla del veto, para que la use el endpoint de vetar jugadores: al vetar a un jugador en una liga, sus
      * filas active pasan a removed (con el motivo del veto) y las pending a cancelled, en los torneos en
      * planeación o en curso de esa liga. Reactivarlo no las restaura. Se une a la transacción de quien la llame.
-     * Devuelve cuántas filas cambió.
+     * Devuelve cuántas plantillas quitó y cuántas solicitudes canceló.
+     *
+     * @return array{removed: int, cancelled: int}
      */
-    public function releaseBannedPlayer(Player $player, League $league, User $actor, string $reason): int;
+    public function releaseBannedPlayer(Player $player, League $league, User $actor, string $reason): array;
 
     /**
      * Cierra las plantillas al entrar a la liguilla: las solicitudes pending pasan a cancelled. Devuelve cuántas.
