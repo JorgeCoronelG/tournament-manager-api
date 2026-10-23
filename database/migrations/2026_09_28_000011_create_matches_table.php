@@ -19,7 +19,8 @@ return new class extends Migration
             $table->foreignId('field_id')->nullable()->constrained('fields');
             $table->enum('phase', ['regular_stage', 'round_of_16', 'quarterfinal', 'semifinal', 'final']);
             $table->unsignedSmallInteger('matchday')->nullable();
-            $table->dateTime('match_datetime');
+            // Nullable: un partido puede estar por programar.
+            $table->dateTime('match_datetime')->nullable();
             $table->dateTime('original_datetime')->nullable();
             $table->enum('status', ['scheduled', 'played', 'cancelled'])->default('scheduled');
             // Nullable: un partido programado aún no tiene marcador.
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('away_score')->nullable();
             $table->unsignedTinyInteger('home_penalties')->nullable();
             $table->unsignedTinyInteger('away_penalties')->nullable();
+            $table->boolean('schedule_locked')->default(false);
             $table->timestamps();
             $table->softDeletes();
 

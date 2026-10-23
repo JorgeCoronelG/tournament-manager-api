@@ -4,6 +4,7 @@ namespace App\Http\Requests\Tournaments;
 
 use App\Core\Enum\Message;
 use App\Core\Enum\Sport;
+use App\Core\Enum\Tiebreaker;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Data\Tournaments\TournamentData;
@@ -41,6 +42,13 @@ class SaveTournamentRequest extends FormRequest
             'max_roster_size' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'min_matches_for_playoffs' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'start_date' => ['required', 'date_format:Y-m-d'],
+            'rounds' => ['sometimes', 'integer', 'in:1,2'],
+            'match_duration_minutes' => [
+                'sometimes', 'integer',
+                'between:'.Tournament::MIN_MATCH_DURATION_MINUTES.','.Tournament::MAX_MATCH_DURATION_MINUTES,
+            ],
+            'tiebreakers' => ['sometimes', 'array', 'min:1'],
+            'tiebreakers.*' => ['string', 'distinct', Rule::in(Tiebreaker::values())],
         ];
     }
 
@@ -58,6 +66,10 @@ class SaveTournamentRequest extends FormRequest
             'max_roster_size' => 'máximo de jugadores por equipo',
             'min_matches_for_playoffs' => 'partidos mínimos para la liguilla',
             'start_date' => 'fecha de inicio',
+            'rounds' => 'vueltas',
+            'match_duration_minutes' => 'duración del partido',
+            'tiebreakers' => 'criterios de desempate',
+            'tiebreakers.*' => 'criterio de desempate',
         ];
     }
 

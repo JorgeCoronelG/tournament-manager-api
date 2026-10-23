@@ -6,8 +6,10 @@ use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\TournamentGender;
+use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
 use App\Models\Tournament;
+use App\Models\TournamentGroup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -47,6 +49,19 @@ class TournamentRepository extends BaseRepository implements TournamentRepositor
         $tournament->saveOrFail();
 
         return $tournament;
+    }
+
+    public function createRegularStageGroup(Tournament $tournament): TournamentGroup
+    {
+        $group = new TournamentGroup;
+        $group->forceFill([
+            'tournament_id' => $tournament->id,
+            'name' => TournamentGroup::DEFAULT_NAME,
+            'type' => TournamentGroupType::REGULAR_STAGE,
+        ]);
+        $group->saveOrFail();
+
+        return $group;
     }
 
     public function updateModel(Tournament $tournament, array $data): Tournament

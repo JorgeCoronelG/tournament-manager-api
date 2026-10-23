@@ -117,6 +117,12 @@ class Message
 
     public const TOURNAMENT_PLAYOFFS_STARTED_LOCKED = 'La liguilla ya inició: no se pueden modificar el máximo de jugadores ni los partidos mínimos.';
 
+    public const TOURNAMENT_CONFIG_PLANNING_ONLY = 'Con el torneo en curso solo se puede editar el nombre.';
+
+    public const TOURNAMENT_START_NEEDS_GROUPS = 'Todos los equipos inscritos deben tener un grupo para iniciar el torneo.';
+
+    public const REGISTRATION_GROUP_INVALID = 'El grupo debe ser de fase regular y pertenecer al mismo torneo.';
+
     public const ROSTER_CLOSED = 'Las plantillas de este torneo están cerradas.';
 
     public const ROSTER_FULL = 'El equipo ya alcanzó el máximo de jugadores del torneo.';

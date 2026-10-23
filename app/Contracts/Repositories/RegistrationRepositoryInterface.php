@@ -67,6 +67,21 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
     public function register(int $tournamentId, int $teamId): Registration;
 
     /**
+     * Inscripciones activas del torneo que aún no tienen grupo.
+     */
+    public function countActiveWithoutGroup(int $tournamentId): int;
+
+    /**
+     * Si el grupo es de fase regular y pertenece al torneo.
+     */
+    public function isRegularGroupOfTournament(int $groupId, int $tournamentId): bool;
+
+    /**
+     * Asigna el grupo a la inscripción.
+     */
+    public function assignGroup(Registration $registration, int $groupId): Registration;
+
+    /**
      * Inscripciones activas del torneo, sin importar el estado del equipo.
      */
     public function countActiveByTournament(int $tournamentId): int;

@@ -125,11 +125,14 @@ class DevelopmentSeeder extends Seeder
                 continue;
             }
 
-            foreach (['Torneo Apertura', 'Torneo Clausura'] as $name) {
+            // Apertura a una vuelta y Clausura a dos; la duración es de 60 min salvo en el Clausura de la primera liga.
+            foreach (['Torneo Apertura', 'Torneo Clausura'] as $index => $name) {
                 Tournament::factory()->create([
                     'league_id' => $league->id,
                     'name' => $name,
                     'start_date' => $startDate,
+                    'rounds' => $index + 1,
+                    'match_duration_minutes' => $league->is($leagues[0]) && $index === 1 ? 50 : 60,
                 ]);
             }
 

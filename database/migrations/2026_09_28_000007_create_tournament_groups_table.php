@@ -16,10 +16,9 @@ return new class extends Migration
             $table->foreignId('tournament_id')->constrained('tournaments');
             $table->string('name', 100);
             $table->enum('type', ['regular_stage', 'playoff']);
-            $table->foreignId('source_group_id')->nullable()->constrained('tournament_groups');
-            $table->unsignedSmallInteger('position_start')->nullable();
-            $table->unsignedSmallInteger('position_end')->nullable();
-            $table->unsignedSmallInteger('playoff_teams')->nullable();
+            // Solo aplica a type playoff: fecha de la primera ronda y días entre rondas. Los equipos salen de playoff_sources.
+            $table->date('start_date')->nullable();
+            $table->unsignedSmallInteger('round_interval_days')->default(7);
             $table->timestamps();
             $table->softDeletes();
         });

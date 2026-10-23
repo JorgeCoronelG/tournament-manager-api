@@ -7,9 +7,11 @@ use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TeamStatus;
+use App\Core\Enum\TournamentGroupType;
 use App\Models\Registration;
 use App\Models\Team;
 use App\Models\Tournament;
+use App\Models\TournamentGroup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -125,8 +127,48 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
             'tournament_id' => $tournamentId,
             'team_id' => $teamId,
             'status' => RegistrationStatus::ACTIVE,
+            'group_id' => $this->singleRegularGroupId($tournamentId),
             'deleted_at' => null,
         ]);
+        $registration->saveOrFail();
+
+        return $registration;
+    }
+
+    /**
+     * Con exactamente un grupo de fase regular es el de la inscripción; con varios la asigna el administrador.
+     */
+    private function singleRegularGroupId(int $tournamentId): ?int
+    {
+        $groups = TournamentGroup::query()
+            ->where('tournament_id', $tournamentId)
+            ->where('type', TournamentGroupType::REGULAR_STAGE)
+            ->get();
+
+        return $groups->count() === 1 ? $groups->first()?->id : null;
+    }
+
+    public function countActiveWithoutGroup(int $tournamentId): int
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereNull('group_id')
+            ->count();
+    }
+
+    public function isRegularGroupOfTournament(int $groupId, int $tournamentId): bool
+    {
+        return TournamentGroup::query()
+            ->whereKey($groupId)
+            ->where('tournament_id', $tournamentId)
+            ->where('type', TournamentGroupType::REGULAR_STAGE)
+            ->exists();
+    }
+
+    public function assignGroup(Registration $registration, int $groupId): Registration
+    {
+        $registration->forceFill(['group_id' => $groupId]);
         $registration->saveOrFail();
 
         return $registration;

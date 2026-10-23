@@ -5,6 +5,7 @@ namespace App\Contracts\Services;
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseServiceInterface;
 use App\Core\Enum\RegistrationStatus;
+use App\Exceptions\CustomErrorException;
 use App\Models\Registration;
 use App\Models\Team;
 use App\Models\Tournament;
@@ -54,5 +55,12 @@ interface RegistrationServiceInterface extends BaseServiceInterface
     /**
      * Baja lógica de la inscripción, solo con el torneo en planeación (422 si no).
      */
+    /**
+     * Asigna el grupo de fase regular a la inscripción; debe ser del mismo torneo.
+     *
+     * @throws CustomErrorException
+     */
+    public function assignGroup(Registration $registration, int $groupId): Registration;
+
     public function removeRegistration(Tournament $tournament, Registration $registration): void;
 }

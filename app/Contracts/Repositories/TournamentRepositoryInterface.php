@@ -7,6 +7,7 @@ use App\Core\Contracts\BaseRepositoryInterface;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
 use App\Models\Tournament;
+use App\Models\TournamentGroup;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -33,6 +34,11 @@ interface TournamentRepositoryInterface extends BaseRepositoryInterface
      * @param  array<string, mixed>  $data
      */
     public function createInLeague(int $leagueId, array $data): Tournament;
+
+    /**
+     * Crea el grupo único de fase regular ("Fase regular") con el que nace todo torneo.
+     */
+    public function createRegularStageGroup(Tournament $tournament): TournamentGroup;
 
     /**
      * @param  array<string, mixed>  $data

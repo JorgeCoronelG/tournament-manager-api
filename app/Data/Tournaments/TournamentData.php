@@ -17,5 +17,9 @@ class TournamentData extends Data
         public ?int $max_age = null,
         public ?int $max_roster_size = null,
         public ?int $min_matches_for_playoffs = null,
+        public ?int $rounds = null,
+        public ?int $match_duration_minutes = null,
+        /** @var list<string>|null */
+        public ?array $tiebreakers = null,
     ) {}
 }

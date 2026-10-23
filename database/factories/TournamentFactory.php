@@ -3,10 +3,13 @@
 namespace Database\Factories;
 
 use App\Core\Enum\Sport;
+use App\Core\Enum\Tiebreaker;
 use App\Core\Enum\TournamentGender;
+use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
 use App\Models\League;
 use App\Models\Tournament;
+use App\Models\TournamentGroup;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -28,7 +31,25 @@ class TournamentFactory extends Factory
             'max_age' => null,
             'start_date' => fake()->date(),
             'status' => TournamentStatus::PLANNING,
+            'rounds' => Tournament::DEFAULT_ROUNDS,
+            'match_duration_minutes' => Tournament::DEFAULT_MATCH_DURATION_MINUTES,
+            'tiebreakers' => Tiebreaker::defaults(),
         ];
+    }
+
+    /**
+     * Todo torneo nace con su grupo de fase regular, igual que al crearlo por el API.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Tournament $tournament) {
+            $group = new TournamentGroup;
+            $group->forceFill([
+                'tournament_id' => $tournament->id,
+                'name' => TournamentGroup::DEFAULT_NAME,
+                'type' => TournamentGroupType::REGULAR_STAGE,
+            ])->save();
+        });
     }
 
     public function status(TournamentStatus $status): static

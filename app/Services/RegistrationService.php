@@ -74,6 +74,15 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
         });
     }
 
+    public function assignGroup(Registration $registration, int $groupId): Registration
+    {
+        if (! $this->registrationRepository->isRegularGroupOfTournament($groupId, $registration->tournament_id)) {
+            throw new CustomErrorException(Message::REGISTRATION_GROUP_INVALID, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->registrationRepository->assignGroup($registration, $groupId);
+    }
+
     public function removeRegistration(Tournament $tournament, Registration $registration): void
     {
         if ($tournament->status !== TournamentStatus::PLANNING) {

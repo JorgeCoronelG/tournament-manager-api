@@ -25,6 +25,14 @@ class Tournament extends Model
 
     public const MAX_PLAYER_AGE = 99;
 
+    public const DEFAULT_ROUNDS = 1;
+
+    public const DEFAULT_MATCH_DURATION_MINUTES = 60;
+
+    public const MIN_MATCH_DURATION_MINUTES = 20;
+
+    public const MAX_MATCH_DURATION_MINUTES = 180;
+
     /**
      * @var list<string>
      */
@@ -50,6 +58,9 @@ class Tournament extends Model
         'max_roster_size',
         'min_matches_for_playoffs',
         'start_date',
+        'rounds',
+        'match_duration_minutes',
+        'tiebreakers',
     ];
 
     /**
@@ -60,6 +71,7 @@ class Tournament extends Model
         'gender' => TournamentGender::class,
         'status' => TournamentStatus::class,
         'start_date' => 'date',
+        'tiebreakers' => 'array',
     ];
 
     /**
@@ -68,6 +80,14 @@ class Tournament extends Model
     public function league(): BelongsTo
     {
         return $this->belongsTo(League::class);
+    }
+
+    /**
+     * @return HasMany<TournamentGroup, $this>
+     */
+    public function groups(): HasMany
+    {
+        return $this->hasMany(TournamentGroup::class);
     }
 
     /**
