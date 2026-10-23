@@ -2,10 +2,14 @@
 
 namespace App\Core\Enum;
 
+/**
+ * Planeación -> en curso (fase regular) -> liguilla -> finalizado. Sin liguillas, de en curso se pasa a finalizado.
+ */
 enum TournamentStatus: string
 {
     case PLANNING = 'planning';
     case IN_PROGRESS = 'in_progress';
+    case PLAYOFFS = 'playoffs';
     case FINISHED = 'finished';
 
     public function label(): string
@@ -13,19 +17,8 @@ enum TournamentStatus: string
         return match ($this) {
             self::PLANNING => 'En planeación',
             self::IN_PROGRESS => 'En curso',
+            self::PLAYOFFS => 'Liguilla',
             self::FINISHED => 'Finalizado',
-        };
-    }
-
-    /**
-     * Único estado al que se puede avanzar desde este (null si es el último).
-     */
-    public function next(): ?self
-    {
-        return match ($this) {
-            self::PLANNING => self::IN_PROGRESS,
-            self::IN_PROGRESS => self::FINISHED,
-            self::FINISHED => null,
         };
     }
 }

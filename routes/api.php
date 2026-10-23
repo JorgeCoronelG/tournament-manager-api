@@ -3,6 +3,7 @@
 use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FieldController;
+use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
@@ -71,6 +72,15 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::put('/tournaments/{tournament}', [TournamentController::class, 'update']);
             Route::patch('/tournaments/{tournament}/status', [TournamentController::class, 'updateStatus']);
             Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);
+
+            // assignments y random-assignment antes de /{group}: si no, se tomarían como el id de un grupo.
+            Route::get('/tournaments/{tournament}/groups', [GroupController::class, 'index']);
+            Route::post('/tournaments/{tournament}/groups', [GroupController::class, 'store']);
+            Route::put('/tournaments/{tournament}/groups/assignments', [GroupController::class, 'assign']);
+            Route::post('/tournaments/{tournament}/groups/random-assignment', [GroupController::class, 'randomAssignment']);
+            Route::get('/tournaments/{tournament}/groups/{group}', [GroupController::class, 'show'])->whereNumber('group');
+            Route::patch('/tournaments/{tournament}/groups/{group}', [GroupController::class, 'update'])->whereNumber('group');
+            Route::delete('/tournaments/{tournament}/groups/{group}', [GroupController::class, 'destroy'])->whereNumber('group');
 
             // available-teams antes de /{registration}: si no, se tomaría como el id de una inscripción.
             Route::get('/tournaments/{tournament}/registrations', [RegistrationController::class, 'index']);

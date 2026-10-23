@@ -166,7 +166,7 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
             ->exists();
     }
 
-    public function assignGroup(Registration $registration, int $groupId): Registration
+    public function assignGroup(Registration $registration, ?int $groupId): Registration
     {
         $registration->forceFill(['group_id' => $groupId]);
         $registration->saveOrFail();

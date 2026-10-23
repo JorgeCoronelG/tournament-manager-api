@@ -219,6 +219,23 @@ class RosterWorkflowTest extends TestCase
         $this->service()->requestPlayer($second, $player, 1, $secondManager);
     }
 
+    public function test_rejoin_cannot_be_authorized_once_the_tournament_is_in_playoffs_or_finished(): void
+    {
+        $tournament = $this->mixedTournament();
+        $admin = $tournament->league->admin;
+        $player = $this->player();
+        [$registration, $manager] = $this->registrationWithManager($tournament);
+        $roster = $this->service()->requestPlayer($registration, $player, 1, $manager);
+        $this->service()->accept($roster, $player->user);
+        $this->service()->removePlayer($roster, $admin, 'Indisciplina');
+
+        foreach ([TournamentStatus::PLAYOFFS, TournamentStatus::FINISHED] as $status) {
+            $tournament->forceFill(['status' => $status])->save();
+
+            $this->assertRejected(fn () => $this->service()->authorizeRejoin($roster, $admin), Message::ROSTER_REJOIN_TOURNAMENT_CLOSED);
+        }
+    }
+
     public function test_removing_needs_a_reason_and_records_who_when_and_why(): void
     {
         $tournament = $this->mixedTournament();

@@ -22,7 +22,7 @@ return new class extends Migration
             // Partidos mínimos con asistencia en la fase regular para jugar la liguilla; NULL = no aplica.
             $table->unsignedSmallInteger('min_matches_for_playoffs')->nullable();
             $table->date('start_date');
-            $table->enum('status', ['planning', 'in_progress', 'finished'])->default('planning');
+            $table->enum('status', ['planning', 'in_progress', 'playoffs', 'finished'])->default('planning');
             // Vueltas de la fase regular: 1 o 2.
             $table->unsignedTinyInteger('rounds')->default(1);
             // Duración fija del partido (20 a 180), con medios tiempos y descansos incluidos.

@@ -123,6 +123,71 @@ class Message
 
     public const REGISTRATION_GROUP_INVALID = 'El grupo debe ser de fase regular y pertenecer al mismo torneo.';
 
+    public const GROUPS_TOURNAMENT_IN_PROGRESS = 'Con el torneo en curso no se pueden modificar los grupos.';
+
+    public const GROUPS_TOURNAMENT_FINISHED = 'Con el torneo terminado no se pueden modificar los grupos.';
+
+    public const GROUPS_TOURNAMENT_PLAYOFFS = 'Con el torneo en liguilla no se pueden modificar los grupos.';
+
+    public const PLAYOFFS_LOCKED = 'Las liguillas ya no se pueden modificar.';
+
+    public const PLAYOFF_HAS_MATCHES = 'Esta liguilla ya tiene partidos y no se puede modificar.';
+
+    public const TOURNAMENT_TO_PLAYOFFS_USE_CLOSE = 'Para pasar a liguilla usa Cerrar fase regular.';
+
+    public const TOURNAMENT_FINISH_HAS_PLAYOFFS = 'El torneo tiene liguillas: usa Cerrar fase regular para pasar a liguilla antes de finalizar.';
+
+    public const ROSTER_REJOIN_TOURNAMENT_CLOSED = 'Con el torneo en liguilla o finalizado no se pueden autorizar reingresos.';
+
+    public const PLAYOFF_ROUND_DATES_NEED_START = 'Para indicar fechas por ronda primero define la fecha de inicio.';
+
+    public const PLAYOFF_ROUND_DATES_FIRST_START = 'La primera fecha de las rondas debe ser igual a la fecha de inicio.';
+
+    public const GROUP_NAME_TAKEN = 'Ya hay un grupo con ese nombre en este torneo.';
+
+    public const GROUP_DELETE_LAST_REGULAR = 'No se puede eliminar el último grupo de fase regular del torneo.';
+
+    public const GROUP_DELETE_HAS_TEAMS = 'El grupo tiene equipos asignados. Muévelos a otro grupo primero.';
+
+    public const GROUP_DELETE_HAS_MATCHES = 'El grupo tiene partidos y no se puede eliminar.';
+
+    public const GROUP_DELETE_USED_BY_PLAYOFF = 'El grupo es fuente de una liguilla. Quítalo de la liguilla primero.';
+
+    public const GROUP_RANDOM_NEEDS_TEAMS = 'Se necesitan al menos 2 equipos inscritos para repartirlos en grupos.';
+
+    public const GROUP_ASSIGN_INVALID_REGISTRATION = 'La inscripción debe estar activa y pertenecer a este torneo.';
+
+    public const GROUP_ASSIGN_INVALID_GROUP = 'El grupo debe ser de fase regular y pertenecer a este torneo.';
+
+    public const PLAYOFF_SOURCE_INVALID_GROUP = 'El grupo de origen debe ser un grupo de fase regular de este torneo.';
+
+    public static function getMessagePlayoffTotalTeams(int $total): string
+    {
+        return "El total de equipos de la liguilla debe ser 2, 4, 8, 16 o 32 (actualmente {$total}).";
+    }
+
+    public static function getMessagePlayoffRoundDatesCount(int $rounds): string
+    {
+        return "Debes indicar una fecha por cada ronda ({$rounds} rondas).";
+    }
+
+    public const PLAYOFF_ROUND_DATES_ORDER = 'Las fechas de las rondas deben ir en orden.';
+
+    public static function getMessagePlayoffOverlap(string $group): string
+    {
+        return "Las posiciones del grupo {$group} se traslapan con otra fuente de liguilla.";
+    }
+
+    public static function getMessageGroupNeedsTeams(string $group): string
+    {
+        return "El grupo {$group} necesita al menos 2 equipos.";
+    }
+
+    public static function getMessagePlayoffAsksTooMany(string $playoff, int $position, string $group, int $teams): string
+    {
+        return "La liguilla {$playoff} pide hasta la posición {$position} del grupo {$group}, que solo tiene {$teams} equipos.";
+    }
+
     public const ROSTER_CLOSED = 'Las plantillas de este torneo están cerradas.';
 
     public const ROSTER_FULL = 'El equipo ya alcanzó el máximo de jugadores del torneo.';
@@ -157,7 +222,7 @@ class Message
 
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {
-        return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → finalizado.";
+        return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → liguilla → finalizado.";
     }
 
     public static function getMessageUserAdministersLeagues(int $leagues, string $action): string

@@ -77,9 +77,9 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
     public function isRegularGroupOfTournament(int $groupId, int $tournamentId): bool;
 
     /**
-     * Asigna el grupo a la inscripción.
+     * Asigna el grupo a la inscripción; null la deja sin grupo.
      */
-    public function assignGroup(Registration $registration, int $groupId): Registration;
+    public function assignGroup(Registration $registration, ?int $groupId): Registration;
 
     /**
      * Inscripciones activas del torneo, sin importar el estado del equipo.

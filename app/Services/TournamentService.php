@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\Repositories\RegistrationRepositoryInterface;
 use App\Contracts\Repositories\RosterRepositoryInterface;
 use App\Contracts\Repositories\TournamentRepositoryInterface;
+use App\Contracts\Services\GroupServiceInterface;
 use App\Contracts\Services\TournamentServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
@@ -12,6 +13,7 @@ use App\Core\Enum\Message;
 use App\Core\Enum\Sport;
 use App\Core\Enum\Tiebreaker;
 use App\Core\Enum\TournamentGender;
+use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
 use App\Data\Tournaments\TournamentData;
 use App\Exceptions\CustomErrorException;
@@ -33,6 +35,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
         protected TournamentRepositoryInterface $tournamentRepository,
         protected RegistrationRepositoryInterface $registrationRepository,
         protected RosterRepositoryInterface $rosterRepository,
+        protected GroupServiceInterface $groupService,
     ) {
         parent::__construct($tournamentRepository);
     }
@@ -76,6 +79,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             case TournamentStatus::FINISHED:
                 throw new CustomErrorException(Message::TOURNAMENT_FINISHED_NOT_EDITABLE, Response::HTTP_UNPROCESSABLE_ENTITY);
             case TournamentStatus::IN_PROGRESS:
+            case TournamentStatus::PLAYOFFS:
                 // Género y edades ya afectan a los rosters: el resto de campos debe llegar sin cambios.
                 if ($this->changesLockedFields($tournament, $data)) {
                     throw new CustomErrorException(Message::TOURNAMENT_IN_PROGRESS_ONLY_NAME, Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -110,12 +114,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
 
     public function changeStatus(Tournament $tournament, TournamentStatus $status): Tournament
     {
-        if ($tournament->status->next() !== $status) {
-            throw new CustomErrorException(
-                Message::getMessageInvalidTournamentTransition($tournament->status->label(), $status->label()),
-                Response::HTTP_UNPROCESSABLE_ENTITY
-            );
-        }
+        $this->assertTransitionAllowed($tournament, $status);
 
         // TODO: al existir partidos, validar aquí el resto de precondiciones para iniciar.
         if ($status === TournamentStatus::IN_PROGRESS
@@ -128,7 +127,40 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             throw new CustomErrorException(Message::TOURNAMENT_START_NEEDS_GROUPS, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        if ($status === TournamentStatus::IN_PROGRESS) {
+            $this->groupService->assertReadyToStart($tournament);
+        }
+
         return $this->tournamentRepository->updateStatus($tournament, $status);
+    }
+
+    /**
+     * Planeación -> en curso; en curso -> finalizado solo sin liguillas (a liguilla se pasa cerrando la fase regular);
+     * liguilla -> finalizado. Cualquier otro salto o regreso se rechaza.
+     */
+    private function assertTransitionAllowed(Tournament $tournament, TournamentStatus $status): void
+    {
+        $unprocessable = Response::HTTP_UNPROCESSABLE_ENTITY;
+        $from = $tournament->status;
+
+        if ($from === TournamentStatus::IN_PROGRESS && $status === TournamentStatus::PLAYOFFS) {
+            throw new CustomErrorException(Message::TOURNAMENT_TO_PLAYOFFS_USE_CLOSE, $unprocessable);
+        }
+
+        $allowed = match ($from) {
+            TournamentStatus::PLANNING => $status === TournamentStatus::IN_PROGRESS,
+            TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS => $status === TournamentStatus::FINISHED,
+            TournamentStatus::FINISHED => false,
+        };
+
+        if (! $allowed) {
+            throw new CustomErrorException(Message::getMessageInvalidTournamentTransition($from->label(), $status->label()), $unprocessable);
+        }
+
+        if ($from === TournamentStatus::IN_PROGRESS
+            && $tournament->groups()->where('type', TournamentGroupType::PLAYOFF)->exists()) {
+            throw new CustomErrorException(Message::TOURNAMENT_FINISH_HAS_PLAYOFFS, $unprocessable);
+        }
     }
 
     public function deleteTournament(Tournament $tournament): void

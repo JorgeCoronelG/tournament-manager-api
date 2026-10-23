@@ -5,17 +5,21 @@ namespace Database\Seeders;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\RosterStatus;
+use App\Core\Enum\TeamStatus;
 use App\Core\Enum\TournamentGender;
+use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
 use App\Models\Field;
 use App\Models\League;
 use App\Models\LeagueReferee;
 use App\Models\Player;
 use App\Models\PlayerLeagueBan;
+use App\Models\PlayoffSource;
 use App\Models\Registration;
 use App\Models\Roster;
 use App\Models\Team;
 use App\Models\Tournament;
+use App\Models\TournamentGroup;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -58,6 +62,9 @@ class DevelopmentSeeder extends Seeder
 
         $this->seedUsersWithRole(RoleEnum::MANAGER, self::MANAGERS, 'DT');
         $this->seedTeams($leagues);
+        $this->seedGroupsTournament($leagues);
+        $this->seedPlayoffStageTournaments($leagues);
+        $this->seedFourGroupsTournament($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
         $this->seedPlayers();
         $this->seedRosters($leagues);
@@ -212,6 +219,148 @@ class DevelopmentSeeder extends Seeder
                     Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
                 }
             }
+        }
+    }
+
+    /**
+     * Torneo en planeación de la primera liga con 8 equipos en su grupo «Fase regular», para probar el reparto en
+     * dos grupos, el reparto aleatorio y una liguilla. No hace nada si ya existe.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedGroupsTournament(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || $league->tournaments()->where('name', 'Torneo de Grupos')->exists()) {
+            return;
+        }
+
+        $tournament = Tournament::factory()->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo de Grupos',
+            'start_date' => now()->addMonths(2)->toDateString(),
+        ]);
+
+        foreach ($league->teams()->orderBy('id')->take(8)->get() as $team) {
+            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
+        }
+    }
+
+    /**
+     * Dos torneos de la primera liga para probar los bloqueos por estado: «Torneo en Fase Regular» (en curso) con una
+     * liguilla sin fechas, y «Torneo en Liguilla» (estado liguilla, sin partidos) con una liguilla con fechas.
+     * Cada uno tiene 4 equipos en su grupo «Fase regular». No hace nada si ya existen.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedPlayoffStageTournaments(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null) {
+            return;
+        }
+
+        $scenarios = [
+            ['Torneo en Fase Regular', TournamentStatus::IN_PROGRESS, null],
+            ['Torneo en Liguilla', TournamentStatus::PLAYOFFS, ['2026-12-07', '2026-12-16']],
+        ];
+
+        foreach ($scenarios as [$name, $status, $roundDates]) {
+            if ($league->tournaments()->where('name', $name)->exists()) {
+                continue;
+            }
+
+            $tournament = Tournament::factory()->status($status)->create([
+                'league_id' => $league->id,
+                'name' => $name,
+                'start_date' => now()->subMonth()->toDateString(),
+            ]);
+            $regular = $tournament->groups()->firstOrFail();
+
+            foreach ($league->teams()->orderBy('id')->take(4)->get() as $team) {
+                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $regular->id]);
+            }
+
+            $playoff = new TournamentGroup;
+            $playoff->forceFill([
+                'tournament_id' => $tournament->id,
+                'name' => 'Liguilla',
+                'type' => TournamentGroupType::PLAYOFF,
+                'start_date' => $roundDates[0] ?? null,
+                'round_interval_days' => 7,
+                'round_dates' => $roundDates,
+            ])->save();
+
+            $source = new PlayoffSource;
+            $source->forceFill(['playoff_group_id' => $playoff->id, 'source_group_id' => $regular->id, 'position_start' => 1, 'position_end' => 4])->save();
+        }
+    }
+
+    /**
+     * «Torneo 4 Grupos» en planeación de la primera liga: Grupo A a D con 4 equipos cada uno (16 en total, sin vetados y
+     * con delegado; crea los que falten) y una «Liguilla Principal» sin fechas con las posiciones 1 y 2 de cada grupo.
+     * No lleva el grupo automático «Fase regular». No hace nada si ya existe.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedFourGroupsTournament(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || $league->tournaments()->where('name', 'Torneo 4 Grupos')->exists()) {
+            return;
+        }
+
+        $teams = $league->teams()->where('status', TeamStatus::ACTIVE)->whereNotNull('manager_user_id')->orderBy('id')->take(16)->get();
+        $managerIds = $league->teams()->whereNotNull('manager_user_id')->pluck('manager_user_id')->unique()->values();
+
+        for ($i = $teams->count() + 1; $i <= 16; $i++) {
+            $teams->push(Team::factory()->create([
+                'league_id' => $league->id,
+                'name' => "Equipo Extra {$i}",
+                'manager_user_id' => $managerIds->isEmpty() ? null : $managerIds[$i % $managerIds->count()],
+            ]));
+        }
+
+        $tournament = Tournament::factory()->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo 4 Grupos',
+            'gender' => TournamentGender::MIXED,
+            'min_age' => null,
+            'max_age' => null,
+            'start_date' => now()->addMonths(3)->toDateString(),
+        ]);
+
+        // El grupo automático sobra: este torneo trae los suyos.
+        $tournament->groups()->where('name', TournamentGroup::DEFAULT_NAME)->delete();
+
+        $groups = [];
+
+        foreach (['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D'] as $index => $name) {
+            $group = new TournamentGroup;
+            $group->forceFill(['tournament_id' => $tournament->id, 'name' => $name, 'type' => TournamentGroupType::REGULAR_STAGE])->save();
+            $groups[] = $group;
+
+            foreach ($teams->slice($index * 4, 4) as $team) {
+                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
+            }
+        }
+
+        $playoff = new TournamentGroup;
+        $playoff->forceFill([
+            'tournament_id' => $tournament->id,
+            'name' => 'Liguilla Principal',
+            'type' => TournamentGroupType::PLAYOFF,
+            'start_date' => null,
+            'round_interval_days' => 7,
+            'round_dates' => null,
+        ])->save();
+
+        foreach ($groups as $group) {
+            $source = new PlayoffSource;
+            $source->forceFill(['playoff_group_id' => $playoff->id, 'source_group_id' => $group->id, 'position_start' => 1, 'position_end' => 2])->save();
         }
     }
 

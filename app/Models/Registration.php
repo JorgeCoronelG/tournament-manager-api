@@ -60,6 +60,14 @@ class Registration extends Model
     }
 
     /**
+     * @return BelongsTo<TournamentGroup, $this>
+     */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(TournamentGroup::class, 'group_id');
+    }
+
+    /**
      * @return BelongsTo<Tournament, $this>
      */
     public function tournament(): BelongsTo

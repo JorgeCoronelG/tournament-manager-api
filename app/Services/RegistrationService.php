@@ -89,6 +89,8 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
             throw new CustomErrorException(Message::REGISTRATION_REMOVE_ONLY_PLANNING, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // La baja deja a la inscripción sin grupo.
+        $this->registrationRepository->assignGroup($registration, null);
         $this->delete($registration->id);
     }
 

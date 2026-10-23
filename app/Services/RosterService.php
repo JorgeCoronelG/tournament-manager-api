@@ -114,7 +114,12 @@ class RosterService extends BaseService implements RosterServiceInterface
     {
         return DB::transaction(function () use ($roster, $actor) {
             $roster = $this->rosterRepository->lockById($roster->id);
-            $this->assertLeagueAdmin($this->tournamentOf($roster), $actor);
+            $tournament = $this->tournamentOf($roster);
+            $this->assertLeagueAdmin($tournament, $actor);
+
+            if (! in_array($tournament->status, [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS], true)) {
+                throw new CustomErrorException(Message::ROSTER_REJOIN_TOURNAMENT_CLOSED, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
 
             if ($roster->status !== RosterStatus::REMOVED) {
                 throw new CustomErrorException(Message::ROSTER_REJOIN_ONLY_REMOVED, Response::HTTP_UNPROCESSABLE_ENTITY);
