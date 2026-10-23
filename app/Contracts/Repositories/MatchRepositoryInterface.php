@@ -40,6 +40,41 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
     public function paginateByTournament(int $tournamentId, ListQuery $query, array $filters): LengthAwarePaginator;
 
     /**
+     * Guarda el resultado y deja el partido jugado; con null en ambos marcadores lo anula y vuelve a programado.
+     */
+    public function setResult(GameMatch $match, ?int $homeScore, ?int $awayScore): GameMatch;
+
+    /**
+     * Partidos jugados de fase regular del grupo.
+     *
+     * @return Collection<int, GameMatch>
+     */
+    public function playedOfGroup(int $groupId): Collection;
+
+    /**
+     * Inscripciones activas del grupo (con equipo), por id; incluye equipos vetados, que conservan su inscripción.
+     *
+     * @return Collection<int, Registration>
+     */
+    public function activeRegistrationsOfGroup(int $groupId): Collection;
+
+    /**
+     * Orden manual guardado del grupo: registration_id => posición.
+     *
+     * @return array<int, int>
+     */
+    public function manualOrder(int $groupId): array;
+
+    /**
+     * Reemplaza el orden manual de esas inscripciones en el grupo (posición 1..n según el orden recibido).
+     *
+     * @param  list<int>  $registrationIds
+     */
+    public function saveManualOrder(int $tournamentId, int $groupId, array $registrationIds): void;
+
+    public function clearManualOrder(int $groupId): void;
+
+    /**
      * Partidos de fase regular del torneo ordenados por jornada y por id, con grupo y equipos.
      *
      * @return Collection<int, GameMatch>

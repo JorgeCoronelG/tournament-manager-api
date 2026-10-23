@@ -96,6 +96,20 @@ class MatchService extends BaseService implements MatchServiceInterface
         });
     }
 
+    public function recordResult(Tournament $tournament, GameMatch $match, int $homeScore, int $awayScore): GameMatch
+    {
+        $this->assertResultsOpen($tournament, $match);
+
+        return $this->matchRepository->setResult($match, $homeScore, $awayScore);
+    }
+
+    public function clearResult(Tournament $tournament, GameMatch $match): GameMatch
+    {
+        $this->assertResultsOpen($tournament, $match);
+
+        return $this->matchRepository->setResult($match, null, null);
+    }
+
     public function deleteAll(Tournament $tournament): void
     {
         $this->assertInProgress($tournament, Message::MATCHES_DELETE_ONLY_IN_PROGRESS);
@@ -146,6 +160,23 @@ class MatchService extends BaseService implements MatchServiceInterface
         }
 
         return ['generated' => $matches->isNotEmpty(), 'groups' => $groups];
+    }
+
+    private function assertResultsOpen(Tournament $tournament, GameMatch $match): void
+    {
+        $unprocessable = Response::HTTP_UNPROCESSABLE_ENTITY;
+
+        if ($tournament->status === TournamentStatus::PLANNING) {
+            throw new CustomErrorException(Message::TOURNAMENT_NOT_STARTED, $unprocessable);
+        }
+
+        if ($tournament->status !== TournamentStatus::IN_PROGRESS) {
+            throw new CustomErrorException(Message::REGULAR_STAGE_CLOSED, $unprocessable);
+        }
+
+        if ($match->phase !== MatchPhase::REGULAR_STAGE) {
+            throw new CustomErrorException(Message::MATCH_RESULT_ONLY_REGULAR_STAGE, $unprocessable);
+        }
     }
 
     private function assertInProgress(Tournament $tournament, string $message): void

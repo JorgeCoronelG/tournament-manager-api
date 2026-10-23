@@ -140,6 +140,18 @@ class Message
         return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";
     }
 
+    public const REGULAR_STAGE_CLOSED = 'La fase regular ya está cerrada.';
+
+    public const TOURNAMENT_NOT_STARTED = 'El torneo no ha iniciado.';
+
+    public const MATCH_RESULT_ONLY_REGULAR_STAGE = 'Solo se puede capturar el resultado de partidos de fase regular.';
+
+    public const STANDINGS_GROUP_INVALID = 'El grupo debe ser de fase regular y pertenecer a este torneo.';
+
+    public const STANDINGS_NOT_TIED = 'Esos equipos no están empatados.';
+
+    public const STANDINGS_MANUAL_ORDER_ONLY_IN_PROGRESS = 'El orden manual solo se puede modificar con el torneo en curso.';
+
     public const GROUPS_TOURNAMENT_PLAYOFFS = 'Con el torneo en liguilla no se pueden modificar los grupos.';
 
     public const PLAYOFFS_LOCKED = 'Las liguillas ya no se pueden modificar.';
@@ -179,10 +191,11 @@ class Message
         return "El total de equipos de la liguilla debe ser 2, 4, 8, 16 o 32 (actualmente {$total}).";
     }
 
-    public static function getMessagePlayoffRoundDatesCount(int $rounds): string
-    {
-        return "Debes indicar una fecha por cada ronda ({$rounds} rondas).";
-    }
+    public const PLAYOFF_ROUND_DATES_COUNT = 'Indica una fecha por cada partido de la liguilla.';
+
+    public const PLAYOFF_ROUND_LEGS_COUNT = 'Indica cuántos partidos tiene cada ronda.';
+
+    public const PLAYOFF_ROUND_LEGS_VALUE = 'Cada ronda debe ser de un partido o de ida y vuelta.';
 
     public const PLAYOFF_ROUND_DATES_ORDER = 'Las fechas de las rondas deben ir en orden.';
 

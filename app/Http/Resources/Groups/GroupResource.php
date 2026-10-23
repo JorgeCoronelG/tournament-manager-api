@@ -51,11 +51,8 @@ class GroupResource extends JsonResource
             'rounds' => PlayoffRounds::count($total),
             'round_names' => PlayoffRounds::names($total),
             'round_dates' => $group->round_dates ?: null,
-            'rounds_detail' => array_map(
-                fn (string $name, ?string $date) => ['name' => $name, 'date' => $date],
-                PlayoffRounds::names($total),
-                $group->resolvedRoundDates()
-            ),
+            'round_legs' => $group->legsPerRound(),
+            'rounds_detail' => $group->roundsDetail(),
             'final_date' => $group->finalDate(),
         ];
     }

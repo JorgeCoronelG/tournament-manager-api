@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Contracts\Services\MatchServiceInterface;
+use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\RosterStatus;
@@ -10,6 +12,7 @@ use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
 use App\Models\Field;
+use App\Models\GameMatch;
 use App\Models\League;
 use App\Models\LeagueReferee;
 use App\Models\Player;
@@ -66,6 +69,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedPlayoffStageTournaments($leagues);
         $this->seedFourGroupsTournament($leagues);
         $this->seedOddTournament($leagues);
+        $this->seedMinimumsTournament($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
         $this->seedPlayers();
         $this->seedRosters($leagues);
@@ -264,11 +268,11 @@ class DevelopmentSeeder extends Seeder
         }
 
         $scenarios = [
-            ['Torneo en Fase Regular', TournamentStatus::IN_PROGRESS, null],
-            ['Torneo en Liguilla', TournamentStatus::PLAYOFFS, ['2026-12-07', '2026-12-16']],
+            ['Torneo en Fase Regular', TournamentStatus::IN_PROGRESS, null, null],
+            ['Torneo en Liguilla', TournamentStatus::PLAYOFFS, ['2026-12-07', '2026-12-10', '2026-12-16'], [2, 1]],
         ];
 
-        foreach ($scenarios as [$name, $status, $roundDates]) {
+        foreach ($scenarios as [$name, $status, $roundDates, $roundLegs]) {
             if ($league->tournaments()->where('name', $name)->exists()) {
                 continue;
             }
@@ -284,6 +288,10 @@ class DevelopmentSeeder extends Seeder
                 Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $regular->id]);
             }
 
+            if ($status === TournamentStatus::PLAYOFFS) {
+                $this->seedPlayedCalendar($tournament);
+            }
+
             $playoff = new TournamentGroup;
             $playoff->forceFill([
                 'tournament_id' => $tournament->id,
@@ -292,6 +300,7 @@ class DevelopmentSeeder extends Seeder
                 'start_date' => $roundDates[0] ?? null,
                 'round_interval_days' => 7,
                 'round_dates' => $roundDates,
+                'round_legs' => $roundLegs,
             ])->save();
 
             $source = new PlayoffSource;
@@ -357,6 +366,7 @@ class DevelopmentSeeder extends Seeder
             'start_date' => null,
             'round_interval_days' => 7,
             'round_dates' => null,
+            'round_legs' => [1, 2, 1],
         ])->save();
 
         foreach ($groups as $group) {
@@ -400,6 +410,61 @@ class DevelopmentSeeder extends Seeder
             foreach ($teams->slice($offset, $size) as $team) {
                 Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
             }
+        }
+    }
+
+    /**
+     * Calendario regular completo del torneo con todos los partidos jugados y sin empates totales: el equipo de
+     * inscripción más antigua gana a todos, el siguiente a los demás, etc. (tabla final de 9, 6, 3 y 0 puntos).
+     */
+    private function seedPlayedCalendar(Tournament $tournament): void
+    {
+        $status = $tournament->status;
+        $tournament->forceFill(['status' => TournamentStatus::IN_PROGRESS])->save();
+        app(MatchServiceInterface::class)->generate($tournament, false);
+        $tournament->forceFill(['status' => $status])->save();
+
+        $strength = $tournament->registrations()->orderBy('id')->pluck('id')->flip();
+
+        foreach (GameMatch::query()->where('tournament_id', $tournament->id)->get() as $match) {
+            $homeWins = $strength[$match->home_registration_id] < $strength[$match->away_registration_id];
+
+            $match->forceFill([
+                'status' => MatchStatus::PLAYED,
+                'home_score' => $homeWins ? 2 : 0,
+                'away_score' => $homeWins ? 0 : 2,
+            ])->save();
+        }
+    }
+
+    /**
+     * «Torneo Mínimos» en curso: un grupo de 4 equipos, una vuelta y 6 partidos mínimos para liguilla (cada equipo
+     * jugará 3), sin calendario: generarlo se rechaza por los partidos mínimos. No hace nada si ya existe.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedMinimumsTournament(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || $league->tournaments()->where('name', 'Torneo Mínimos')->exists()) {
+            return;
+        }
+
+        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo Mínimos',
+            'gender' => TournamentGender::MIXED,
+            'min_age' => null,
+            'max_age' => null,
+            'rounds' => 1,
+            'min_matches_for_playoffs' => 6,
+            'start_date' => now()->subWeek()->toDateString(),
+        ]);
+        $group = $tournament->groups()->firstOrFail();
+
+        foreach ($league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(4)->get() as $team) {
+            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
         }
     }
 

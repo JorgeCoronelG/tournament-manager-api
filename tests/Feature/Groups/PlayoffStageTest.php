@@ -77,7 +77,7 @@ class PlayoffStageTest extends TestCase
             'type' => 'playoff', 'name' => 'Liguilla',
             'sources' => [['source_group_id' => $a->id, 'position_start' => 1, 'position_end' => 4]],
         ], $header)->assertCreated()->assertJsonPath('start_date', null)->assertJsonPath('final_date', null)
-            ->assertJsonPath('rounds_detail.0.date', null)->assertJsonPath('editable', true)->json('id');
+            ->assertJsonPath('rounds_detail.0.dates', [null])->assertJsonPath('editable', true)->json('id');
 
         $this->postJson($url, [
             'type' => 'playoff', 'name' => 'Otra',
@@ -128,6 +128,90 @@ class PlayoffStageTest extends TestCase
         $this->patchJson("{$url}/{$id}", ['start_date' => null], $header)->assertOk()
             ->assertJsonPath('round_dates', null)->assertJsonPath('final_date', null);
         $this->getJson($url, $header)->assertJsonPath('finals_aligned', null);
+    }
+
+    public function test_round_legs_and_dates_per_match(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        $a = $tournament->groups()->firstOrFail();
+        $url = $this->groupsUrl($league, $tournament);
+        $sources = [['source_group_id' => $a->id, 'position_start' => 1, 'position_end' => 8]];
+
+        $id = $this->postJson($url, [
+            'type' => 'playoff', 'name' => 'Liguilla', 'start_date' => '2026-12-07', 'round_legs' => [2, 2, 1],
+            'round_dates' => ['2026-12-07', '2026-12-08', '2026-12-14', '2026-12-15', '2026-12-21'], 'sources' => $sources,
+        ], $header)->assertCreated()
+            ->assertJsonPath('round_legs', [2, 2, 1])
+            ->assertJsonPath('rounds_detail.1', ['name' => 'Semifinal', 'legs' => 2, 'dates' => ['2026-12-14', '2026-12-15']])
+            ->assertJsonPath('rounds_detail.2.dates', ['2026-12-21'])
+            ->assertJsonPath('round_dates', ['2026-12-07', '2026-12-08', '2026-12-14', '2026-12-15', '2026-12-21'])
+            ->assertJsonPath('final_date', '2026-12-21')
+            ->assertJsonPath('rounds', 3)
+            ->json('id');
+
+        // Sin fechas guardadas se calculan por partido con el intervalo.
+        $this->patchJson("{$url}/{$id}", ['start_date' => '2026-12-01'], $header)->assertOk()
+            ->assertJsonPath('round_dates', null)
+            ->assertJsonPath('rounds_detail.0.dates', ['2026-12-01', '2026-12-08'])
+            ->assertJsonPath('rounds_detail.2.dates', ['2026-12-29'])
+            ->assertJsonPath('final_date', '2026-12-29');
+    }
+
+    public function test_round_legs_default_to_one_per_round_and_are_validated(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        $a = $tournament->groups()->firstOrFail();
+        $url = $this->groupsUrl($league, $tournament);
+        $body = fn (array $extra) => $extra + [
+            'type' => 'playoff', 'name' => 'Liguilla',
+            'sources' => [['source_group_id' => $a->id, 'position_start' => 1, 'position_end' => 4]],
+        ];
+
+        $this->postJson($url, $body(['name' => 'B', 'round_legs' => [2]]), $header)->assertStatus(422)->assertJsonPath('error.round_legs.0', Message::PLAYOFF_ROUND_LEGS_COUNT);
+        $this->postJson($url, $body(['name' => 'C', 'round_legs' => [1, 3]]), $header)->assertStatus(422)->assertJsonPath('error.round_legs.0', Message::PLAYOFF_ROUND_LEGS_VALUE);
+        $this->postJson($url, $body(['name' => 'D', 'round_legs' => [1, 'a']]), $header)->assertStatus(422)->assertJsonPath('error.round_legs.0', Message::PLAYOFF_ROUND_LEGS_VALUE);
+        $this->postJson($url, $body(['name' => 'E', 'start_date' => '2026-12-01', 'round_legs' => [2, 1], 'round_dates' => ['2026-12-01', '2026-12-02']]), $header)
+            ->assertStatus(422)->assertJsonPath('error.round_dates.0', Message::PLAYOFF_ROUND_DATES_COUNT);
+
+        // Ya sin errores y al final, porque una liguilla creada ocupa esas posiciones.
+        $this->postJson($url, $body([]), $header)->assertCreated()->assertJsonPath('round_legs', [1, 1]);
+    }
+
+    public function test_changing_round_legs_or_sources_clears_the_dates(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        $a = $tournament->groups()->firstOrFail();
+        $url = $this->groupsUrl($league, $tournament);
+        $sources = [['source_group_id' => $a->id, 'position_start' => 1, 'position_end' => 4]];
+        $id = $this->postJson($url, [
+            'type' => 'playoff', 'name' => 'Liguilla', 'start_date' => '2026-12-01', 'round_legs' => [2, 1],
+            'round_dates' => ['2026-12-01', '2026-12-02', '2026-12-09'], 'sources' => $sources,
+        ], $header)->assertCreated()->json('id');
+
+        // Mismos partidos en total: las fechas se conservan.
+        $this->patchJson("{$url}/{$id}", ['round_legs' => [1, 2]], $header)->assertOk()
+            ->assertJsonPath('round_legs', [1, 2])->assertJsonPath('round_dates', ['2026-12-01', '2026-12-02', '2026-12-09']);
+
+        // Cambia la cantidad de partidos: se vacían.
+        $this->patchJson("{$url}/{$id}", ['round_legs' => [2, 2]], $header)->assertOk()
+            ->assertJsonPath('round_legs', [2, 2])->assertJsonPath('round_dates', null)->assertJsonPath('final_date', '2026-12-22');
+
+        $this->patchJson("{$url}/{$id}", ['round_dates' => ['2026-12-01', '2026-12-02', '2026-12-09', '2026-12-10']], $header)->assertOk();
+        $this->patchJson("{$url}/{$id}", ['sources' => [['source_group_id' => $a->id, 'position_start' => 1, 'position_end' => 2]]], $header)->assertOk()
+            ->assertJsonPath('round_legs', [1])->assertJsonPath('round_dates', null);
+    }
+
+    public function test_round_legs_cannot_be_edited_once_the_tournament_is_in_playoffs(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        $a = $tournament->groups()->firstOrFail();
+        $url = $this->groupsUrl($league, $tournament);
+        $id = $this->postJson($url, [
+            'type' => 'playoff', 'name' => 'Liguilla', 'sources' => [['source_group_id' => $a->id, 'position_start' => 1, 'position_end' => 4]],
+        ], $header)->assertCreated()->json('id');
+        $tournament->forceFill(['status' => TournamentStatus::PLAYOFFS])->save();
+
+        $this->patchJson("{$url}/{$id}", ['round_legs' => [2, 2]], $header)->assertStatus(422)->assertJsonPath('error', Message::PLAYOFFS_LOCKED);
     }
 
     public function test_starting_without_playoffs_is_allowed(): void

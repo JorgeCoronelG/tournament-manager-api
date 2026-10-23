@@ -34,6 +34,20 @@ interface MatchServiceInterface extends BaseServiceInterface
     public function deleteAll(Tournament $tournament): void;
 
     /**
+     * Guarda (o corrige) el resultado de un partido de fase regular y lo deja jugado. Solo con el torneo en curso.
+     *
+     * @throws CustomErrorException
+     */
+    public function recordResult(Tournament $tournament, GameMatch $match, int $homeScore, int $awayScore): GameMatch;
+
+    /**
+     * Anula el resultado: marcadores nulos y partido programado. Mismas restricciones que recordResult.
+     *
+     * @throws CustomErrorException
+     */
+    public function clearResult(Tournament $tournament, GameMatch $match): GameMatch;
+
+    /**
      * @param  array{group_id?: int, matchday?: int, status?: string, round_number?: int, phase?: string}  $filters
      * @return LengthAwarePaginator<int, GameMatch>
      */

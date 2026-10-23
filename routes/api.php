@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RosterController;
+use App\Http\Controllers\Api\StandingController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
 use App\Http\Controllers\Api\UserController;
@@ -88,6 +89,12 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::get('/tournaments/{tournament}/matches/schedule', [MatchController::class, 'schedule']);
             Route::post('/tournaments/{tournament}/matches/generate', [MatchController::class, 'generate']);
             Route::delete('/tournaments/{tournament}/matches', [MatchController::class, 'destroy']);
+            Route::patch('/tournaments/{tournament}/matches/{match}/result', [MatchController::class, 'updateResult'])->whereNumber('match');
+            Route::delete('/tournaments/{tournament}/matches/{match}/result', [MatchController::class, 'destroyResult'])->whereNumber('match');
+
+            Route::get('/tournaments/{tournament}/standings', [StandingController::class, 'index']);
+            Route::put('/tournaments/{tournament}/standings/manual-order', [StandingController::class, 'saveManualOrder']);
+            Route::delete('/tournaments/{tournament}/standings/manual-order', [StandingController::class, 'clearManualOrder']);
 
             // available-teams antes de /{registration}: si no, se tomaría como el id de una inscripción.
             Route::get('/tournaments/{tournament}/registrations', [RegistrationController::class, 'index']);

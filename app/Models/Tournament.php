@@ -91,6 +91,14 @@ class Tournament extends Model
     }
 
     /**
+     * @return HasMany<GameMatch, $this>
+     */
+    public function matches(): HasMany
+    {
+        return $this->hasMany(GameMatch::class);
+    }
+
+    /**
      * @return HasMany<Registration, $this>
      */
     public function registrations(): HasMany

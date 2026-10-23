@@ -26,6 +26,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'RosterServiceInterface' => 'RosterService',
         'GroupServiceInterface' => 'GroupService',
         'MatchServiceInterface' => 'MatchService',
+        'StandingServiceInterface' => 'StandingService',
         'LogoProcessorInterface' => 'LogoImageProcessor',
     ];
 

@@ -8,6 +8,7 @@ use App\Core\Classes\ListQuery;
 use App\Core\Enum\MatchPhase;
 use App\Core\Enum\MatchStatus;
 use App\Http\Requests\Matches\GenerateMatchesRequest;
+use App\Http\Requests\Matches\MatchResultRequest;
 use App\Http\Resources\Matches\MatchResource;
 use App\Models\GameMatch;
 use App\Models\League;
@@ -57,6 +58,20 @@ class MatchController extends BaseApiController
     public function generate(GenerateMatchesRequest $request, League $league, Tournament $tournament): JsonResponse
     {
         return $this->successResponse($this->matchService->generate($tournament, $request->shuffle()), Response::HTTP_OK);
+    }
+
+    public function updateResult(MatchResultRequest $request, League $league, Tournament $tournament, GameMatch $match): JsonResponse
+    {
+        $match = $this->matchService->recordResult($tournament, $match, $request->integer('home_score'), $request->integer('away_score'));
+
+        return $this->showOne(new MatchResource($match->load(['group', 'home.team', 'away.team'])));
+    }
+
+    public function destroyResult(League $league, Tournament $tournament, GameMatch $match): JsonResponse
+    {
+        $match = $this->matchService->clearResult($tournament, $match);
+
+        return $this->showOne(new MatchResource($match->load(['group', 'home.team', 'away.team'])));
     }
 
     public function destroy(League $league, Tournament $tournament): Response

@@ -11,6 +11,7 @@ use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TeamStatus;
 use App\Models\GameMatch;
 use App\Models\Registration;
+use App\Models\StandingManualOrder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -75,6 +76,64 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->orderBy('id');
 
         return $query->paginate($builder);
+    }
+
+    public function setResult(GameMatch $match, ?int $homeScore, ?int $awayScore): GameMatch
+    {
+        $match->forceFill([
+            'home_score' => $homeScore,
+            'away_score' => $awayScore,
+            'home_penalties' => null,
+            'away_penalties' => null,
+            'status' => $homeScore === null ? MatchStatus::SCHEDULED : MatchStatus::PLAYED,
+        ]);
+        $match->saveOrFail();
+
+        return $match;
+    }
+
+    public function playedOfGroup(int $groupId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('group_id', $groupId)
+            ->where('phase', MatchPhase::REGULAR_STAGE)
+            ->where('status', MatchStatus::PLAYED)
+            ->get();
+    }
+
+    public function activeRegistrationsOfGroup(int $groupId): Collection
+    {
+        return Registration::query()
+            ->where('group_id', $groupId)
+            ->where('status', RegistrationStatus::ACTIVE)
+            ->with('team')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function manualOrder(int $groupId): array
+    {
+        return StandingManualOrder::query()->where('group_id', $groupId)->pluck('position', 'registration_id')->map(fn (mixed $position) => is_numeric($position) ? (int) $position : 0)->all();
+    }
+
+    public function saveManualOrder(int $tournamentId, int $groupId, array $registrationIds): void
+    {
+        StandingManualOrder::query()->where('group_id', $groupId)->whereIn('registration_id', $registrationIds)->delete();
+
+        foreach ($registrationIds as $index => $registrationId) {
+            $row = new StandingManualOrder;
+            $row->forceFill([
+                'tournament_id' => $tournamentId,
+                'group_id' => $groupId,
+                'registration_id' => $registrationId,
+                'position' => $index + 1,
+            ])->save();
+        }
+    }
+
+    public function clearManualOrder(int $groupId): void
+    {
+        StandingManualOrder::query()->where('group_id', $groupId)->delete();
     }
 
     public function regularMatches(int $tournamentId): Collection

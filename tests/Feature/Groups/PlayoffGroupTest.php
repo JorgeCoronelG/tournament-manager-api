@@ -205,8 +205,9 @@ class PlayoffGroupTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('start_date', '2026-12-07')
             ->assertJsonPath('round_dates', ['2026-12-07', '2026-12-16', '2026-12-30'])
-            ->assertJsonPath('rounds_detail.0', ['name' => 'Cuartos de final', 'date' => '2026-12-07'])
-            ->assertJsonPath('rounds_detail.2', ['name' => 'Final', 'date' => '2026-12-30'])
+            ->assertJsonPath('round_legs', [1, 1, 1])
+            ->assertJsonPath('rounds_detail.0', ['name' => 'Cuartos de final', 'legs' => 1, 'dates' => ['2026-12-07']])
+            ->assertJsonPath('rounds_detail.2', ['name' => 'Final', 'legs' => 1, 'dates' => ['2026-12-30']])
             ->assertJsonPath('final_date', '2026-12-30');
     }
 
@@ -221,7 +222,7 @@ class PlayoffGroupTest extends TestCase
         ];
 
         $this->postJson($url, $body(['2026-12-01']), $header)->assertStatus(422)
-            ->assertJsonPath('error.round_dates.0', Message::getMessagePlayoffRoundDatesCount(2));
+            ->assertJsonPath('error.round_dates.0', Message::PLAYOFF_ROUND_DATES_COUNT);
         $this->postJson($url, $body(['2026-12-08', '2026-12-01']), $header)->assertStatus(422)
             ->assertJsonPath('error.round_dates.0', Message::PLAYOFF_ROUND_DATES_ORDER);
         $this->postJson($url, $body(['2026-12-01', '2026-12-01']), $header)->assertStatus(422);
@@ -240,7 +241,7 @@ class PlayoffGroupTest extends TestCase
 
         $this->patchJson("{$url}/{$id}", ['start_date' => '2026-12-10'], $header)->assertOk()
             ->assertJsonPath('round_dates', null)
-            ->assertJsonPath('rounds_detail.1.date', '2026-12-17')
+            ->assertJsonPath('rounds_detail.1.dates', ['2026-12-17'])
             ->assertJsonPath('final_date', '2026-12-17');
     }
 

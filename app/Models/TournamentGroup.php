@@ -33,6 +33,7 @@ class TournamentGroup extends Model
         'type' => TournamentGroupType::class,
         'start_date' => 'date',
         'round_dates' => 'array',
+        'round_legs' => 'array',
     ];
 
     /**
@@ -74,39 +75,84 @@ class TournamentGroup extends Model
     }
 
     /**
-     * Fecha de cada ronda, de la primera a la final: round_dates si existe; si no, start_date + (n - 1) * round_interval_days
-     * (n desde 1); null en cada ronda sin start_date.
+     * Partidos de cada ronda (1 o 2), de la primera a la final: round_legs si coincide con las rondas; si no, 1 por ronda.
+     *
+     * @return list<int>
+     */
+    public function legsPerRound(): array
+    {
+        $rounds = PlayoffRounds::count($this->totalTeams());
+        $stored = $this->round_legs;
+
+        if (is_array($stored) && count($stored) === $rounds) {
+            return array_values(array_map(fn (mixed $legs) => $legs === 2 ? 2 : 1, $stored));
+        }
+
+        return array_fill(0, $rounds, 1);
+    }
+
+    /**
+     * Total de partidos de ronda de la liguilla: suma de los partidos de cada ronda.
+     */
+    public function matchCount(): int
+    {
+        return array_sum($this->legsPerRound());
+    }
+
+    /**
+     * Fecha de cada partido de ronda, en orden: round_dates si coincide con el total de partidos; si no,
+     * start_date + k * round_interval_days para el partido k (desde 0); null en cada uno sin start_date.
      *
      * @return list<string|null>
      */
-    public function resolvedRoundDates(): array
+    public function resolvedMatchDates(): array
     {
         if ($this->type !== TournamentGroupType::PLAYOFF) {
             return [];
         }
 
-        $rounds = PlayoffRounds::count($this->totalTeams());
+        $matches = $this->matchCount();
         $stored = $this->round_dates;
 
-        if (is_array($stored) && $stored !== [] && count($stored) === $rounds) {
+        if (is_array($stored) && $stored !== [] && count($stored) === $matches) {
             return array_values($stored);
         }
 
         $dates = [];
 
-        for ($n = 1; $n <= $rounds; $n++) {
-            $dates[] = $this->start_date?->copy()->addDays(($n - 1) * (int) $this->round_interval_days)->toDateString();
+        for ($k = 0; $k < $matches; $k++) {
+            $dates[] = $this->start_date?->copy()->addDays($k * (int) $this->round_interval_days)->toDateString();
         }
 
         return $dates;
     }
 
     /**
-     * Fecha de la final: la de la última ronda; null sin fechas.
+     * Rondas con su nombre, partidos y la fecha (o null) de cada partido.
+     *
+     * @return list<array{name: string, legs: int, dates: list<string|null>}>
+     */
+    public function roundsDetail(): array
+    {
+        $dates = $this->resolvedMatchDates();
+        $detail = [];
+        $offset = 0;
+
+        foreach (PlayoffRounds::names($this->totalTeams()) as $index => $name) {
+            $legs = $this->legsPerRound()[$index] ?? 1;
+            $detail[] = ['name' => $name, 'legs' => $legs, 'dates' => array_slice($dates, $offset, $legs)];
+            $offset += $legs;
+        }
+
+        return $detail;
+    }
+
+    /**
+     * Fecha de la final: la del último partido de la última ronda; null sin fechas.
      */
     public function finalDate(): ?string
     {
-        $dates = $this->resolvedRoundDates();
+        $dates = $this->resolvedMatchDates();
 
         return $dates === [] ? null : end($dates);
     }

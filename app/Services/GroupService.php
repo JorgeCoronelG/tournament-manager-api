@@ -65,14 +65,17 @@ class GroupService extends BaseService implements GroupServiceInterface
         $this->assertSources($tournament, $sources, null, is_string($attributes['name']) ? $attributes['name'] : '');
 
         $startDate = is_string($attributes['start_date'] ?? null) ? $attributes['start_date'] : null;
-        $roundDates = $this->normalizeRoundDates($attributes['round_dates'] ?? null, $this->roundsOf($sources), $startDate);
+        $rounds = $this->roundsOf($sources);
+        $roundLegs = $this->normalizeRoundLegs($attributes['round_legs'] ?? null, $rounds);
+        $roundDates = $this->normalizeRoundDates($attributes['round_dates'] ?? null, $roundLegs === null ? $rounds : array_sum($roundLegs), $startDate);
 
-        return DB::transaction(function () use ($tournament, $type, $attributes, $sources, $roundDates, $startDate) {
+        return DB::transaction(function () use ($tournament, $type, $attributes, $sources, $roundDates, $roundLegs, $startDate) {
             $group = $this->groupRepository->createGroup($tournament->id, $type->value, [
                 'name' => $attributes['name'],
                 'start_date' => $startDate,
                 'round_interval_days' => $attributes['round_interval_days'] ?? 7,
                 'round_dates' => $roundDates,
+                'round_legs' => $roundLegs,
             ]);
             $this->groupRepository->replaceSources($group, $sources);
 
@@ -101,13 +104,25 @@ class GroupService extends BaseService implements GroupServiceInterface
         $currentRounds = PlayoffRounds::count($group->totalTeams());
         $rounds = $sources !== null ? $this->roundsOf($sources) : $currentRounds;
 
+        if (array_key_exists('round_legs', $attributes)) {
+            $legs = $this->normalizeRoundLegs($attributes['round_legs'], $rounds);
+            $fields['round_legs'] = $legs;
+        } elseif ($rounds !== $currentRounds) {
+            $legs = null;
+            $fields['round_legs'] = null;
+        } else {
+            $legs = $group->round_legs === null ? null : $group->legsPerRound();
+        }
+
+        $matches = $legs === null ? $rounds : array_sum($legs);
+
         if (array_key_exists('round_dates', $attributes)) {
             $startDate = array_key_exists('start_date', $attributes)
                 ? (is_string($attributes['start_date']) ? $attributes['start_date'] : null)
                 : $group->start_date?->toDateString();
-            $fields['round_dates'] = $this->normalizeRoundDates($attributes['round_dates'], $rounds, $startDate);
-        } elseif (array_key_exists('start_date', $attributes) || $rounds !== $currentRounds) {
-            // Solo start_date, o cambió el número de rondas: vuelve al cálculo automático.
+            $fields['round_dates'] = $this->normalizeRoundDates($attributes['round_dates'], $matches, $startDate);
+        } elseif (array_key_exists('start_date', $attributes) || $rounds !== $currentRounds || $matches !== $group->matchCount()) {
+            // Solo start_date, o cambió el número de rondas o de partidos: vuelve al cálculo automático.
             $fields['round_dates'] = null;
         }
 
@@ -270,13 +285,41 @@ class GroupService extends BaseService implements GroupServiceInterface
     }
 
     /**
-     * Fechas de rondas: null si vienen vacías; si no, requieren start_date, una por ronda, en orden estrictamente creciente y la primera igual a start_date.
+     * Partidos por ronda: null si vienen vacíos; si no, uno por ronda y cada valor 1 (un partido) o 2 (ida y vuelta).
+     *
+     * @return list<int>|null
+     *
+     * @throws ValidationException
+     */
+    private function normalizeRoundLegs(mixed $legs, int $rounds): ?array
+    {
+        if (! is_array($legs) || $legs === []) {
+            return null;
+        }
+
+        $legs = array_values($legs);
+
+        if (count($legs) !== $rounds) {
+            throw ValidationException::withMessages(['round_legs' => Message::PLAYOFF_ROUND_LEGS_COUNT]);
+        }
+
+        foreach ($legs as $value) {
+            if ($value !== 1 && $value !== 2) {
+                throw ValidationException::withMessages(['round_legs' => Message::PLAYOFF_ROUND_LEGS_VALUE]);
+            }
+        }
+
+        return array_map(fn (mixed $value) => (int) $value, $legs);
+    }
+
+    /**
+     * Fechas de partidos de ronda: null si vienen vacías; si no, requieren start_date, una por partido de ronda, en orden estrictamente creciente y la primera igual a start_date.
      *
      * @return list<string>|null
      *
      * @throws ValidationException
      */
-    private function normalizeRoundDates(mixed $dates, int $rounds, ?string $startDate): ?array
+    private function normalizeRoundDates(mixed $dates, int $matches, ?string $startDate): ?array
     {
         if (! is_array($dates) || $dates === []) {
             return null;
@@ -288,8 +331,8 @@ class GroupService extends BaseService implements GroupServiceInterface
             throw ValidationException::withMessages(['round_dates' => Message::PLAYOFF_ROUND_DATES_NEED_START]);
         }
 
-        if (count($dates) !== $rounds) {
-            throw ValidationException::withMessages(['round_dates' => Message::getMessagePlayoffRoundDatesCount($rounds)]);
+        if (count($dates) !== $matches) {
+            throw ValidationException::withMessages(['round_dates' => Message::PLAYOFF_ROUND_DATES_COUNT]);
         }
 
         for ($i = 1; $i < count($dates); $i++) {

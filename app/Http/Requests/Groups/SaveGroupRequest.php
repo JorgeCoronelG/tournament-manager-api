@@ -45,6 +45,7 @@ class SaveGroupRequest extends FormRequest
             $rules += [
                 'start_date' => ['nullable', 'date_format:Y-m-d'],
                 'round_dates' => ['nullable', 'array'],
+                'round_legs' => ['nullable', 'array'],
                 'round_dates.*' => ['required', 'date_format:Y-m-d'],
                 'round_interval_days' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_SMALLINT],
                 'sources' => [$editing ? 'sometimes' : 'required', 'array', 'min:1'],
@@ -67,7 +68,8 @@ class SaveGroupRequest extends FormRequest
             'type' => 'tipo',
             'start_date' => 'fecha de inicio',
             'round_dates' => 'fechas de las rondas',
-            'round_dates.*' => 'fecha de la ronda',
+            'round_dates.*' => 'fecha del partido',
+            'round_legs' => 'partidos por ronda',
             'round_interval_days' => 'días entre rondas',
             'sources' => 'fuentes',
             'sources.*.source_group_id' => 'grupo de origen',

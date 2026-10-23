@@ -19,8 +19,11 @@ return new class extends Migration
             // Solo aplica a type playoff: fecha de la primera ronda y días entre rondas. Los equipos salen de playoff_sources.
             $table->date('start_date')->nullable();
             $table->unsignedSmallInteger('round_interval_days')->default(7);
-            // Solo type playoff: lista JSON de fechas Y-m-d, una por ronda en orden. Si es null se calculan con round_interval_days.
+            // Solo type playoff: lista JSON de fechas Y-m-d, una por partido de ronda en orden. Si es null se calculan con round_interval_days.
             $table->json('round_dates')->nullable();
+            // Solo type playoff: lista JSON con un valor por ronda, 1 (un partido) o 2 (ida y vuelta). Null: todas a un partido.
+            // round_dates trae una fecha por partido (suma de round_legs).
+            $table->json('round_legs')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
