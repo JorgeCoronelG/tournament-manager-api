@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
+use App\Http\Controllers\Api\MatchController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
@@ -81,6 +82,12 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::get('/tournaments/{tournament}/groups/{group}', [GroupController::class, 'show'])->whereNumber('group');
             Route::patch('/tournaments/{tournament}/groups/{group}', [GroupController::class, 'update'])->whereNumber('group');
             Route::delete('/tournaments/{tournament}/groups/{group}', [GroupController::class, 'destroy'])->whereNumber('group');
+
+            // generate y schedule son rutas fijas: no hay /matches/{match}.
+            Route::get('/tournaments/{tournament}/matches', [MatchController::class, 'index']);
+            Route::get('/tournaments/{tournament}/matches/schedule', [MatchController::class, 'schedule']);
+            Route::post('/tournaments/{tournament}/matches/generate', [MatchController::class, 'generate']);
+            Route::delete('/tournaments/{tournament}/matches', [MatchController::class, 'destroy']);
 
             // available-teams antes de /{registration}: si no, se tomaría como el id de una inscripción.
             Route::get('/tournaments/{tournament}/registrations', [RegistrationController::class, 'index']);

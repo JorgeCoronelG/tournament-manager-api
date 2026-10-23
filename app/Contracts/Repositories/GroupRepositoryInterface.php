@@ -78,6 +78,11 @@ interface GroupRepositoryInterface extends BaseRepositoryInterface
 
     public function hasMatches(int $groupId): bool;
 
+    /**
+     * Equipos del grupo que juegan: inscripciones activas con equipo no vetado.
+     */
+    public function playingCount(int $groupId): int;
+
     public function isUsedAsSource(int $groupId): bool;
 
     public function countRegistrations(int $groupId): int;

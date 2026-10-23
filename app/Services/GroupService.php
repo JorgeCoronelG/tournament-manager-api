@@ -229,6 +229,8 @@ class GroupService extends BaseService implements GroupServiceInterface
             }
         }
 
+        $this->assertMinMatchesFit($tournament, true);
+
         foreach ($groups->where('type', TournamentGroupType::PLAYOFF) as $playoff) {
             foreach ($playoff->sources as $source) {
                 $teams = $counts[$source->source_group_id] ?? 0;
@@ -301,6 +303,32 @@ class GroupService extends BaseService implements GroupServiceInterface
         }
 
         return $dates;
+    }
+
+    public function assertMinMatchesFit(Tournament $tournament, bool $atStart): void
+    {
+        $minimum = $tournament->min_matches_for_playoffs;
+
+        if ($minimum === null) {
+            return;
+        }
+
+        foreach ($this->groupRepository->regularGroups($tournament->id) as $group) {
+            $teams = $this->groupRepository->playingCount($group->id);
+
+            // Un grupo con menos de 2 equipos no juega: ya lo rechaza la validación de inicio.
+            if ($teams < 2) {
+                continue;
+            }
+
+            $matches = ($teams - 1) * $tournament->rounds;
+
+            if ($minimum > $matches) {
+                $message = Message::getMessageMinMatchesExceed($minimum, $group->name, $matches);
+
+                throw new CustomErrorException($atStart ? $message.' Ajusta el torneo antes de iniciar.' : $message, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
     }
 
     private function assertPlanning(Tournament $tournament): void

@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Contracts\Repositories\GroupRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Enum\RegistrationStatus;
+use App\Core\Enum\TeamStatus;
 use App\Core\Enum\TournamentGroupType;
 use App\Models\PlayoffSource;
 use App\Models\Registration;
@@ -125,6 +126,15 @@ class GroupRepository extends BaseRepository implements GroupRepositoryInterface
     public function hasMatches(int $groupId): bool
     {
         return DB::table('matches')->where('group_id', $groupId)->whereNull('deleted_at')->exists();
+    }
+
+    public function playingCount(int $groupId): int
+    {
+        return Registration::query()
+            ->where('group_id', $groupId)
+            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereHas('team', fn (Builder $team) => $team->where('status', '!=', TeamStatus::BANNED))
+            ->count();
     }
 
     public function isUsedAsSource(int $groupId): bool

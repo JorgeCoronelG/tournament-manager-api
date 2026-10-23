@@ -127,6 +127,19 @@ class Message
 
     public const GROUPS_TOURNAMENT_FINISHED = 'Con el torneo terminado no se pueden modificar los grupos.';
 
+    public const MATCHES_GENERATE_ONLY_IN_PROGRESS = 'El calendario solo se genera con el torneo en curso.';
+
+    public const MATCHES_REGENERATE_HAS_PLAYED = 'Ya hay partidos jugados; el calendario no se puede regenerar.';
+
+    public const MATCHES_DELETE_ONLY_IN_PROGRESS = 'El calendario solo se puede borrar con el torneo en curso.';
+
+    public const MATCHES_DELETE_HAS_PLAYED = 'Ya hay partidos jugados; el calendario no se puede borrar.';
+
+    public static function getMessageMinMatchesExceed(int $minimum, string $group, int $matches): string
+    {
+        return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";
+    }
+
     public const GROUPS_TOURNAMENT_PLAYOFFS = 'Con el torneo en liguilla no se pueden modificar los grupos.';
 
     public const PLAYOFFS_LOCKED = 'Las liguillas ya no se pueden modificar.';

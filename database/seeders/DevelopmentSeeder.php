@@ -65,6 +65,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedGroupsTournament($leagues);
         $this->seedPlayoffStageTournaments($leagues);
         $this->seedFourGroupsTournament($leagues);
+        $this->seedOddTournament($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
         $this->seedPlayers();
         $this->seedRosters($leagues);
@@ -361,6 +362,44 @@ class DevelopmentSeeder extends Seeder
         foreach ($groups as $group) {
             $source = new PlayoffSource;
             $source->forceFill(['playoff_group_id' => $playoff->id, 'source_group_id' => $group->id, 'position_start' => 1, 'position_end' => 2])->save();
+        }
+    }
+
+    /**
+     * «Torneo Impar» en curso, doble vuelta, de la primera liga: Grupo A con 5 equipos y Grupo B con 4, sin partidos
+     * ni liguillas (al generar: A = 10 jornadas y 20 partidos, B = 6 jornadas y 12, total 32). No hace nada si ya existe.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedOddTournament(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || $league->tournaments()->where('name', 'Torneo Impar')->exists()) {
+            return;
+        }
+
+        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo Impar',
+            'gender' => TournamentGender::MIXED,
+            'min_age' => null,
+            'max_age' => null,
+            'rounds' => 2,
+            'min_matches_for_playoffs' => null,
+            'start_date' => now()->subWeek()->toDateString(),
+        ]);
+
+        $tournament->groups()->where('name', TournamentGroup::DEFAULT_NAME)->delete();
+        $teams = $league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(9)->get();
+
+        foreach ([['Grupo A', 0, 5], ['Grupo B', 5, 4]] as [$name, $offset, $size]) {
+            $group = new TournamentGroup;
+            $group->forceFill(['tournament_id' => $tournament->id, 'name' => $name, 'type' => TournamentGroupType::REGULAR_STAGE])->save();
+
+            foreach ($teams->slice($offset, $size) as $team) {
+                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
+            }
         }
     }
 

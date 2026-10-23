@@ -19,6 +19,8 @@ return new class extends Migration
             $table->foreignId('field_id')->nullable()->constrained('fields');
             $table->enum('phase', ['regular_stage', 'round_of_16', 'quarterfinal', 'semifinal', 'final']);
             $table->unsignedSmallInteger('matchday')->nullable();
+            // Vuelta a la que pertenece el partido (1 o 2).
+            $table->unsignedTinyInteger('round_number')->default(1);
             // Nullable: un partido puede estar por programar.
             $table->dateTime('match_datetime')->nullable();
             $table->dateTime('original_datetime')->nullable();
@@ -33,6 +35,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['tournament_id', 'phase', 'status']);
+            $table->index(['tournament_id', 'group_id', 'matchday']);
             $table->index(['referee_user_id', 'match_datetime']);
         });
     }

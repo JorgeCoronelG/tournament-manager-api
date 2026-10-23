@@ -75,4 +75,12 @@ interface GroupServiceInterface extends BaseServiceInterface
      * @throws CustomErrorException
      */
     public function assertReadyToStart(Tournament $tournament): void;
+
+    /**
+     * Si el torneo define partidos mínimos para liguilla, ningún grupo regular puede jugar menos: (equipos - 1) x vueltas.
+     * Cuenta equipos activos y no vetados.
+     *
+     * @throws CustomErrorException
+     */
+    public function assertMinMatchesFit(Tournament $tournament, bool $atStart): void;
 }
