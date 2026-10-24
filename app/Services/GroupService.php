@@ -547,7 +547,7 @@ class GroupService extends BaseService implements GroupServiceInterface
             } elseif ($source['best_count'] < 1 || $source['best_count'] >= count($candidates)) {
                 $errors["sources.{$index}.best_count"] = Message::PLAYOFF_BEST_COUNT;
             } elseif ($this->candidateInOtherPlayoff($position, $candidates, $others)) {
-                $errors["sources.{$index}.position_start"] = Message::getMessagePlayoffOverlap('');
+                $errors["sources.{$index}.position_start"] = Message::PLAYOFF_BEST_OTHER_PLAYOFF;
             }
         }
 
@@ -586,8 +586,16 @@ class GroupService extends BaseService implements GroupServiceInterface
     private function overlaps(array $sources, array $others, mixed $regular): array
     {
         $errors = [];
+        $reported = [];
 
         foreach ($sources as $position => $source) {
+            // Un solo mensaje por grupo con traslape, sin importar cuántas fuentes se traslapen.
+            $groupId = (int) $source['source_group_id'];
+
+            if (isset($reported[$groupId])) {
+                continue;
+            }
+
             $conflicts = array_merge(array_values(array_diff_key($sources, [$position => true])), $others);
 
             foreach ($conflicts as $other) {
@@ -596,6 +604,7 @@ class GroupService extends BaseService implements GroupServiceInterface
                     && $other['position_start'] <= $source['position_end']) {
                     $name = $regular->get($source['source_group_id'])->name ?? '';
                     $errors["sources.{$position}.position_start"] = Message::getMessagePlayoffOverlap($name);
+                    $reported[$groupId] = true;
 
                     break;
                 }

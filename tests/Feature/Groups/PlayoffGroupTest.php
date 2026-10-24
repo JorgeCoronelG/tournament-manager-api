@@ -284,6 +284,27 @@ class PlayoffGroupTest extends TestCase
         $this->getJson($url, $header)->assertJsonPath('finals_aligned', false);
     }
 
+    public function test_overlapping_sources_report_one_message_per_group(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        $a = $tournament->groups()->firstOrFail();
+        $b = $this->makeGroup($tournament, 'Grupo B');
+        $url = $this->groupsUrl($league, $tournament);
+        $source = fn ($group, int $from, int $to) => ['source_group_id' => $group->id, 'position_start' => $from, 'position_end' => $to];
+        $messages = fn (array $sources) => collect($this->postJson($url, ['type' => 'playoff', 'name' => 'Liguilla', 'sources' => $sources], $header)
+            ->assertStatus(422)->json('error'))->flatten()->all();
+
+        $this->assertSame([Message::getMessagePlayoffOverlap('Fase regular')], $messages([$source($a, 1, 2), $source($a, 1, 2)]));
+        $this->assertSame([Message::getMessagePlayoffOverlap('Fase regular')], $messages([$source($a, 1, 2), $source($a, 1, 2), $source($a, 2, 3)]));
+        $this->assertSame(
+            [Message::getMessagePlayoffOverlap('Fase regular'), Message::getMessagePlayoffOverlap('Grupo B')],
+            $messages([$source($a, 1, 2), $source($a, 1, 2), $source($b, 1, 1), $source($b, 1, 1)])
+        );
+        $this->assertSame('Las posiciones de Grupo B se traslapan con otra fuente de liguilla.', Message::getMessagePlayoffOverlap('Grupo B'));
+
+        $this->postJson($url, ['type' => 'playoff', 'name' => 'Liguilla', 'sources' => [$source($a, 1, 2), $source($a, 3, 4)]], $header)->assertCreated();
+    }
+
     public function test_round_names(): void
     {
         $this->assertSame(['Final'], PlayoffRounds::names(2));

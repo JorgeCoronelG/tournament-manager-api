@@ -323,7 +323,7 @@ class RosterPanelTest extends TestCase
 
         $running = Tournament::query()->where('status', TournamentStatus::IN_PROGRESS)->where('name', 'Torneo Relámpago')->firstOrFail();
         $this->assertTrue(Roster::query()->where('tournament_id', $running->id)->where('status', RosterStatus::ACTIVE)->exists());
-        $this->assertSame(Player::query()->count(), 100);
+        $this->assertGreaterThanOrEqual(100, Player::query()->count());
         $this->assertInstanceOf(User::class, $first->admin);
     }
 }

@@ -247,9 +247,11 @@ class Message
 
     public const PLAYOFF_ROUND_DATES_ORDER = 'Las fechas de las rondas deben ir en orden.';
 
+    public const PLAYOFF_BEST_OTHER_PLAYOFF = 'Los candidatos de esa posición ya pertenecen a otra liguilla.';
+
     public static function getMessagePlayoffOverlap(string $group): string
     {
-        return "Las posiciones del grupo {$group} se traslapan con otra fuente de liguilla.";
+        return "Las posiciones de {$group} se traslapan con otra fuente de liguilla.";
     }
 
     public static function getMessageGroupNeedsTeams(string $group): string

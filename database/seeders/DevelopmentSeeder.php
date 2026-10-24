@@ -6,6 +6,7 @@ use App\Contracts\Services\MatchServiceInterface;
 use App\Contracts\Services\PlayoffServiceInterface;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\RosterStatus;
 use App\Core\Enum\TeamStatus;
@@ -26,6 +27,7 @@ use App\Models\Team;
 use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use App\Models\User;
+use App\Services\PlayerEligibility;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -42,6 +44,13 @@ class DevelopmentSeeder extends Seeder
     private const MANAGERS = 15;
 
     private const PLAYERS = 100;
+
+    /**
+     * Plantilla de cada equipo inscrito: filas de roster por estado (jugadores distintos entre sí).
+     *
+     * @var array<string, int>
+     */
+    private const ROSTER_PLAN = ['active' => 10, 'pending' => 2, 'rejected' => 2, 'cancelled' => 2, 'removed' => 1];
 
     /** Inscritos por torneo: los primeros de TEAM_NAMES; el resto queda libre para probar la inscripción. */
     private const TEAMS_PER_TOURNAMENT = 10;
@@ -80,6 +89,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedPlayers();
         $this->seedRosters($leagues);
         $this->seedPlayerScenarios($leagues);
+        $this->seedTeamRosters($leagues);
     }
 
     /**
@@ -688,6 +698,138 @@ class DevelopmentSeeder extends Seeder
         }
 
         return $teams;
+    }
+
+    /**
+     * Plantilla de {@see self::ROSTER_PLAN} (10 activos, 2 pendientes, 2 rechazados, 2 cancelados y 1 removido) en cada
+     * inscripción activa que todavía no tiene filas de roster (las plantillas de prueba de arriba se respetan), para
+     * simular jugadores ya ligados a un equipo y un torneo. Los jugadores salen de los ya sembrados, así que juegan en varios torneos (y en varias ligas); en un mismo
+     * torneo nunca se repiten, cumplen rama y edad y no tienen veto vigente en la liga. Si no alcanzan, crea jugadores
+     * nuevos. No repite filas al volver a correr.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedTeamRosters(array $leagues): void
+    {
+        $eligibility = new PlayerEligibility;
+        $cursor = 0;
+
+        foreach ($leagues as $league) {
+            $admin = $league->admin;
+
+            if ($admin === null) {
+                continue;
+            }
+
+            $banned = PlayerLeagueBan::query()->where('league_id', $league->id)->whereNull('lifted_at')->pluck('player_id')->all();
+
+            foreach ($league->tournaments()->orderBy('id')->get() as $tournament) {
+                $registrations = $tournament->registrations()
+                    ->where('status', RegistrationStatus::ACTIVE)
+                    ->whereDoesntHave('rosters')
+                    ->with('team')
+                    ->orderBy('id')
+                    ->get();
+
+                if ($registrations->isEmpty()) {
+                    continue;
+                }
+
+                $taken = Roster::query()->where('tournament_id', $tournament->id)->where('status', RosterStatus::ACTIVE)->pluck('player_id')->all();
+                $perTeam = array_sum(self::ROSTER_PLAN);
+                $needed = $registrations->count() * $perTeam;
+                $pool = $this->eligiblePlayers($tournament, $eligibility, $banned, $taken);
+
+                for ($attempt = 0; $pool->count() < $needed && $attempt < 5; $attempt++) {
+                    $this->addPlayers(($needed - $pool->count()) * 2);
+                    $pool = $this->eligiblePlayers($tournament, $eligibility, $banned, $taken);
+                }
+
+                if ($pool->count() < $needed) {
+                    continue;
+                }
+
+                // Se empieza en un punto distinto de la lista en cada torneo para que los jugadores se repartan entre ellos.
+                $offset = $cursor % $pool->count();
+                $rotated = $pool->slice($offset)->concat($pool->take($offset))->values();
+                $cursor += $needed;
+                $rows = [];
+
+                foreach ($registrations as $index => $registration) {
+                    $players = $rotated->slice($index * $perTeam, $perTeam)->values();
+                    $number = 0;
+
+                    foreach (self::ROSTER_PLAN as $status => $count) {
+                        for ($i = 0; $i < $count; $i++) {
+                            $rows[] = $this->rosterRow($registration, $players[$number], ++$number, $status, $admin->id);
+                        }
+                    }
+                }
+
+                foreach (array_chunk($rows, 500) as $chunk) {
+                    Roster::query()->insert($chunk);
+                }
+            }
+        }
+    }
+
+    /**
+     * Fila de roster de un estado: las pendientes no tienen respuesta y la removida lleva quién, cuándo y por qué.
+     *
+     * @return array<string, mixed>
+     */
+    private function rosterRow(Registration $registration, Player $player, int $jersey, string $status, int $adminId): array
+    {
+        $pending = $status === RosterStatus::PENDING->value;
+        $removed = $status === RosterStatus::REMOVED->value;
+        $requestedDays = match ($status) {
+            RosterStatus::PENDING->value => 2,
+            RosterStatus::ACTIVE->value, RosterStatus::REMOVED->value => 20,
+            default => 12,
+        };
+
+        return [
+            'registration_id' => $registration->id,
+            'tournament_id' => $registration->tournament_id,
+            'player_id' => $player->id,
+            'jersey_number' => $jersey,
+            'status' => $status,
+            'requested_by_user_id' => $registration->team->manager_user_id ?? $adminId,
+            'requested_at' => now()->subDays($requestedDays),
+            'responded_at' => $pending ? null : now()->subDays($requestedDays - 1),
+            'removed_by_user_id' => $removed ? $adminId : null,
+            'removed_at' => $removed ? now()->subDays(3) : null,
+            'removal_reason' => $removed ? 'Baja solicitada por el delegado' : null,
+            'rejoin_authorized_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    /**
+     * Jugadores que cumplen rama y edad del torneo, sin veto vigente en la liga y que no están activos en el torneo.
+     *
+     * @param  list<int>  $banned
+     * @param  list<int>  $taken
+     * @return Collection<int, Player>
+     */
+    private function eligiblePlayers(Tournament $tournament, PlayerEligibility $eligibility, array $banned, array $taken): Collection
+    {
+        return Player::query()->orderBy('id')->get()
+            ->reject(fn (Player $player) => in_array($player->id, $banned, true) || in_array($player->id, $taken, true))
+            ->filter(fn (Player $player) => $eligibility->isEligible($player, $tournament))
+            ->values();
+    }
+
+    /**
+     * Crea $count jugadores nuevos (usuario con rol jugador y perfil), con ramas alternadas.
+     */
+    private function addPlayers(int $count): void
+    {
+        $existing = User::query()->whereHas('roles', fn ($q) => $q->where('roles.id', RoleEnum::PLAYER->value))->count();
+
+        $this->seedUsersWithRole(RoleEnum::PLAYER, $existing + $count, 'JUG');
+        $this->seedPlayers();
     }
 
     private function seedUsersWithRole(RoleEnum $role, int $total, string $codePrefix): void
