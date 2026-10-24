@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\MatchController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\PlayoffController;
 use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
@@ -91,6 +92,13 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::delete('/tournaments/{tournament}/matches', [MatchController::class, 'destroy']);
             Route::patch('/tournaments/{tournament}/matches/{match}/result', [MatchController::class, 'updateResult'])->whereNumber('match');
             Route::delete('/tournaments/{tournament}/matches/{match}/result', [MatchController::class, 'destroyResult'])->whereNumber('match');
+
+            Route::get('/tournaments/{tournament}/close-regular-phase/preview', [PlayoffController::class, 'preview']);
+            Route::post('/tournaments/{tournament}/close-regular-phase', [PlayoffController::class, 'close']);
+            // {playoffSource} (no {source}): el binding con alcance busca la relación Tournament::playoffSources().
+            Route::put('/tournaments/{tournament}/playoff-sources/{playoffSource}/manual-order', [PlayoffController::class, 'saveBestManualOrder'])->whereNumber('playoffSource');
+            Route::delete('/tournaments/{tournament}/playoff-sources/{playoffSource}/manual-order', [PlayoffController::class, 'clearBestManualOrder'])->whereNumber('playoffSource');
+            Route::get('/tournaments/{tournament}/playoffs', [PlayoffController::class, 'show']);
 
             Route::get('/tournaments/{tournament}/standings', [StandingController::class, 'index']);
             Route::put('/tournaments/{tournament}/standings/manual-order', [StandingController::class, 'saveManualOrder']);

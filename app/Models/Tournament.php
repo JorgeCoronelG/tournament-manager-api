@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 
@@ -91,6 +92,16 @@ class Tournament extends Model
     }
 
     /**
+     * Fuentes de todas las liguillas del torneo.
+     *
+     * @return HasManyThrough<PlayoffSource, TournamentGroup, $this>
+     */
+    public function playoffSources(): HasManyThrough
+    {
+        return $this->hasManyThrough(PlayoffSource::class, TournamentGroup::class, 'tournament_id', 'playoff_group_id');
+    }
+
+    /**
      * @return HasMany<GameMatch, $this>
      */
     public function matches(): HasMany
@@ -111,9 +122,13 @@ class Tournament extends Model
      */
     public function playoffsStarted(): bool
     {
-        return DB::table('brackets')
-            ->join('tournament_groups', 'tournament_groups.id', '=', 'brackets.group_id')
+        return DB::table('playoff_ties')
+            ->join('tournament_groups', 'tournament_groups.id', '=', 'playoff_ties.group_id')
             ->where('tournament_groups.tournament_id', $this->id)
-            ->exists();
+            ->exists()
+            || DB::table('brackets')
+                ->join('tournament_groups', 'tournament_groups.id', '=', 'brackets.group_id')
+                ->where('tournament_groups.tournament_id', $this->id)
+                ->exists();
     }
 }

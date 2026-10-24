@@ -51,15 +51,15 @@ class TournamentGroup extends Model
      */
     public function sources(): HasMany
     {
-        return $this->hasMany(PlayoffSource::class, 'playoff_group_id');
+        return $this->hasMany(PlayoffSource::class, 'playoff_group_id')->orderBy('id');
     }
 
     /**
-     * Total de equipos de una liguilla: suma de los rangos de sus fuentes.
+     * Total de equipos de una liguilla: suma de los rangos de sus fuentes más los mejores de posición.
      */
     public function totalTeams(): int
     {
-        return $this->sources->sum(fn (PlayoffSource $source) => $source->position_end - $source->position_start + 1);
+        return $this->sources->sum(fn (PlayoffSource $source) => $source->teamsCount());
     }
 
     /**

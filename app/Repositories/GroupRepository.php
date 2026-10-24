@@ -114,9 +114,11 @@ class GroupRepository extends BaseRepository implements GroupRepositoryInterface
             ->when($exceptGroupId !== null, fn (Builder $builder) => $builder->where('playoff_group_id', '!=', $exceptGroupId))
             ->get()
             ->map(fn (PlayoffSource $source) => [
-                'source_group_id' => (int) $source->source_group_id,
+                'kind' => (string) $source->kind,
+                'source_group_id' => $source->source_group_id === null ? null : (int) $source->source_group_id,
                 'position_start' => (int) $source->position_start,
                 'position_end' => (int) $source->position_end,
+                'best_count' => $source->best_count === null ? null : (int) $source->best_count,
             ])
             ->all();
 

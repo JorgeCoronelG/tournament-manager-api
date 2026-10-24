@@ -42,7 +42,12 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
     /**
      * Guarda el resultado y deja el partido jugado; con null en ambos marcadores lo anula y vuelve a programado.
      */
-    public function setResult(GameMatch $match, ?int $homeScore, ?int $awayScore): GameMatch;
+    public function setResult(GameMatch $match, ?int $homeScore, ?int $awayScore, ?int $homePenalties = null, ?int $awayPenalties = null): GameMatch;
+
+    /**
+     * Fecha del último partido de fase regular con fecha y hora; null si ninguno la tiene.
+     */
+    public function lastRegularDate(int $tournamentId): ?string;
 
     /**
      * Partidos jugados de fase regular del grupo.

@@ -140,6 +140,54 @@ class Message
         return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";
     }
 
+    public const PLAYOFF_BEST_COUNT = 'Los mejores deben ser menos que los equipos candidatos de esa posición.';
+
+    public const PLAYOFF_BEST_POSITION = 'Esa posición no existe en todos los grupos.';
+
+    public const PLAYOFF_BEST_DUPLICATE = 'Una liguilla no puede tener dos fuentes de mejores de la misma posición.';
+
+    public const PLAYOFF_BEST_NOT_SOURCE = 'La fuente debe ser de mejores de una posición.';
+
+    public const CLOSE_ONLY_IN_PROGRESS = 'Solo se puede cerrar la fase regular de un torneo en curso.';
+
+    public const CLOSE_NO_PLAYOFFS = 'Este torneo no tiene liguilla; usa Terminar torneo.';
+
+    public const CLOSE_PENDING_MATCHES = 'Faltan partidos de la fase regular por jugar.';
+
+    public const CLOSE_UNRESOLVED_TIES = 'Hay empates sin resolver en posiciones de clasificación; define el orden manual en la tabla.';
+
+    public const CLOSE_NO_CALENDAR = 'No hay calendario de fase regular generado.';
+
+    public const CLOSE_INVALID_QUALIFIED = 'La liguilla necesita un número de equipos clasificados potencia de 2.';
+
+    public const CLOSE_BLOCKED = 'No se puede cerrar la fase regular.';
+
+    public const CLOSE_CONFIRM_ALL_PLAYOFFS = 'Confirma las fechas de todas las liguillas.';
+
+    public const CLOSE_TIES_INVALID = 'Los cruces deben usar exactamente a los equipos clasificados.';
+
+    public const CLOSE_DATES_AFTER_REGULAR = 'Las fechas de liguilla deben ser posteriores al último partido de la fase regular.';
+
+    public const PLAYOFFS_NOT_STARTED = 'El torneo aún no está en liguilla.';
+
+    public const PLAYOFFS_PENDING_MATCHES = 'Faltan partidos de liguilla por jugar.';
+
+    public const MATCH_NO_TEAMS = 'Este partido aún no tiene equipos definidos.';
+
+    public const MATCH_FIRST_LEG_FIRST = 'Primero registra el resultado de la ida.';
+
+    public const MATCH_REGULAR_NO_PENALTIES = 'La fase regular no tiene penales.';
+
+    public const MATCH_FIRST_LEG_NO_PENALTIES = 'La ida no tiene penales.';
+
+    public const MATCH_PENALTIES_REQUIRED = 'En caso de empate debes capturar los penales con un ganador.';
+
+    public const MATCH_PENALTIES_ONLY_ON_DRAW = 'Los penales solo se capturan cuando hay empate.';
+
+    public const MATCH_NEXT_ROUND_HAS_RESULTS = 'No se puede modificar: ya hay resultados posteriores.';
+
+    public const MATCH_TOURNAMENT_FINISHED = 'El torneo ya terminó: no se pueden modificar resultados.';
+
     public const REGULAR_STAGE_CLOSED = 'La fase regular ya está cerrada.';
 
     public const TOURNAMENT_NOT_STARTED = 'El torneo no ha iniciado.';

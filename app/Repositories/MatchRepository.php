@@ -78,18 +78,29 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
         return $query->paginate($builder);
     }
 
-    public function setResult(GameMatch $match, ?int $homeScore, ?int $awayScore): GameMatch
+    public function setResult(GameMatch $match, ?int $homeScore, ?int $awayScore, ?int $homePenalties = null, ?int $awayPenalties = null): GameMatch
     {
         $match->forceFill([
             'home_score' => $homeScore,
             'away_score' => $awayScore,
-            'home_penalties' => null,
-            'away_penalties' => null,
+            'home_penalties' => $homePenalties,
+            'away_penalties' => $awayPenalties,
             'status' => $homeScore === null ? MatchStatus::SCHEDULED : MatchStatus::PLAYED,
         ]);
         $match->saveOrFail();
 
         return $match;
+    }
+
+    public function lastRegularDate(int $tournamentId): ?string
+    {
+        $last = $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('phase', MatchPhase::REGULAR_STAGE)
+            ->whereNotNull('match_datetime')
+            ->max('match_datetime');
+
+        return is_string($last) ? substr($last, 0, 10) : null;
     }
 
     public function playedOfGroup(int $groupId): Collection

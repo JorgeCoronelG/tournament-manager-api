@@ -15,9 +15,13 @@ return new class extends Migration
         Schema::create('playoff_sources', function (Blueprint $table) {
             $table->id();
             $table->foreignId('playoff_group_id')->constrained('tournament_groups')->cascadeOnDelete();
-            $table->foreignId('source_group_id')->constrained('tournament_groups')->cascadeOnDelete();
+            // 'range': posiciones position_start a position_end de source_group_id. 'best_of_position': los best_count mejores
+            // equipos que quedaron en esa posición (position_start = position_end) entre los grupos candidatos; sin grupo de origen.
+            $table->enum('kind', ['range', 'best_of_position'])->default('range');
+            $table->foreignId('source_group_id')->nullable()->constrained('tournament_groups')->cascadeOnDelete();
             $table->unsignedSmallInteger('position_start');
             $table->unsignedSmallInteger('position_end');
+            $table->unsignedSmallInteger('best_count')->nullable();
             $table->timestamps();
 
             $table->unique(['playoff_group_id', 'source_group_id', 'position_start'], 'playoff_sources_unique');

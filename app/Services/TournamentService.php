@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\Repositories\PlayoffRepositoryInterface;
 use App\Contracts\Repositories\RegistrationRepositoryInterface;
 use App\Contracts\Repositories\RosterRepositoryInterface;
 use App\Contracts\Repositories\TournamentRepositoryInterface;
@@ -36,6 +37,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
         protected RegistrationRepositoryInterface $registrationRepository,
         protected RosterRepositoryInterface $rosterRepository,
         protected GroupServiceInterface $groupService,
+        protected PlayoffRepositoryInterface $playoffRepository,
     ) {
         parent::__construct($tournamentRepository);
     }
@@ -157,10 +159,21 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             throw new CustomErrorException(Message::getMessageInvalidTournamentTransition($from->label(), $status->label()), $unprocessable);
         }
 
+        if ($from === TournamentStatus::PLAYOFFS && $this->hasUndecidedPlayoffTies($tournament)) {
+            throw new CustomErrorException(Message::PLAYOFFS_PENDING_MATCHES, $unprocessable);
+        }
+
         if ($from === TournamentStatus::IN_PROGRESS
             && $tournament->groups()->where('type', TournamentGroupType::PLAYOFF)->exists()) {
             throw new CustomErrorException(Message::TOURNAMENT_FINISH_HAS_PLAYOFFS, $unprocessable);
         }
+    }
+
+    private function hasUndecidedPlayoffTies(Tournament $tournament): bool
+    {
+        $groupIds = $tournament->groups()->where('type', TournamentGroupType::PLAYOFF)->pluck('id')->map(fn (mixed $id) => is_numeric($id) ? (int) $id : 0)->values()->all();
+
+        return $groupIds !== [] && $this->playoffRepository->hasUndecidedTies(array_values($groupIds));
     }
 
     public function deleteTournament(Tournament $tournament): void

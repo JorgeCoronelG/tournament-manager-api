@@ -62,16 +62,21 @@ class MatchController extends BaseApiController
 
     public function updateResult(MatchResultRequest $request, League $league, Tournament $tournament, GameMatch $match): JsonResponse
     {
-        $match = $this->matchService->recordResult($tournament, $match, $request->integer('home_score'), $request->integer('away_score'));
+        $result = $this->matchService->recordResult(
+            $tournament,
+            $match,
+            $request->homeGoals(),
+            $request->awayGoals(),
+            $request->homePenalties(),
+            $request->awayPenalties()
+        );
 
-        return $this->showOne(new MatchResource($match->load(['group', 'home.team', 'away.team'])));
+        return $this->resultResponse($result);
     }
 
     public function destroyResult(League $league, Tournament $tournament, GameMatch $match): JsonResponse
     {
-        $match = $this->matchService->clearResult($tournament, $match);
-
-        return $this->showOne(new MatchResource($match->load(['group', 'home.team', 'away.team'])));
+        return $this->resultResponse($this->matchService->clearResult($tournament, $match));
     }
 
     public function destroy(League $league, Tournament $tournament): Response
@@ -79,5 +84,20 @@ class MatchController extends BaseApiController
         $this->matchService->deleteAll($tournament);
 
         return $this->noContentResponse();
+    }
+
+    /**
+     * El partido (como siempre) más, en liguilla, el cruce actualizado y el avance del ganador (`null` en fase regular).
+     *
+     * @param  array{match: GameMatch, tie: array<string, mixed>|null, advanced_to: array<string, mixed>|null}  $result
+     */
+    private function resultResponse(array $result): JsonResponse
+    {
+        $match = $result['match']->load(['group', 'home.team', 'away.team']);
+
+        return $this->successResponse(
+            (new MatchResource($match))->resolve() + ['tie' => $result['tie'], 'advanced_to' => $result['advanced_to']],
+            Response::HTTP_OK
+        );
     }
 }

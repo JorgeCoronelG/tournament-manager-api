@@ -42,7 +42,7 @@ class Handler extends ExceptionHandler
     {
         $this->renderable(function (Throwable $e, $request) {
             if ($e instanceof CustomErrorException) {
-                return $this->errorResponse($e->getMessage(), $e->getCode());
+                return $this->errorResponse($e->payload ?? $e->getMessage(), $e->getCode());
             }
 
             if ($e instanceof ValidationException) {

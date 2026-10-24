@@ -2,6 +2,8 @@
 
 namespace App\Helpers;
 
+use App\Core\Enum\MatchPhase;
+
 /**
  * Rondas de una liguilla según el total de equipos (potencia de 2).
  */
@@ -18,6 +20,20 @@ class PlayoffRounds
     public static function count(int $total): int
     {
         return $total >= 2 ? (int) log($total, 2) : 0;
+    }
+
+    /**
+     * Fase de los partidos de una ronda en la que juegan $teams equipos (2 = final).
+     */
+    public static function phaseFor(int $teams): MatchPhase
+    {
+        return match (true) {
+            $teams <= 2 => MatchPhase::FINAL,
+            $teams === 4 => MatchPhase::SEMIFINAL,
+            $teams === 8 => MatchPhase::QUARTERFINAL,
+            $teams === 16 => MatchPhase::ROUND_OF_16,
+            default => MatchPhase::ROUND_OF_32,
+        };
     }
 
     /**

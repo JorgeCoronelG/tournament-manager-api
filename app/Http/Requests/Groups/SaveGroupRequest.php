@@ -5,6 +5,7 @@ namespace App\Http\Requests\Groups;
 use App\Core\Enum\Message;
 use App\Core\Enum\TournamentGroupType;
 use App\Helpers\Names;
+use App\Models\PlayoffSource;
 use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use Closure;
@@ -23,6 +24,30 @@ class SaveGroupRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * En las fuentes de mejores de una posición la posición final es la inicial.
+     */
+    protected function prepareForValidation(): void
+    {
+        $input = $this->input('sources');
+
+        if (! is_array($input)) {
+            return;
+        }
+
+        $sources = [];
+
+        foreach ($input as $index => $source) {
+            if (is_array($source) && ($source['kind'] ?? null) === PlayoffSource::KIND_BEST_OF_POSITION && isset($source['position_start'])) {
+                $source['position_end'] = $source['position_start'];
+            }
+
+            $sources[$index] = $source;
+        }
+
+        $this->merge(['sources' => $sources]);
     }
 
     /**
@@ -49,7 +74,9 @@ class SaveGroupRequest extends FormRequest
                 'round_dates.*' => ['required', 'date_format:Y-m-d'],
                 'round_interval_days' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_SMALLINT],
                 'sources' => [$editing ? 'sometimes' : 'required', 'array', 'min:1'],
-                'sources.*.source_group_id' => ['required', 'integer', 'min:1'],
+                'sources.*.kind' => ['sometimes', Rule::in([PlayoffSource::KIND_RANGE, PlayoffSource::KIND_BEST_OF_POSITION])],
+                'sources.*.source_group_id' => ['required_unless:sources.*.kind,best_of_position', 'nullable', 'integer', 'min:1'],
+                'sources.*.best_count' => ['required_if:sources.*.kind,best_of_position', 'nullable', 'integer', 'max:'.self::MAX_SMALLINT],
                 'sources.*.position_start' => ['required', 'integer', 'min:1', 'max:'.self::MAX_SMALLINT],
                 'sources.*.position_end' => ['required', 'integer', 'gte:sources.*.position_start', 'max:'.self::MAX_SMALLINT],
             ];
@@ -72,7 +99,9 @@ class SaveGroupRequest extends FormRequest
             'round_legs' => 'partidos por ronda',
             'round_interval_days' => 'días entre rondas',
             'sources' => 'fuentes',
+            'sources.*.kind' => 'tipo de fuente',
             'sources.*.source_group_id' => 'grupo de origen',
+            'sources.*.best_count' => 'cantidad de mejores',
             'sources.*.position_start' => 'posición inicial',
             'sources.*.position_end' => 'posición final',
         ];

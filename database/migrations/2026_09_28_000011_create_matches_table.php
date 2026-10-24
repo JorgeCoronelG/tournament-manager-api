@@ -12,15 +12,23 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tournament_id')->constrained('tournaments');
             $table->foreignId('group_id')->nullable()->constrained('tournament_groups');
-            $table->foreignId('home_registration_id')->constrained('registrations');
-            $table->foreignId('away_registration_id')->constrained('registrations');
+            // Nullable: las rondas de liguilla se crean vacías hasta saber los ganadores.
+            $table->foreignId('home_registration_id')->nullable()->constrained('registrations');
+            $table->foreignId('away_registration_id')->nullable()->constrained('registrations');
             // Nullable: se puede programar antes de asignar árbitro o cancha.
             $table->foreignId('referee_user_id')->nullable()->constrained('users');
             $table->foreignId('field_id')->nullable()->constrained('fields');
-            $table->enum('phase', ['regular_stage', 'round_of_16', 'quarterfinal', 'semifinal', 'final']);
+            $table->enum('phase', ['regular_stage', 'round_of_32', 'round_of_16', 'quarterfinal', 'semifinal', 'final']);
             $table->unsignedSmallInteger('matchday')->nullable();
             // Vuelta a la que pertenece el partido (1 o 2).
             $table->unsignedTinyInteger('round_number')->default(1);
+            // Solo liguilla: cruce (playoff_ties), ronda (1 = primera), partido de ida y vuelta (1 o 2; nulo si es único),
+            // posición del cruce en la ronda y fecha programada (sin hora).
+            $table->foreignId('tie_id')->nullable()->constrained('playoff_ties');
+            $table->unsignedTinyInteger('round_index')->nullable();
+            $table->unsignedTinyInteger('leg')->nullable();
+            $table->unsignedSmallInteger('bracket_position')->nullable();
+            $table->date('scheduled_date')->nullable();
             // Nullable: un partido puede estar por programar.
             $table->dateTime('match_datetime')->nullable();
             $table->dateTime('original_datetime')->nullable();

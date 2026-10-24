@@ -60,7 +60,7 @@ interface GroupRepositoryInterface extends BaseRepositoryInterface
     /**
      * Reemplaza por completo las fuentes de una liguilla.
      *
-     * @param  list<array{source_group_id: int, position_start: int, position_end: int}>  $sources
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $sources
      */
     public function replaceSources(TournamentGroup $group, array $sources): void;
 
@@ -72,7 +72,7 @@ interface GroupRepositoryInterface extends BaseRepositoryInterface
     /**
      * Fuentes de las demás liguillas del torneo (todas si `$exceptGroupId` es null).
      *
-     * @return list<array{source_group_id: int, position_start: int, position_end: int}>
+     * @return list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>
      */
     public function sourcesOfOtherPlayoffs(int $tournamentId, ?int $exceptGroupId): array;
 

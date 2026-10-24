@@ -29,8 +29,14 @@ class GameMatch extends Model
         'phase' => MatchPhase::class,
         'status' => MatchStatus::class,
         'match_datetime' => 'datetime',
+        'scheduled_date' => 'date',
         'original_datetime' => 'datetime',
         'schedule_locked' => 'boolean',
+        'leg' => 'integer',
+        'round_index' => 'integer',
+        'bracket_position' => 'integer',
+        'home_registration_id' => 'integer',
+        'away_registration_id' => 'integer',
     ];
 
     /**
@@ -39,6 +45,14 @@ class GameMatch extends Model
     public function group(): BelongsTo
     {
         return $this->belongsTo(TournamentGroup::class, 'group_id');
+    }
+
+    /**
+     * @return BelongsTo<PlayoffTie, $this>
+     */
+    public function tie(): BelongsTo
+    {
+        return $this->belongsTo(PlayoffTie::class, 'tie_id');
     }
 
     /**

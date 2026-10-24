@@ -10,10 +10,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PlayoffSource extends Model
 {
+    public const KIND_RANGE = 'range';
+
+    public const KIND_BEST_OF_POSITION = 'best_of_position';
+
     /**
      * @var list<string>
      */
     protected $fillable = [];
+
+    public function isBestOfPosition(): bool
+    {
+        return $this->kind === self::KIND_BEST_OF_POSITION;
+    }
+
+    /**
+     * Equipos que aporta a la liguilla: el rango de posiciones o los mejores de una posición.
+     */
+    public function teamsCount(): int
+    {
+        return $this->isBestOfPosition() ? (int) $this->best_count : $this->position_end - $this->position_start + 1;
+    }
 
     /**
      * @return BelongsTo<TournamentGroup, $this>

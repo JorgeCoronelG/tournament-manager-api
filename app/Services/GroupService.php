@@ -9,7 +9,9 @@ use App\Core\Enum\Message;
 use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
 use App\Exceptions\CustomErrorException;
+use App\Helpers\BestOfPosition;
 use App\Helpers\PlayoffRounds;
+use App\Models\PlayoffSource;
 use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use Illuminate\Database\Eloquent\Collection;
@@ -60,8 +62,7 @@ class GroupService extends BaseService implements GroupServiceInterface
 
         $this->assertPlayoffsEditable($tournament, null);
 
-        /** @var list<array{source_group_id: int, position_start: int, position_end: int}> $sources */
-        $sources = $attributes['sources'];
+        $sources = $this->normalizeSources((array) $attributes['sources']);
         $this->assertSources($tournament, $sources, null, is_string($attributes['name']) ? $attributes['name'] : '');
 
         $startDate = is_string($attributes['start_date'] ?? null) ? $attributes['start_date'] : null;
@@ -93,8 +94,7 @@ class GroupService extends BaseService implements GroupServiceInterface
 
         $this->assertPlayoffsEditable($tournament, $group);
 
-        /** @var list<array{source_group_id: int, position_start: int, position_end: int}>|null $sources */
-        $sources = $attributes['sources'] ?? null;
+        $sources = isset($attributes['sources']) ? $this->normalizeSources((array) $attributes['sources']) : null;
 
         if ($sources !== null) {
             $this->assertSources($tournament, $sources, $group->id, is_string($attributes['name'] ?? null) ? $attributes['name'] : $group->name);
@@ -246,9 +246,34 @@ class GroupService extends BaseService implements GroupServiceInterface
 
         $this->assertMinMatchesFit($tournament, true);
 
+        $regularIds = $groups->where('type', TournamentGroupType::REGULAR_STAGE)->pluck('id')->map(fn (mixed $id) => is_numeric($id) ? (int) $id : 0)->values()->all();
+        $names = $groups->pluck('name', 'id')->all();
+
         foreach ($groups->where('type', TournamentGroupType::PLAYOFF) as $playoff) {
+            $ranges = $playoff->sources->where('kind', PlayoffSource::KIND_RANGE)->map(fn (PlayoffSource $s) => [
+                'source_group_id' => $s->source_group_id,
+                'position_start' => $s->position_start,
+                'position_end' => $s->position_end,
+            ])->values()->all();
+
             foreach ($playoff->sources as $source) {
-                $teams = $counts[$source->source_group_id] ?? 0;
+                if ($source->isBestOfPosition()) {
+                    // Cada grupo candidato debe tener esa posición.
+                    foreach (BestOfPosition::candidateGroupIds($source->position_start, $ranges, $regularIds) as $candidateId) {
+                        $teams = $counts[$candidateId] ?? 0;
+
+                        if ($teams < $source->position_start) {
+                            throw new CustomErrorException(
+                                Message::getMessagePlayoffAsksTooMany($playoff->name, $source->position_start, is_string($names[$candidateId] ?? null) ? $names[$candidateId] : '', $teams),
+                                $unprocessable
+                            );
+                        }
+                    }
+
+                    continue;
+                }
+
+                $teams = $counts[(int) $source->source_group_id] ?? 0;
 
                 if ($teams < $source->position_end) {
                     throw new CustomErrorException(
@@ -277,11 +302,51 @@ class GroupService extends BaseService implements GroupServiceInterface
     }
 
     /**
-     * @param  list<array{source_group_id: int, position_start: int, position_end: int}>  $sources
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $sources
      */
     private function roundsOf(array $sources): int
     {
-        return PlayoffRounds::count((int) array_sum(array_map(fn (array $s) => $s['position_end'] - $s['position_start'] + 1, $sources)));
+        return PlayoffRounds::count($this->sourcesTotal($sources));
+    }
+
+    /**
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $sources
+     */
+    private function sourcesTotal(array $sources): int
+    {
+        return (int) array_sum(array_map(
+            fn (array $s) => $s['kind'] === PlayoffSource::KIND_BEST_OF_POSITION ? (int) $s['best_count'] : $s['position_end'] - $s['position_start'] + 1,
+            $sources
+        ));
+    }
+
+    /**
+     * Completa cada fuente: `range` por defecto; las de mejores no llevan grupo de origen y su posición final es la inicial.
+     *
+     * @param  array<mixed, mixed>  $sources
+     * @return list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>
+     */
+    private function normalizeSources(array $sources): array
+    {
+        $normalized = [];
+        // validated() deja primero las fuentes con `kind`: se vuelve al orden en que se enviaron.
+        ksort($sources);
+
+        foreach ($sources as $source) {
+            /** @var array<string, mixed> $source */
+            $best = ($source['kind'] ?? PlayoffSource::KIND_RANGE) === PlayoffSource::KIND_BEST_OF_POSITION;
+            $start = is_numeric($source['position_start'] ?? null) ? (int) $source['position_start'] : 0;
+
+            $normalized[] = [
+                'kind' => $best ? PlayoffSource::KIND_BEST_OF_POSITION : PlayoffSource::KIND_RANGE,
+                'source_group_id' => $best || ! is_numeric($source['source_group_id'] ?? null) ? null : (int) $source['source_group_id'],
+                'position_start' => $start,
+                'position_end' => $best || ! is_numeric($source['position_end'] ?? null) ? $start : (int) $source['position_end'],
+                'best_count' => $best ? (is_numeric($source['best_count'] ?? null) ? (int) $source['best_count'] : 0) : null,
+            ];
+        }
+
+        return $normalized;
     }
 
     /**
@@ -391,37 +456,36 @@ class GroupService extends BaseService implements GroupServiceInterface
     }
 
     /**
-     * Fuentes de una liguilla: grupos regulares del torneo, rangos sin traslape con las demás fuentes y total de
-     * equipos potencia de 2 (al menos 2).
+     * Fuentes de una liguilla: grupos regulares del torneo, rangos sin traslape con las demás fuentes, mejores de una
+     * posición válidos y total de equipos potencia de 2 (al menos 2).
      *
-     * @param  list<array{source_group_id: int, position_start: int, position_end: int}>  $sources
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $sources
      *
      * @throws ValidationException
      */
     private function assertSources(Tournament $tournament, array $sources, ?int $exceptGroupId, string $playoffName): void
     {
         $regular = $this->groupRepository->regularGroups($tournament->id)->keyBy('id');
+        $others = $this->groupRepository->sourcesOfOtherPlayoffs($tournament->id, $exceptGroupId);
+        $ranges = array_filter($sources, fn (array $s) => $s['kind'] === PlayoffSource::KIND_RANGE);
         $errors = [];
-        $total = 0;
 
-        foreach ($sources as $position => $source) {
-            if (! $regular->has($source['source_group_id'])) {
+        foreach ($ranges as $position => $source) {
+            if ($source['source_group_id'] === null || ! $regular->has($source['source_group_id'])) {
                 $errors["sources.{$position}.source_group_id"] = Message::PLAYOFF_SOURCE_INVALID_GROUP;
             }
-
-            $total += $source['position_end'] - $source['position_start'] + 1;
         }
 
         if ($errors === []) {
-            $errors = $this->overlaps($sources, $this->groupRepository->sourcesOfOtherPlayoffs($tournament->id, $exceptGroupId), $regular);
+            $errors = $this->overlaps($ranges, array_values(array_filter($others, fn (array $o) => $o['kind'] === PlayoffSource::KIND_RANGE)), $regular);
         }
 
         // Con el torneo en curso ya hay equipos en los grupos: la posición final no puede exceder los actuales.
         if ($errors === [] && $tournament->status === TournamentStatus::IN_PROGRESS) {
             $counts = $this->groupRepository->teamCounts($tournament->id);
 
-            foreach ($sources as $position => $source) {
-                $teams = $counts[$source['source_group_id']] ?? 0;
+            foreach ($ranges as $position => $source) {
+                $teams = $counts[(int) $source['source_group_id']] ?? 0;
 
                 if ($source['position_end'] > $teams) {
                     $name = $regular->get($source['source_group_id'])->name ?? '';
@@ -429,6 +493,12 @@ class GroupService extends BaseService implements GroupServiceInterface
                 }
             }
         }
+
+        if ($errors === []) {
+            $errors = $this->bestOfErrors($sources, $ranges, $others, $regular, $tournament);
+        }
+
+        $total = $this->sourcesTotal($sources);
 
         if ($errors === [] && ! PlayoffRounds::isValidTotal($total)) {
             $errors['sources'] = Message::getMessagePlayoffTotalTeams($total);
@@ -440,8 +510,76 @@ class GroupService extends BaseService implements GroupServiceInterface
     }
 
     /**
-     * @param  list<array{source_group_id: int, position_start: int, position_end: int}>  $sources
-     * @param  list<array{source_group_id: int, position_start: int, position_end: int}>  $others
+     * Fuentes de mejores de una posición: sin repetir posición, la posición existe en todos los candidatos, los mejores
+     * son al menos 1 y menos que los candidatos, y ningún candidato pertenece a otra liguilla.
+     *
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $sources
+     * @param  array<int, array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $ranges
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $others
+     * @param  Collection<int|string, TournamentGroup>|\Illuminate\Support\Collection<int|string, TournamentGroup>  $regular
+     * @return array<string, string>
+     */
+    private function bestOfErrors(array $sources, array $ranges, array $others, mixed $regular, Tournament $tournament): array
+    {
+        $errors = [];
+        $seen = [];
+        $regularIds = array_values($regular->keys()->map(fn ($id) => (int) $id)->all());
+        $counts = $this->groupRepository->teamCounts($tournament->id);
+
+        foreach ($sources as $index => $source) {
+            if ($source['kind'] !== PlayoffSource::KIND_BEST_OF_POSITION) {
+                continue;
+            }
+
+            $position = $source['position_start'];
+
+            if (isset($seen[$position])) {
+                $errors["sources.{$index}.position_start"] = Message::PLAYOFF_BEST_DUPLICATE;
+
+                continue;
+            }
+
+            $seen[$position] = true;
+            $candidates = BestOfPosition::candidateGroupIds($position, array_values($ranges), $regularIds);
+
+            if ($position < 1 || array_filter($candidates, fn (int $id) => ($counts[$id] ?? 0) < $position) !== []) {
+                $errors["sources.{$index}.position_start"] = Message::PLAYOFF_BEST_POSITION;
+            } elseif ($source['best_count'] < 1 || $source['best_count'] >= count($candidates)) {
+                $errors["sources.{$index}.best_count"] = Message::PLAYOFF_BEST_COUNT;
+            } elseif ($this->candidateInOtherPlayoff($position, $candidates, $others)) {
+                $errors["sources.{$index}.position_start"] = Message::getMessagePlayoffOverlap('');
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param  list<int>  $candidates
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $others
+     */
+    private function candidateInOtherPlayoff(int $position, array $candidates, array $others): bool
+    {
+        foreach ($others as $other) {
+            if ($other['kind'] === PlayoffSource::KIND_BEST_OF_POSITION) {
+                if ($other['position_start'] === $position) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (in_array($other['source_group_id'], $candidates, true) && $other['position_start'] <= $position && $position <= $other['position_end']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $sources
+     * @param  list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>  $others
      * @param  Collection<int|string, TournamentGroup>|\Illuminate\Support\Collection<int|string, TournamentGroup>  $regular
      * @return array<string, string>
      */
@@ -450,11 +588,7 @@ class GroupService extends BaseService implements GroupServiceInterface
         $errors = [];
 
         foreach ($sources as $position => $source) {
-            $conflicts = array_merge(
-                array_slice($sources, 0, $position),
-                array_slice($sources, $position + 1),
-                $others
-            );
+            $conflicts = array_merge(array_values(array_diff_key($sources, [$position => true])), $others);
 
             foreach ($conflicts as $other) {
                 if ($other['source_group_id'] === $source['source_group_id']

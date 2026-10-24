@@ -41,10 +41,13 @@ class GroupResource extends JsonResource
             'round_interval_days' => $group->round_interval_days,
             'sources' => $group->sources->map(fn (PlayoffSource $source) => [
                 'id' => $source->id,
+                'kind' => $source->kind,
                 'source_group_id' => $source->source_group_id,
                 'source_group_name' => $source->sourceGroup?->name,
                 'position_start' => $source->position_start,
                 'position_end' => $source->position_end,
+                'position' => $source->isBestOfPosition() ? $source->position_start : null,
+                'best_count' => $source->best_count,
             ])->values()->all(),
             'editable' => $group->tournament !== null && $group->editableIn($group->tournament),
             'total_teams' => $total,

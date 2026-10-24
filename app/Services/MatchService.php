@@ -6,6 +6,7 @@ use App\Contracts\Repositories\GroupRepositoryInterface;
 use App\Contracts\Repositories\MatchRepositoryInterface;
 use App\Contracts\Services\GroupServiceInterface;
 use App\Contracts\Services\MatchServiceInterface;
+use App\Contracts\Services\PlayoffServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\MatchPhase;
@@ -30,6 +31,7 @@ class MatchService extends BaseService implements MatchServiceInterface
         protected MatchRepositoryInterface $matchRepository,
         protected GroupRepositoryInterface $groupRepository,
         protected GroupServiceInterface $groupService,
+        protected PlayoffServiceInterface $playoffService,
     ) {
         parent::__construct($matchRepository);
     }
@@ -96,18 +98,30 @@ class MatchService extends BaseService implements MatchServiceInterface
         });
     }
 
-    public function recordResult(Tournament $tournament, GameMatch $match, int $homeScore, int $awayScore): GameMatch
+    public function recordResult(Tournament $tournament, GameMatch $match, int $homeScore, int $awayScore, ?int $homePenalties = null, ?int $awayPenalties = null): array
     {
         $this->assertResultsOpen($tournament, $match);
 
-        return $this->matchRepository->setResult($match, $homeScore, $awayScore);
+        if ($match->tie_id !== null) {
+            return $this->playoffService->recordResult($match, $homeScore, $awayScore, $homePenalties, $awayPenalties);
+        }
+
+        if ($homePenalties !== null || $awayPenalties !== null) {
+            throw new CustomErrorException(Message::MATCH_REGULAR_NO_PENALTIES, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return ['match' => $this->matchRepository->setResult($match, $homeScore, $awayScore), 'tie' => null, 'advanced_to' => null];
     }
 
-    public function clearResult(Tournament $tournament, GameMatch $match): GameMatch
+    public function clearResult(Tournament $tournament, GameMatch $match): array
     {
         $this->assertResultsOpen($tournament, $match);
 
-        return $this->matchRepository->setResult($match, null, null);
+        if ($match->tie_id !== null) {
+            return $this->playoffService->clearResult($match);
+        }
+
+        return ['match' => $this->matchRepository->setResult($match, null, null), 'tie' => null, 'advanced_to' => null];
     }
 
     public function deleteAll(Tournament $tournament): void
@@ -162,12 +176,27 @@ class MatchService extends BaseService implements MatchServiceInterface
         return ['generated' => $matches->isNotEmpty(), 'groups' => $groups];
     }
 
+    /**
+     * Resultados abiertos: fase regular con el torneo en curso; liguilla con el torneo en liguilla.
+     */
     private function assertResultsOpen(Tournament $tournament, GameMatch $match): void
     {
         $unprocessable = Response::HTTP_UNPROCESSABLE_ENTITY;
 
         if ($tournament->status === TournamentStatus::PLANNING) {
             throw new CustomErrorException(Message::TOURNAMENT_NOT_STARTED, $unprocessable);
+        }
+
+        if ($match->tie_id !== null) {
+            if ($tournament->status === TournamentStatus::FINISHED) {
+                throw new CustomErrorException(Message::MATCH_TOURNAMENT_FINISHED, $unprocessable);
+            }
+
+            if ($tournament->status !== TournamentStatus::PLAYOFFS) {
+                throw new CustomErrorException(Message::PLAYOFFS_NOT_STARTED, $unprocessable);
+            }
+
+            return;
         }
 
         if ($tournament->status !== TournamentStatus::IN_PROGRESS) {
