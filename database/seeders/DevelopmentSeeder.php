@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Contracts\Repositories\ScheduleRepositoryInterface;
 use App\Contracts\Services\MatchServiceInterface;
 use App\Contracts\Services\PlayoffServiceInterface;
+use App\Core\Enum\FieldStatus;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\RegistrationStatus;
@@ -28,6 +30,7 @@ use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use App\Models\User;
 use App\Services\PlayerEligibility;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -37,9 +40,7 @@ class DevelopmentSeeder extends Seeder
 
     private const REFEREES_PER_LEAGUE = 3;
 
-    private const MIN_FIELDS_PER_LEAGUE = 1;
-
-    private const MAX_FIELDS_PER_LEAGUE = 3;
+    private const FIELDS_PER_LEAGUE = 3;
 
     private const MANAGERS = 15;
 
@@ -164,9 +165,10 @@ class DevelopmentSeeder extends Seeder
                 ]);
             }
 
-            // Las canchas son de la liga, no del torneo: entre 1 y 3 por liga.
-            Field::factory(random_int(self::MIN_FIELDS_PER_LEAGUE, self::MAX_FIELDS_PER_LEAGUE))
-                ->create(['league_id' => $league->id]);
+            // Las canchas son de la liga, no del torneo: 3 activas por liga.
+            for ($number = 1; $number <= self::FIELDS_PER_LEAGUE; $number++) {
+                Field::factory()->create(['league_id' => $league->id, 'name' => "Cancha {$number}"]);
+            }
         }
     }
 
@@ -462,6 +464,44 @@ class DevelopmentSeeder extends Seeder
                 Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
             }
         }
+
+        $this->seedScheduleConfig($tournament, $league);
+    }
+
+    /**
+     * Horarios de «Torneo Impar» (60 min) desde el próximo lunes: sábado 8:00-14:00 en las canchas 1 y 2 (la 2 partida en
+     * 8:00-9:00 y 10:00-14:00), domingo 8:00-12:00 en las canchas 1, 2 y 3, y un bloqueo de todo el día en la quinta
+     * semana. Usa las canchas activas de la liga por orden (Cancha 1, 2 y 3).
+     */
+    private function seedScheduleConfig(Tournament $tournament, League $league): void
+    {
+        $fields = $league->fields()->where('status', FieldStatus::ACTIVE)->orderBy('id')->take(3)->get();
+        $monday = now()->next(CarbonInterface::MONDAY)->startOfDay()->toImmutable();
+        $saturday = 6;
+        $sunday = 7;
+        $windows = [];
+
+        foreach ($fields as $index => $field) {
+            if ($index < 2) {
+                $saturdayRanges = $index === 1 ? [['08:00', '09:00'], ['10:00', '14:00']] : [['08:00', '14:00']];
+
+                foreach ($saturdayRanges as [$start, $end]) {
+                    $windows[] = ['weekday' => $saturday, 'field_id' => $field->id, 'start_time' => $start, 'end_time' => $end];
+                }
+            }
+
+            $windows[] = ['weekday' => $sunday, 'field_id' => $field->id, 'start_time' => '08:00', 'end_time' => '12:00'];
+        }
+
+        $blocks = [[
+            'date' => $monday->addWeeks(4)->addDays($saturday - 1)->toDateString(),
+            'field_id' => null,
+            'start_time' => null,
+            'end_time' => null,
+            'reason' => 'Día festivo',
+        ]];
+
+        app(ScheduleRepositoryInterface::class)->replace($tournament, $monday->toDateString(), $windows, $blocks);
     }
 
     /**

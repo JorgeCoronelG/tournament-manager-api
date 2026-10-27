@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RosterController;
+use App\Http\Controllers\Api\ScheduleConfigController;
 use App\Http\Controllers\Api\StandingController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
@@ -99,6 +100,11 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::put('/tournaments/{tournament}/playoff-sources/{playoffSource}/manual-order', [PlayoffController::class, 'saveBestManualOrder'])->whereNumber('playoffSource');
             Route::delete('/tournaments/{tournament}/playoff-sources/{playoffSource}/manual-order', [PlayoffController::class, 'clearBestManualOrder'])->whereNumber('playoffSource');
             Route::get('/tournaments/{tournament}/playoffs', [PlayoffController::class, 'show']);
+
+            Route::get('/tournaments/{tournament}/schedule-config', [ScheduleConfigController::class, 'show']);
+            Route::put('/tournaments/{tournament}/schedule-config', [ScheduleConfigController::class, 'update']);
+            Route::get('/tournaments/{tournament}/schedule-config/capacity', [ScheduleConfigController::class, 'capacity']);
+            Route::post('/tournaments/{tournament}/schedule-config/capacity', [ScheduleConfigController::class, 'previewCapacity']);
 
             Route::get('/tournaments/{tournament}/standings', [StandingController::class, 'index']);
             Route::put('/tournaments/{tournament}/standings/manual-order', [StandingController::class, 'saveManualOrder']);

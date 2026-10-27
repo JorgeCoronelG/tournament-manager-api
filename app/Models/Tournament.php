@@ -72,6 +72,7 @@ class Tournament extends Model
         'gender' => TournamentGender::class,
         'status' => TournamentStatus::class,
         'start_date' => 'date',
+        'schedule_start_date' => 'date',
         'tiebreakers' => 'array',
     ];
 
@@ -107,6 +108,22 @@ class Tournament extends Model
     public function matches(): HasMany
     {
         return $this->hasMany(GameMatch::class);
+    }
+
+    /**
+     * @return HasMany<TournamentScheduleWindow, $this>
+     */
+    public function scheduleWindows(): HasMany
+    {
+        return $this->hasMany(TournamentScheduleWindow::class);
+    }
+
+    /**
+     * @return HasMany<TournamentScheduleBlock, $this>
+     */
+    public function scheduleBlocks(): HasMany
+    {
+        return $this->hasMany(TournamentScheduleBlock::class);
     }
 
     /**

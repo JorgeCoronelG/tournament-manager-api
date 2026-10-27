@@ -135,6 +135,22 @@ class Message
 
     public const MATCHES_DELETE_HAS_PLAYED = 'Ya hay partidos jugados; el calendario no se puede borrar.';
 
+    public const SCHEDULE_NOT_EDITABLE = 'El horario del torneo ya no se puede modificar.';
+
+    public const SCHEDULE_TIME_ORDER = 'La hora de inicio debe ser menor que la de fin.';
+
+    public const SCHEDULE_WINDOWS_OVERLAP = 'Las ventanas de una cancha no pueden empalmarse.';
+
+    public const SCHEDULE_FIELD_UNAVAILABLE = 'Una de las canchas no está disponible.';
+
+    public const SCHEDULE_WINDOW_TOO_SHORT = 'Una ventana es más corta que la duración del partido.';
+
+    public const SCHEDULE_START_DATE_REQUIRED = 'Indica la fecha de inicio del calendario.';
+
+    public const SCHEDULE_BLOCK_TIME_PAIR = 'Indica la hora de inicio y la de fin del bloqueo, o ninguna.';
+
+    public const SCHEDULE_DURATION_REQUIRED = 'Define la duración del partido en el torneo.';
+
     public static function getMessageMinMatchesExceed(int $minimum, string $group, int $matches): string
     {
         return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";

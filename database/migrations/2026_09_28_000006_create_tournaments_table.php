@@ -29,6 +29,8 @@ return new class extends Migration
             $table->unsignedSmallInteger('match_duration_minutes')->default(60);
             // Criterios de desempate en orden (ver App\Core\Enum\Tiebreaker). MySQL no admite default en json: lo asigna la aplicación.
             $table->json('tiebreakers');
+            // Fecha desde la que corre el patrón de horarios: la jornada 1 es la semana (lunes a domingo) que la contiene.
+            $table->date('schedule_start_date')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
