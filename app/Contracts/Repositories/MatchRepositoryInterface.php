@@ -85,4 +85,11 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
      * @return Collection<int, GameMatch>
      */
     public function regularMatches(int $tournamentId): Collection;
+
+    /**
+     * Asigna fecha, hora y cancha: id del partido => [match_datetime (Y-m-d H:i:s) o null, field_id o null].
+     *
+     * @param  array<int, array{0: string|null, 1: int|null}>  $assignments
+     */
+    public function assignSchedule(array $assignments): void;
 }

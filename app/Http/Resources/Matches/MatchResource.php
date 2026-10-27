@@ -35,6 +35,7 @@ class MatchResource extends JsonResource
             'phase' => $match->phase->value,
             'status' => $match->status->value,
             'match_datetime' => $match->match_datetime?->toIso8601String(),
+            'field' => $match->field_id === null ? null : ['id' => $match->field_id, 'name' => $match->field?->name],
             'home' => $this->side($match->home),
             'away' => $this->side($match->away),
             'home_score' => $match->home_score,

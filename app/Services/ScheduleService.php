@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 class ScheduleService implements ScheduleServiceInterface
 {
     /** Tope de semanas que se recorren para ubicar las jornadas. */
-    private const MAX_WEEKS = 52;
+    public const MAX_WEEKS = 52;
 
     public function __construct(protected ScheduleRepositoryInterface $scheduleRepository) {}
 
@@ -67,20 +67,49 @@ class ScheduleService implements ScheduleServiceInterface
 
     public function capacity(Tournament $tournament): array
     {
-        $windows = array_values($this->scheduleRepository->windows($tournament->id)->map(fn (TournamentScheduleWindow $window) => [
+        return $this->computeCapacity($tournament, $this->startDate($tournament), $this->loadWindows($tournament), $this->loadBlocks($tournament));
+    }
+
+    public function plan(Tournament $tournament, array $matchdays, int $limit): array
+    {
+        $startDate = $this->startDate($tournament);
+        $names = [];
+
+        foreach ($this->scheduleRepository->windows($tournament->id) as $window) {
+            $names[(int) $window->field_id] = $window->field->name ?? '';
+        }
+
+        $planned = $startDate === null
+            ? ['weeks' => [], 'assigned' => []]
+            : ScheduleCapacity::plan($startDate, $this->loadWindows($tournament), $this->loadBlocks($tournament), $this->duration($tournament), $matchdays, $limit);
+
+        return $planned + ['names' => $names];
+    }
+
+    /**
+     * @return list<array{weekday: int, field_id: int, start: int, end: int}>
+     */
+    private function loadWindows(Tournament $tournament): array
+    {
+        return array_values($this->scheduleRepository->windows($tournament->id)->map(fn (TournamentScheduleWindow $window) => [
             'weekday' => (int) $window->weekday,
             'field_id' => (int) $window->field_id,
             'start' => ScheduleCapacity::minutes($window->start_time),
             'end' => ScheduleCapacity::minutes($window->end_time),
         ])->all());
-        $blocks = array_values($this->scheduleRepository->blocks($tournament->id)->map(fn (TournamentScheduleBlock $block) => [
+    }
+
+    /**
+     * @return list<array{date: string, field_id: int|null, start: int|null, end: int|null}>
+     */
+    private function loadBlocks(Tournament $tournament): array
+    {
+        return array_values($this->scheduleRepository->blocks($tournament->id)->map(fn (TournamentScheduleBlock $block) => [
             'date' => $block->date->toDateString(),
             'field_id' => $block->field_id === null ? null : (int) $block->field_id,
             'start' => $block->start_time === null ? null : ScheduleCapacity::minutes($block->start_time),
             'end' => $block->end_time === null ? null : ScheduleCapacity::minutes($block->end_time),
         ])->all());
-
-        return $this->computeCapacity($tournament, $this->startDate($tournament), $windows, $blocks);
     }
 
     public function previewCapacity(Tournament $tournament, array $data): array
@@ -114,28 +143,20 @@ class ScheduleService implements ScheduleServiceInterface
         $hasCalendar = $perMatchday !== [];
 
         // Las jornadas, en orden, van solo a las semanas con espacios; las de 0 espacios se saltan sin consumir jornada.
-        $pending = array_keys($perMatchday);
-        $assigned = [];
-
-        for ($week = 1; $startDate !== null && $hasCalendar && $pending !== [] && $week <= self::MAX_WEEKS; $week++) {
-            $monday = $startDate->startOfWeek(CarbonImmutable::MONDAY)->addWeeks($week - 1);
-            $slots = ScheduleCapacity::weekSlots($monday, $startDate, $windows, $blocks, $duration);
-
-            if ($slots !== []) {
-                $matchday = array_shift($pending);
-                $assigned[$matchday] = ['week' => $week, 'start_date' => $monday->toDateString(), 'end_date' => $monday->addDays(6)->toDateString(), 'slots' => count($slots)];
-            }
-        }
+        $plan = $startDate === null || ! $hasCalendar
+            ? ['weeks' => [], 'assigned' => []]
+            : ScheduleCapacity::plan($startDate, $windows, $blocks, $duration, array_keys($perMatchday), self::MAX_WEEKS);
 
         $matchdays = [];
 
         foreach ($perMatchday as $matchday => $required) {
-            $slotsAvailable = $assigned[$matchday]['slots'] ?? 0;
+            $week = isset($plan['assigned'][$matchday]) ? $plan['weeks'][$plan['assigned'][$matchday]] : null;
+            $slotsAvailable = $week === null ? 0 : count($week['slots']);
             $matchdays[] = [
                 'matchday' => $matchday,
-                'week' => $assigned[$matchday]['week'] ?? null,
-                'start_date' => $assigned[$matchday]['start_date'] ?? null,
-                'end_date' => $assigned[$matchday]['end_date'] ?? null,
+                'week' => $week['week'] ?? null,
+                'start_date' => $week === null ? null : $week['monday']->toDateString(),
+                'end_date' => $week === null ? null : $week['monday']->addDays(6)->toDateString(),
                 'matches_required' => $required,
                 'slots_available' => $slotsAvailable,
                 'deficit' => max(0, $required - $slotsAvailable),
@@ -146,10 +167,42 @@ class ScheduleService implements ScheduleServiceInterface
             'schedule_start_date' => $startDate?->toDateString(),
             'match_duration_minutes' => $duration,
             'has_calendar' => $hasCalendar,
-            'schedule_outdated' => $this->scheduleRepository->hasTimedMatches($tournament->id),
+            'schedule_outdated' => $this->outdated($tournament, $windows, $blocks, $duration, $startDate),
             'matchdays' => $matchdays,
             'warnings' => array_values(array_filter($matchdays, fn (array $matchday) => $matchday['deficit'] > 0)),
         ];
+    }
+
+    /**
+     * Si algún partido no jugado tiene un horario que ya no existe entre los espacios actuales (ventana eliminada,
+     * bloqueo nuevo, cancha distinta o cambio de duración).
+     *
+     * @param  list<array{weekday: int, field_id: int, start: int, end: int}>  $windows
+     * @param  list<array{date: string, field_id: int|null, start: int|null, end: int|null}>  $blocks
+     */
+    private function outdated(Tournament $tournament, array $windows, array $blocks, int $duration, ?CarbonImmutable $startDate): bool
+    {
+        $timed = $this->scheduleRepository->timedMatches($tournament->id);
+
+        if ($timed !== [] && $startDate === null) {
+            return true;
+        }
+
+        $weekSlots = [];
+
+        foreach ($timed as $match) {
+            $monday = CarbonImmutable::parse($match['date'])->startOfWeek(CarbonImmutable::MONDAY);
+            $weekSlots[$monday->toDateString()] ??= array_map(
+                fn (array $slot) => "{$slot['date']}|{$slot['field_id']}|{$slot['start']}",
+                ScheduleCapacity::weekSlots($monday, $startDate, $windows, $blocks, $duration)
+            );
+
+            if (! in_array("{$match['date']}|{$match['field_id']}|{$match['start']}", $weekSlots[$monday->toDateString()], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function startDate(Tournament $tournament): ?CarbonImmutable

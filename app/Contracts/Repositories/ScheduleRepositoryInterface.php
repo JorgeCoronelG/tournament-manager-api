@@ -42,9 +42,11 @@ interface ScheduleRepositoryInterface
     public function countLeagueFields(int $leagueId, array $fieldIds, bool $onlyActive): int;
 
     /**
-     * Si algún partido de fase regular ya tiene hora asignada.
+     * Partidos de fase regular no jugados con hora asignada: fecha (Y-m-d), hora de inicio (minutos) y cancha.
+     *
+     * @return list<array{date: string, start: int, field_id: int|null}>
      */
-    public function hasTimedMatches(int $tournamentId): bool;
+    public function timedMatches(int $tournamentId): array;
 
     /**
      * Partidos de fase regular por jornada (todos los grupos juntos): jornada => partidos.

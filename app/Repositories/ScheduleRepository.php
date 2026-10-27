@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Contracts\Repositories\ScheduleRepositoryInterface;
 use App\Core\Enum\FieldStatus;
 use App\Core\Enum\MatchPhase;
+use App\Core\Enum\MatchStatus;
 use App\Models\Field;
 use App\Models\GameMatch;
 use App\Models\Tournament;
@@ -63,13 +64,26 @@ class ScheduleRepository implements ScheduleRepositoryInterface
             ->count();
     }
 
-    public function hasTimedMatches(int $tournamentId): bool
+    public function timedMatches(int $tournamentId): array
     {
-        return GameMatch::query()
+        $rows = [];
+
+        $matches = GameMatch::query()
             ->where('tournament_id', $tournamentId)
             ->where('phase', MatchPhase::REGULAR_STAGE)
+            ->where('status', '!=', MatchStatus::PLAYED)
             ->whereNotNull('match_datetime')
-            ->exists();
+            ->get(['match_datetime', 'field_id']);
+
+        foreach ($matches as $match) {
+            $at = $match->match_datetime;
+
+            if ($at !== null) {
+                $rows[] = ['date' => $at->format('Y-m-d'), 'start' => (int) $at->format('G') * 60 + (int) $at->format('i'), 'field_id' => $match->field_id];
+            }
+        }
+
+        return $rows;
     }
 
     public function matchesPerMatchday(int $tournamentId): array

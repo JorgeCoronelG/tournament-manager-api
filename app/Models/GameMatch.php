@@ -35,6 +35,7 @@ class GameMatch extends Model
         'leg' => 'integer',
         'round_index' => 'integer',
         'bracket_position' => 'integer',
+        'field_id' => 'integer',
         'home_registration_id' => 'integer',
         'away_registration_id' => 'integer',
     ];
@@ -53,6 +54,14 @@ class GameMatch extends Model
     public function tie(): BelongsTo
     {
         return $this->belongsTo(PlayoffTie::class, 'tie_id');
+    }
+
+    /**
+     * @return BelongsTo<Field, $this>
+     */
+    public function field(): BelongsTo
+    {
+        return $this->belongsTo(Field::class)->withTrashed();
     }
 
     /**

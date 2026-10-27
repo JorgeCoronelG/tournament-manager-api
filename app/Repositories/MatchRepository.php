@@ -70,7 +70,7 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->when(array_key_exists('status', $filters), fn (Builder $b) => $b->where('status', $filters['status'] ?? null))
             ->when(array_key_exists('round_number', $filters), fn (Builder $b) => $b->where('round_number', $filters['round_number'] ?? null))
             ->when(array_key_exists('phase', $filters), fn (Builder $b) => $b->where('phase', $filters['phase'] ?? null))
-            ->with(['group', 'home.team', 'away.team'])
+            ->with(['group', 'field', 'home.team', 'away.team'])
             ->orderBy('matchday')
             ->orderBy('group_id')
             ->orderBy('id');
@@ -152,9 +152,18 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
         return $this->entity->newQuery()
             ->where('tournament_id', $tournamentId)
             ->where('phase', MatchPhase::REGULAR_STAGE)
-            ->with(['group', 'home.team', 'away.team'])
+            ->with(['group', 'field', 'home.team', 'away.team'])
             ->orderBy('matchday')
             ->orderBy('id')
             ->get();
+    }
+
+    public function assignSchedule(array $assignments): void
+    {
+        $now = now();
+
+        foreach ($assignments as $matchId => [$datetime, $fieldId]) {
+            $this->entity->newQuery()->whereKey($matchId)->update(['match_datetime' => $datetime, 'field_id' => $fieldId, 'updated_at' => $now]);
+        }
     }
 }

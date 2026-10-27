@@ -96,4 +96,40 @@ class ScheduleCapacity
 
         return false;
     }
+
+    /**
+     * Semanas del patrón desde la de $startDate. Las jornadas, en orden, van solo a las semanas con espacios; las de 0
+     * espacios se saltan sin consumir jornada. Con jornadas se recorre hasta ubicarlas todas o hasta $limit semanas;
+     * sin jornadas, $limit semanas.
+     *
+     * @param  list<int>  $matchdays  Números de jornada, en orden.
+     * @param  list<array{weekday: int, field_id: int, start: int, end: int}>  $windows
+     * @param  list<array{date: string, field_id: int|null, start: int|null, end: int|null}>  $blocks
+     * @return array{weeks: list<array{week: int, monday: CarbonImmutable, slots: list<array{date: string, field_id: int, start: int, end: int}>, matchday: int|null}>, assigned: array<int, int>}
+     */
+    public static function plan(CarbonImmutable $startDate, array $windows, array $blocks, int $duration, array $matchdays, int $limit): array
+    {
+        $pending = $matchdays;
+        $weeks = [];
+        $assigned = [];
+
+        for ($week = 1; $week <= $limit; $week++) {
+            if ($matchdays !== [] && $pending === []) {
+                break;
+            }
+
+            $monday = $startDate->startOfWeek(CarbonImmutable::MONDAY)->addWeeks($week - 1);
+            $slots = self::weekSlots($monday, $startDate, $windows, $blocks, $duration);
+            $matchday = null;
+
+            if ($matchdays !== [] && $slots !== []) {
+                $matchday = array_shift($pending);
+                $assigned[$matchday] = count($weeks);
+            }
+
+            $weeks[] = ['week' => $week, 'monday' => $monday, 'slots' => $slots, 'matchday' => $matchday];
+        }
+
+        return ['weeks' => $weeks, 'assigned' => $assigned];
+    }
 }

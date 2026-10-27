@@ -151,6 +151,12 @@ class Message
 
     public const SCHEDULE_DURATION_REQUIRED = 'Define la duración del partido en el torneo.';
 
+    public const SCHEDULE_ONLY_IN_PROGRESS = 'El horario solo se genera con el torneo en curso.';
+
+    public const SCHEDULE_NO_CALENDAR = 'Primero genera el calendario de partidos.';
+
+    public const SCHEDULE_NOT_CONFIGURED = 'Configura los horarios del torneo primero.';
+
     public static function getMessageMinMatchesExceed(int $minimum, string $group, int $matches): string
     {
         return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";

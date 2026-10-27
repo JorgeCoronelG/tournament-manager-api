@@ -306,6 +306,9 @@ class DevelopmentSeeder extends Seeder
 
             if ($closed) {
                 $this->seedPlayedCalendar($tournament);
+            } else {
+                // Calendario de emparejamientos sin partidos jugados ni horarios, para probar capacidad y horarios.
+                app(MatchServiceInterface::class)->generate($tournament, false);
             }
 
             $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$regular, 1, 4]], $closed ? [2, 1] : null);
@@ -465,6 +468,8 @@ class DevelopmentSeeder extends Seeder
             }
         }
 
+        // Calendario de emparejamientos sin horarios generados: el flujo completo se prueba desde el generador.
+        app(MatchServiceInterface::class)->generate($tournament, false);
         $this->seedScheduleConfig($tournament, $league);
     }
 
