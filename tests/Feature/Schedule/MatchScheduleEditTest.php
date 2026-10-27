@@ -276,7 +276,7 @@ class MatchScheduleEditTest extends TestCase
         $this->matches[0]->forceFill(['status' => MatchStatus::PLAYED, 'home_score' => 1, 'away_score' => 0])->save();
         $this->schedule($this->matches[0], ['match_datetime' => '2026-11-07 08:00:00'])->assertUnprocessable()->assertJsonPath('error', Message::MATCH_SCHEDULE_PLAYED);
 
-        $this->tournament->forceFill(['status' => TournamentStatus::PLAYOFFS])->save();
+        $this->tournament->forceFill(['status' => TournamentStatus::FINISHED])->save();
         $this->schedule($this->matches[1], ['match_datetime' => '2026-11-07 08:00:00'])->assertUnprocessable()->assertJsonPath('error', Message::MATCH_SCHEDULE_ONLY_IN_PROGRESS);
     }
 

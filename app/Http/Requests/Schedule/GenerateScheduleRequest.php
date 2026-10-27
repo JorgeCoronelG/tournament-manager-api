@@ -25,6 +25,8 @@ class GenerateScheduleRequest extends FormRequest
             'mode' => ['nullable', Rule::in([Generator::MODE_BALANCED, Generator::MODE_RANDOM])],
             'scope' => ['nullable', Rule::in([Generator::SCOPE_ALL, Generator::SCOPE_UNSCHEDULED])],
             'seed' => ['nullable', 'integer', 'min:0', 'max:2147483647'],
+            'phase' => ['nullable', Rule::in(['regular', 'playoffs'])],
+            'align_finals' => ['nullable', 'boolean'],
         ];
     }
 
@@ -37,6 +39,8 @@ class GenerateScheduleRequest extends FormRequest
             'mode' => 'modo de reparto',
             'scope' => 'alcance',
             'seed' => 'semilla',
+            'phase' => 'fase',
+            'align_finals' => 'alinear finales',
         ];
     }
 
@@ -53,5 +57,18 @@ class GenerateScheduleRequest extends FormRequest
     public function seed(): ?int
     {
         return $this->filled('seed') ? $this->integer('seed') : null;
+    }
+
+    /**
+     * "regular" (por defecto) o "playoffs".
+     */
+    public function phase(): string
+    {
+        return $this->filled('phase') ? $this->string('phase')->value() : 'regular';
+    }
+
+    public function alignFinals(): bool
+    {
+        return $this->filled('align_finals') ? $this->boolean('align_finals') : true;
     }
 }

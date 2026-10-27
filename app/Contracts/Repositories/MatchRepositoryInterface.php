@@ -111,4 +111,24 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
      * @param  array<string, mixed>  $attributes
      */
     public function saveSchedule(GameMatch $match, array $attributes): GameMatch;
+
+    /**
+     * Partidos de liguilla del torneo con liguilla, equipos y cancha, por fecha programada, ronda, posición e ida/vuelta.
+     *
+     * @return Collection<int, GameMatch>
+     */
+    public function playoffMatches(int $tournamentId): Collection;
+
+    /**
+     * Partidos con hora de la liga entre dos fechas (inclusive), con torneo, grupo, equipos, cancha y árbitro.
+     *
+     * @param  array{tournament_id?: int, field_id?: int, referee_user_id?: int, unassigned_referee?: bool}  $filters
+     * @return Collection<int, GameMatch>
+     */
+    public function agenda(int $leagueId, string $dateFrom, string $dateTo, array $filters): Collection;
+
+    /**
+     * Partidos sin hora (no jugados ni cancelados) de la liga, o de un torneo.
+     */
+    public function countUnscheduled(int $leagueId, ?int $tournamentId): int;
 }

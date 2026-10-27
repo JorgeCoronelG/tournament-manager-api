@@ -6,6 +6,8 @@ use App\Contracts\Repositories\GroupRepositoryInterface;
 use App\Contracts\Repositories\MatchRepositoryInterface;
 use App\Contracts\Repositories\PlayoffRepositoryInterface;
 use App\Contracts\Repositories\TournamentRepositoryInterface;
+use App\Contracts\Services\MatchScheduleServiceInterface;
+use App\Contracts\Services\PlayoffScheduleServiceInterface;
 use App\Contracts\Services\PlayoffServiceInterface;
 use App\Contracts\Services\StandingServiceInterface;
 use App\Core\Enum\MatchStatus;
@@ -38,6 +40,8 @@ class PlayoffService implements PlayoffServiceInterface
         protected GroupRepositoryInterface $groupRepository,
         protected StandingServiceInterface $standingService,
         protected TournamentRepositoryInterface $tournamentRepository,
+        protected PlayoffScheduleServiceInterface $playoffSchedule,
+        protected MatchScheduleServiceInterface $matchSchedule,
     ) {}
 
     public function preview(Tournament $tournament): array
@@ -60,7 +64,13 @@ class PlayoffService implements PlayoffServiceInterface
             ));
         }
 
-        return ['blockers' => $analysis['blockers'], 'warnings' => $analysis['warnings'], 'playoffs' => $playoffs];
+        return [
+            'blockers' => $analysis['blockers'],
+            'warnings' => $analysis['warnings'],
+            // Capacidad de horarios para las fechas propuestas o capturadas; no bloquea el cierre.
+            'schedule_warnings' => $analysis['blockers'] === [] ? $this->playoffSchedule->proposalWarnings($tournament, $playoffs) : [],
+            'playoffs' => $playoffs,
+        ];
     }
 
     public function saveBestManualOrder(Tournament $tournament, PlayoffSource $source, array $teamIds): void
@@ -827,7 +837,14 @@ class PlayoffService implements PlayoffServiceInterface
             return null;
         }
 
-        return ['tie_id' => $next->id, 'round_index' => $next->round_index, 'bracket_position' => $next->bracket_position, 'slot' => $slot, 'match_ids' => $next->matches->pluck('id')->all()];
+        // El equipo que llega a un partido que ya tenía hora puede chocar con otro: solo se avisa, el resultado se guarda.
+        $warnings = [];
+
+        foreach ($this->playoffRepository->findTie($next->id)->matches as $match) {
+            $warnings = [...$warnings, ...$this->matchSchedule->teamConflictWarnings($match, $winner)];
+        }
+
+        return ['tie_id' => $next->id, 'round_index' => $next->round_index, 'bracket_position' => $next->bracket_position, 'slot' => $slot, 'match_ids' => $next->matches->pluck('id')->all(), 'warnings' => $warnings];
     }
 
     private function text(mixed $value): string
@@ -890,6 +907,11 @@ class PlayoffService implements PlayoffServiceInterface
                 'id' => $m->id,
                 'leg' => $m->leg,
                 'scheduled_date' => $m->scheduled_date?->toDateString(),
+                'match_datetime' => $m->match_datetime?->toIso8601String(),
+                'original_match_datetime' => $m->original_match_datetime?->toIso8601String(),
+                'schedule_locked' => $m->schedule_locked,
+                'field' => $m->field_id === null ? null : ['id' => $m->field_id, 'name' => $m->field?->name],
+                'referee' => $m->referee_user_id === null ? null : ['id' => $m->referee_user_id, 'name' => $m->referee === null ? null : trim($m->referee->first_name.' '.$m->referee->last_name)],
                 'home_team' => $this->team($m->home),
                 'away_team' => $this->team($m->away),
                 'home_goals' => $m->home_score,

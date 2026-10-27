@@ -194,4 +194,49 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
 
         return $match;
     }
+
+    public function playoffMatches(int $tournamentId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->whereNotNull('tie_id')
+            ->with(['group', 'field', 'referee', 'home.team', 'away.team'])
+            ->orderBy('scheduled_date')
+            ->orderBy('round_index')
+            ->orderBy('bracket_position')
+            ->orderBy('leg')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function agenda(int $leagueId, string $dateFrom, string $dateTo, array $filters): Collection
+    {
+        $tournamentId = $filters['tournament_id'] ?? null;
+        $fieldId = $filters['field_id'] ?? null;
+        $refereeId = $filters['referee_user_id'] ?? null;
+
+        return $this->entity->newQuery()
+            ->whereHas('tournament', fn ($query) => $query->where('league_id', $leagueId))
+            ->whereNotNull('match_datetime')
+            ->whereBetween('match_datetime', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
+            ->when($tournamentId !== null, fn ($query) => $query->where('tournament_id', $tournamentId))
+            ->when($fieldId !== null, fn ($query) => $query->where('field_id', $fieldId))
+            ->when($refereeId !== null, fn ($query) => $query->where('referee_user_id', $refereeId))
+            ->when(! empty($filters['unassigned_referee']), fn ($query) => $query->whereNull('referee_user_id'))
+            ->with(['tournament', 'group', 'field', 'referee', 'home.team', 'away.team'])
+            ->orderBy('match_datetime')
+            ->orderBy('field_id')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function countUnscheduled(int $leagueId, ?int $tournamentId): int
+    {
+        return $this->entity->newQuery()
+            ->whereHas('tournament', fn ($query) => $query->where('league_id', $leagueId))
+            ->whereNull('match_datetime')
+            ->whereNotIn('status', [MatchStatus::PLAYED, MatchStatus::CANCELLED])
+            ->when($tournamentId !== null, fn ($query) => $query->where('tournament_id', $tournamentId))
+            ->count();
+    }
 }

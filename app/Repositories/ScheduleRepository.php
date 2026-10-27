@@ -132,4 +132,9 @@ class ScheduleRepository implements ScheduleRepositoryInterface
             ->whereHas('player', fn ($query) => $query->where('user_id', $userId))
             ->exists();
     }
+
+    public function activeFields(int $leagueId): Collection
+    {
+        return Field::query()->where('league_id', $leagueId)->where('status', FieldStatus::ACTIVE)->orderBy('name')->orderBy('id')->get();
+    }
 }

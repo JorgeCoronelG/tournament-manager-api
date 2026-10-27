@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
 
 class PlayoffRepository implements PlayoffRepositoryInterface
 {
-    private const WITH = ['registrationA.team', 'registrationB.team', 'winner.team', 'matches.home.team', 'matches.away.team'];
+    private const WITH = ['registrationA.team', 'registrationB.team', 'winner.team', 'matches.home.team', 'matches.away.team', 'matches.field', 'matches.referee'];
 
     public function createTie(int $groupId, int $roundIndex, int $position, array $attributes): PlayoffTie
     {

@@ -53,4 +53,13 @@ interface MatchScheduleServiceInterface
      * @return list<array{id: int, name: string, available: bool, reason: string|null}>
      */
     public function availableReferees(League $league, GameMatch $match, ?string $datetime): array;
+
+    /**
+     * Avisos (no bloquean) de choque de equipo de un partido ya programado, p. ej. cuando un ganador avanza a un
+     * partido de liguilla que ya tenía hora. Con `$registrationId` solo se revisa el equipo de esa inscripción (aunque
+     * el partido aún no tenga local y visitante). Cada uno `{code: team_conflict, message}`; vacío sin hora o sin choque.
+     *
+     * @return list<array{code: string, message: string}>
+     */
+    public function teamConflictWarnings(GameMatch $match, ?int $registrationId = null): array;
 }

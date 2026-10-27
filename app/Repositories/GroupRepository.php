@@ -186,4 +186,14 @@ class GroupRepository extends BaseRepository implements GroupRepositoryInterface
             ->whereNull('group_id')
             ->update(['group_id' => $groupId]);
     }
+
+    public function playoffGroups(int $tournamentId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('type', TournamentGroupType::PLAYOFF)
+            ->with('sources')
+            ->orderBy('id')
+            ->get();
+    }
 }

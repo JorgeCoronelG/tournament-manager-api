@@ -157,7 +157,17 @@ class Message
 
     public const SCHEDULE_NOT_CONFIGURED = 'Configura los horarios del torneo primero.';
 
-    public const MATCH_SCHEDULE_ONLY_IN_PROGRESS = 'El horario solo se edita con el torneo en curso.';
+    public const MATCH_SCHEDULE_ONLY_IN_PROGRESS = 'El horario solo se edita con el torneo en curso o en liguilla.';
+
+    public const SCHEDULE_PLAYOFFS_ONLY = 'Los horarios de liguilla se generan con el torneo en liguilla.';
+
+    public const SCHEDULE_NO_PLAYOFF_MATCHES = 'La liguilla aún no tiene partidos.';
+
+    public const SCHEDULE_FINALS_NOT_ALIGNED = 'Las finales de las liguillas no están en la misma fecha.';
+
+    public const AGENDA_RANGE_TOO_LONG = 'El rango de fechas no puede ser mayor a 31 días.';
+
+    public const AGENDA_RANGE_INVALID = 'La fecha de inicio no puede ser posterior a la de fin.';
 
     public const MATCH_SCHEDULE_PLAYED = 'No se puede reprogramar un partido jugado.';
 

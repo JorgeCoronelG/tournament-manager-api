@@ -13,6 +13,7 @@ use App\Exceptions\CustomErrorException;
 use App\Helpers\ScheduleCapacity;
 use App\Models\GameMatch;
 use App\Models\League;
+use App\Models\Registration;
 use App\Models\Tournament;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -87,6 +88,11 @@ class MatchScheduleService implements MatchScheduleServiceInterface
             'original_match_datetime' => $this->original($current, $match->original_match_datetime, $datetime)?->format('Y-m-d H:i:s'),
         ];
 
+        // Liguilla: la fecha editada a mano se respeta y scheduled_date la sigue; sin hora se conserva.
+        if ($match->tie_id !== null && $datetime !== null) {
+            $attributes['scheduled_date'] = $datetime->toDateString();
+        }
+
         if (array_key_exists('schedule_locked', $data)) {
             $attributes['schedule_locked'] = (bool) $data['schedule_locked'];
         } elseif ($touchesSchedule) {
@@ -148,7 +154,7 @@ class MatchScheduleService implements MatchScheduleServiceInterface
                     'referee_user_id' => $new['referee'],
                     'original_match_datetime' => $this->original($old['at'], $target->original_match_datetime, $new['at'])?->format('Y-m-d H:i:s'),
                     'schedule_locked' => true,
-                ]);
+                ] + ($target->tie_id !== null && $new['at'] !== null ? ['scheduled_date' => $new['at']->toDateString()] : []));
             }
         });
 
@@ -238,6 +244,31 @@ class MatchScheduleService implements MatchScheduleServiceInterface
         return $result;
     }
 
+    public function teamConflictWarnings(GameMatch $match, ?int $registrationId = null): array
+    {
+        $this->prepare($match);
+
+        $at = $this->toDate($match->match_datetime);
+
+        if ($at === null) {
+            return [];
+        }
+
+        $duration = $this->duration($this->tournament($match));
+        $teams = $registrationId === null ? $this->teamIds($match) : $this->teamIdsOf($registrationId);
+        $warnings = [];
+
+        foreach ($this->matchRepository->scheduledInLeague($this->tournament($match)->league_id, $at->subMinutes(self::LOOKBACK_MINUTES), $at->addMinutes($duration), [$match->id]) as $other) {
+            $shared = array_values(array_intersect($teams, $this->teamIds($other)));
+
+            if ($shared !== [] && $this->overlaps($at, $duration, $other)) {
+                $warnings[] = ['code' => self::CODE_TEAM_CONFLICT, 'message' => 'El equipo '.$this->teamNameById($other, $shared[0]).' ya juega en '.$this->describe($other).'.'];
+            }
+        }
+
+        return $warnings;
+    }
+
     /**
      * El partido debe ser de la liga (si no, 404) y, al editar, no estar jugado y con el torneo en curso.
      */
@@ -263,7 +294,7 @@ class MatchScheduleService implements MatchScheduleServiceInterface
 
     private function assertInProgress(Tournament $tournament): void
     {
-        if ($tournament->status !== TournamentStatus::IN_PROGRESS) {
+        if (! in_array($tournament->status, [TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS], true)) {
             throw new CustomErrorException(Message::MATCH_SCHEDULE_ONLY_IN_PROGRESS, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
@@ -459,6 +490,27 @@ class MatchScheduleService implements MatchScheduleServiceInterface
         }
 
         return $ids;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function teamIdsOf(int $registrationId): array
+    {
+        $registration = Registration::query()->find($registrationId);
+
+        return $registration === null ? [] : [(int) $registration->team_id];
+    }
+
+    private function teamNameById(GameMatch $match, int $teamId): string
+    {
+        foreach ([$match->home, $match->away] as $registration) {
+            if ($registration !== null && (int) $registration->team_id === $teamId) {
+                return (string) ($registration->team->name ?? '');
+            }
+        }
+
+        return '';
     }
 
     private function teamName(GameMatch $match, GameMatch $other, int $teamId): string

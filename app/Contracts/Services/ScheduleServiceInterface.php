@@ -18,7 +18,7 @@ interface ScheduleServiceInterface
     public function show(Tournament $tournament): array;
 
     /**
-     * Reemplaza fecha de inicio, ventanas y bloqueos. Solo con el torneo en planeación o en curso.
+     * Reemplaza fecha de inicio, ventanas y bloqueos. Solo con el torneo en planeación, en curso o en liguilla.
      *
      * @param  array{schedule_start_date: string|null, windows: list<array{weekday: int, field_id: int, start_time: string, end_time: string}>, blocks: list<array{date: string, field_id: int|null, start_time: string|null, end_time: string|null, reason: string|null}>}  $data
      * @return array<string, mixed> La configuración guardada, como show().

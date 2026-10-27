@@ -1,6 +1,7 @@
 <?php
 
 use App\Core\Enum\Role as RoleEnum;
+use App\Http\Controllers\Api\AgendaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
@@ -70,6 +71,10 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
         Route::post('/players/{player}/ban', [PlayerController::class, 'ban'])->whereNumber('player');
         Route::post('/players/{player}/unban', [PlayerController::class, 'unban'])->whereNumber('player');
         Route::patch('/players/{player}/gender', [PlayerController::class, 'updateGender'])->whereNumber('player');
+
+        // Agenda de toda la liga (todos sus torneos).
+        Route::get('/agenda', [AgendaController::class, 'index']);
+        Route::get('/agenda/unscheduled', [AgendaController::class, 'unscheduled']);
 
         // Fuera de scopeBindings y de /tournaments/{tournament}: el servicio comprueba que el partido sea de la liga.
         Route::patch('/matches/{match}/schedule', [MatchScheduleController::class, 'update'])->whereNumber('match');

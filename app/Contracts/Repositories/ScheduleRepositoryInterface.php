@@ -2,6 +2,7 @@
 
 namespace App\Contracts\Repositories;
 
+use App\Models\Field;
 use App\Models\LeagueReferee;
 use App\Models\Tournament;
 use App\Models\TournamentScheduleBlock;
@@ -74,4 +75,11 @@ interface ScheduleRepositoryInterface
      * @param  list<int>  $registrationIds
      */
     public function playsInRegistrations(int $userId, array $registrationIds): bool;
+
+    /**
+     * Canchas activas de la liga, por nombre.
+     *
+     * @return Collection<int, Field>
+     */
+    public function activeFields(int $leagueId): Collection;
 }

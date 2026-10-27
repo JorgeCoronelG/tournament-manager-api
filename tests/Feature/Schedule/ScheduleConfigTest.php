@@ -145,16 +145,16 @@ class ScheduleConfigTest extends TestCase
         }
     }
 
-    public function test_cannot_be_modified_in_playoffs_or_finished(): void
+    public function test_can_be_modified_in_playoffs_but_not_when_finished(): void
     {
         [$league, $header] = $this->leagueWithAdminHeader();
         $field = Field::factory()->create(['league_id' => $league->id]);
 
-        foreach ([TournamentStatus::PLAYOFFS, TournamentStatus::FINISHED] as $status) {
-            $this->putJson($this->url($league, $this->tournament($league, [], $status)), $this->config($field), $header)
-                ->assertUnprocessable()
-                ->assertJsonPath('error', Message::SCHEDULE_NOT_EDITABLE);
-        }
+        $this->putJson($this->url($league, $this->tournament($league, [], TournamentStatus::PLAYOFFS)), $this->config($field), $header)->assertOk();
+
+        $this->putJson($this->url($league, $this->tournament($league, [], TournamentStatus::FINISHED)), $this->config($field), $header)
+            ->assertUnprocessable()
+            ->assertJsonPath('error', Message::SCHEDULE_NOT_EDITABLE);
     }
 
     public function test_capacity_preview_uses_the_given_config_without_saving_it(): void

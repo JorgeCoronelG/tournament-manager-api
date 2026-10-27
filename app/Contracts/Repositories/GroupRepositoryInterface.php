@@ -100,4 +100,11 @@ interface GroupRepositoryInterface extends BaseRepositoryInterface
      * Asigna al grupo las inscripciones activas del torneo que no tienen grupo.
      */
     public function assignUnassignedTo(int $tournamentId, int $groupId): void;
+
+    /**
+     * Liguillas del torneo con sus fuentes, por id.
+     *
+     * @return Collection<int, TournamentGroup>
+     */
+    public function playoffGroups(int $tournamentId): Collection;
 }

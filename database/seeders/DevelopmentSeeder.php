@@ -320,6 +320,9 @@ class DevelopmentSeeder extends Seeder
                     'round_dates' => ['2026-12-07', '2026-12-10', '2026-12-16'],
                 ]]);
                 $this->seedSemifinalResults($tournament->refresh(), $playoff);
+
+                // Horarios que cubren las semifinales (lunes y jueves) pero no la final (miércoles): déficit de la final.
+                $this->seedScheduleWindows($tournament, $league, '2026-12-01', [[1, 0, '18:00', '21:00'], [1, 1, '18:00', '21:00'], [4, 0, '18:00', '21:00'], [4, 1, '18:00', '21:00']]);
             }
         }
     }
@@ -366,8 +369,9 @@ class DevelopmentSeeder extends Seeder
     }
 
     /**
-     * «Torneo 4 Grupos» en planeación de la primera liga: Grupo A a D con 4 equipos cada uno (16 en total, sin vetados y
-     * con delegado; crea los que falten) y una «Liguilla Principal» sin fechas con las posiciones 1 y 2 de cada grupo.
+     * «Torneo 4 Grupos» en liguilla de la primera liga: Grupo A a D con 4 equipos cada uno (16 en total, sin vetados y
+     * con delegado; crea los que falten), fase regular jugada y cerrada, «Liguilla Principal» (posiciones 1 y 2 de cada
+     * grupo) y «Liguilla Consolación» (posiciones 3 y 4) con partidos y fechas pero sin horarios, y finales el mismo día.
      * No lleva el grupo automático «Fase regular». No hace nada si ya existe.
      *
      * @param  list<League>  $leagues
@@ -391,7 +395,7 @@ class DevelopmentSeeder extends Seeder
             ]));
         }
 
-        $tournament = Tournament::factory()->create([
+        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
             'league_id' => $league->id,
             'name' => 'Torneo 4 Grupos',
             'gender' => TournamentGender::MIXED,
@@ -415,21 +419,21 @@ class DevelopmentSeeder extends Seeder
             }
         }
 
-        $playoff = new TournamentGroup;
-        $playoff->forceFill([
-            'tournament_id' => $tournament->id,
-            'name' => 'Liguilla Principal',
-            'type' => TournamentGroupType::PLAYOFF,
-            'start_date' => null,
-            'round_interval_days' => 7,
-            'round_dates' => null,
-            'round_legs' => [1, 2, 1],
-        ])->save();
+        $this->seedPlayedCalendar($tournament);
+        $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', array_map(fn (TournamentGroup $group) => [$group, 1, 2], $groups), [1, 2, 1]);
+        $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', array_map(fn (TournamentGroup $group) => [$group, 3, 4], $groups), [1, 2, 1]);
 
-        foreach ($groups as $group) {
-            $source = new PlayoffSource;
-            $source->forceFill(['playoff_group_id' => $playoff->id, 'source_group_id' => $group->id, 'position_start' => 1, 'position_end' => 2])->save();
-        }
+        // Las dos liguillas comparten fechas, así que sus finales caen el mismo sábado: cuartos el sábado, semifinales el
+        // domingo de esa semana y el siguiente, y finales el sábado de dos semanas después.
+        $saturday = now()->next(CarbonInterface::SATURDAY)->startOfDay()->toImmutable();
+        $dates = [$saturday->toDateString(), $saturday->addDay()->toDateString(), $saturday->addDays(8)->toDateString(), $saturday->addDays(14)->toDateString()];
+        app(PlayoffServiceInterface::class)->close($tournament, [
+            ['group_id' => $principal->id, 'round_dates' => $dates],
+            ['group_id' => $consolation->id, 'round_dates' => $dates],
+        ]);
+
+        // Horarios que alcanzan para sábado (8 cuartos y 2 finales) pero no para las semifinales del domingo (4 partidos en 2 espacios).
+        $this->seedScheduleWindows($tournament, $league, $saturday->subDays(5)->toDateString(), [[6, 0, '08:00', '12:00'], [6, 1, '08:00', '12:00'], [7, 0, '08:00', '10:00']]);
     }
 
     /**
@@ -628,6 +632,27 @@ class DevelopmentSeeder extends Seeder
     }
 
     /**
+     * Guarda la configuración de horarios de un torneo con las canchas activas de la liga por orden (Cancha 1, 2, 3).
+     *
+     * @param  list<array{0: int, 1: int, 2: string, 3: string}>  $windows  día de la semana (1 = lunes), índice de cancha, inicio y fin
+     */
+    private function seedScheduleWindows(Tournament $tournament, League $league, string $startDate, array $windows): void
+    {
+        $fields = $league->fields()->where('status', FieldStatus::ACTIVE)->orderBy('id')->get();
+        $rows = [];
+
+        foreach ($windows as [$weekday, $fieldIndex, $start, $end]) {
+            $field = $fields[$fieldIndex] ?? null;
+
+            if ($field !== null) {
+                $rows[] = ['weekday' => $weekday, 'field_id' => $field->id, 'start_time' => $start, 'end_time' => $end];
+            }
+        }
+
+        app(ScheduleRepositoryInterface::class)->replace($tournament, $startDate, $rows, []);
+    }
+
+    /**
      * Calendario regular completo del torneo con todos los partidos jugados. Por defecto el equipo de inscripción más
      * antigua gana 2-0 a los demás, el siguiente a los que le siguen, etc. (sin empates entre equipos). `$score` recibe
      * el orden de inscripción (0 = más antigua) del local y del visitante y devuelve `[goles local, goles visitante]`.
@@ -681,7 +706,15 @@ class DevelopmentSeeder extends Seeder
         }
 
         $this->seedPlayedCalendar($tournament);
-        $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 8]], [1, 2, 1]);
+        $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 8]], [1, 2, 1]);
+
+        // Fechas propuestas: sábado, domingo, miércoles (sin ventana, para el aviso) y sábado siguiente.
+        $saturday = now()->next(CarbonInterface::SATURDAY)->startOfDay()->toImmutable();
+        $playoff->forceFill([
+            'start_date' => $saturday->toDateString(),
+            'round_dates' => [$saturday->toDateString(), $saturday->addDay()->toDateString(), $saturday->addDays(4)->toDateString(), $saturday->addDays(7)->toDateString()],
+        ])->save();
+        $this->seedScheduleWindows($tournament, $league, $saturday->subDays(5)->toDateString(), [[6, 0, '08:00', '14:00'], [6, 1, '08:00', '14:00'], [7, 0, '08:00', '12:00'], [7, 1, '08:00', '12:00'], [7, 2, '08:00', '12:00']]);
     }
 
     /**

@@ -45,7 +45,7 @@ class ScheduleService implements ScheduleServiceInterface
 
     public function save(Tournament $tournament, array $data): array
     {
-        if (! in_array($tournament->status, [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS], true)) {
+        if (! in_array($tournament->status, [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS], true)) {
             throw new CustomErrorException(Message::SCHEDULE_NOT_EDITABLE, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 

@@ -15,7 +15,7 @@ interface PlayoffServiceInterface
     /**
      * Bloqueos, avisos y, sin bloqueos, la propuesta (clasificados, cruces de primera ronda y fechas) de cada liguilla.
      *
-     * @return array{blockers: list<array<string, mixed>>, warnings: list<array<string, mixed>>, playoffs: list<array<string, mixed>>} `playoffs` trae la propuesta (sin bloqueos) y la comparativa `best_of` de las fuentes de mejores
+     * @return array{blockers: list<array<string, mixed>>, warnings: list<array<string, mixed>>, schedule_warnings: list<array<string, mixed>>, playoffs: list<array<string, mixed>>} `schedule_warnings` avisa de capacidad de horarios en las fechas propuestas (no bloquea); `playoffs` trae la propuesta (sin bloqueos) y la comparativa `best_of` de las fuentes de mejores
      *
      * @throws CustomErrorException
      */

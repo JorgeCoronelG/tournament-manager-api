@@ -95,8 +95,12 @@ class MatchController extends BaseApiController
     {
         $match = $result['match']->load(['group', 'field', 'referee', 'home.team', 'away.team']);
 
+        $advanced = $result['advanced_to'];
+        $warnings = $advanced['warnings'] ?? [];
+        unset($advanced['warnings']);
+
         return $this->successResponse(
-            (new MatchResource($match))->resolve() + ['tie' => $result['tie'], 'advanced_to' => $result['advanced_to']],
+            (new MatchResource($match))->resolve() + ['tie' => $result['tie'], 'advanced_to' => $advanced, 'warnings' => $warnings],
             Response::HTTP_OK
         );
     }

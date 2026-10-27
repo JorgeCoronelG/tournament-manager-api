@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Services\PlayoffScheduleServiceInterface;
 use App\Contracts\Services\ScheduleServiceInterface;
 use App\Core\BaseApiController;
 use App\Http\Requests\Schedule\SaveScheduleConfigRequest;
@@ -12,7 +13,10 @@ use Illuminate\Http\Response;
 
 class ScheduleConfigController extends BaseApiController
 {
-    public function __construct(protected ScheduleServiceInterface $scheduleService) {}
+    public function __construct(
+        protected ScheduleServiceInterface $scheduleService,
+        protected PlayoffScheduleServiceInterface $playoffSchedule,
+    ) {}
 
     public function show(League $league, Tournament $tournament): JsonResponse
     {
@@ -26,7 +30,7 @@ class ScheduleConfigController extends BaseApiController
 
     public function capacity(League $league, Tournament $tournament): JsonResponse
     {
-        return $this->successResponse($this->scheduleService->capacity($tournament), Response::HTTP_OK);
+        return $this->successResponse($this->scheduleService->capacity($tournament) + $this->playoffSchedule->capacity($tournament), Response::HTTP_OK);
     }
 
     public function previewCapacity(SaveScheduleConfigRequest $request, League $league, Tournament $tournament): JsonResponse
