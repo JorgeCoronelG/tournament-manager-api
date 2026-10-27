@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
 use App\Http\Controllers\Api\MatchController;
+use App\Http\Controllers\Api\MatchScheduleController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
@@ -69,6 +70,12 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
         Route::post('/players/{player}/ban', [PlayerController::class, 'ban'])->whereNumber('player');
         Route::post('/players/{player}/unban', [PlayerController::class, 'unban'])->whereNumber('player');
         Route::patch('/players/{player}/gender', [PlayerController::class, 'updateGender'])->whereNumber('player');
+
+        // Fuera de scopeBindings y de /tournaments/{tournament}: el servicio comprueba que el partido sea de la liga.
+        Route::patch('/matches/{match}/schedule', [MatchScheduleController::class, 'update'])->whereNumber('match');
+        Route::post('/matches/{match}/swap-schedule', [MatchScheduleController::class, 'swap'])->whereNumber('match');
+        Route::get('/matches/{match}/available-slots', [MatchScheduleController::class, 'availableSlots'])->whereNumber('match');
+        Route::get('/matches/{match}/available-referees', [MatchScheduleController::class, 'availableReferees'])->whereNumber('match');
 
         Route::scopeBindings()->group(function (): void {
             Route::get('/tournaments', [TournamentController::class, 'index']);

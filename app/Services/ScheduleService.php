@@ -86,6 +86,65 @@ class ScheduleService implements ScheduleServiceInterface
         return $planned + ['names' => $names];
     }
 
+    public function slotsOfDate(Tournament $tournament, string $date): array
+    {
+        $startDate = $this->startDate($tournament);
+
+        if ($startDate === null) {
+            return [];
+        }
+
+        $day = CarbonImmutable::parse($date);
+        $slots = ScheduleCapacity::weekSlots($day->startOfWeek(CarbonImmutable::MONDAY), $startDate, $this->loadWindows($tournament), $this->loadBlocks($tournament), $this->duration($tournament));
+
+        return array_values(array_filter($slots, fn (array $slot) => $slot['date'] === $day->toDateString()));
+    }
+
+    public function firstSlotDate(Tournament $tournament): ?string
+    {
+        foreach ($this->plan($tournament, [], 12)['weeks'] as $week) {
+            if ($week['slots'] !== []) {
+                return $week['slots'][0]['date'];
+            }
+        }
+
+        return null;
+    }
+
+    public function fitsWindows(Tournament $tournament, CarbonImmutable $at, ?int $fieldId): ?bool
+    {
+        $windows = $this->loadWindows($tournament);
+        $startDate = $this->startDate($tournament);
+
+        if ($windows === [] || $startDate === null) {
+            return null;
+        }
+
+        $date = $at->toDateString();
+        $start = (int) $at->format('G') * 60 + (int) $at->format('i');
+        $end = $start + $this->duration($tournament);
+
+        if ($at->startOfDay()->lt($startDate)) {
+            return false;
+        }
+
+        foreach ($this->loadBlocks($tournament) as $block) {
+            if ($block['date'] === $date
+                && ($block['field_id'] === null || $fieldId === null || $block['field_id'] === $fieldId)
+                && ($block['start'] === null || $block['end'] === null || ScheduleCapacity::overlap(['start' => $start, 'end' => $end], ['start' => $block['start'], 'end' => $block['end']]))) {
+                return false;
+            }
+        }
+
+        foreach ($windows as $window) {
+            if ($window['weekday'] === $at->dayOfWeekIso && ($fieldId === null || $window['field_id'] === $fieldId) && $start >= $window['start'] && $end <= $window['end']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @return list<array{weekday: int, field_id: int, start: int, end: int}>
      */
@@ -163,46 +222,58 @@ class ScheduleService implements ScheduleServiceInterface
             ];
         }
 
+        $staleness = $this->staleness($tournament, $windows, $blocks, $duration, $startDate);
+
         return [
             'schedule_start_date' => $startDate?->toDateString(),
             'match_duration_minutes' => $duration,
             'has_calendar' => $hasCalendar,
-            'schedule_outdated' => $this->outdated($tournament, $windows, $blocks, $duration, $startDate),
+            'schedule_outdated' => $staleness['outdated'],
+            'locked_outside_schedule' => $staleness['locked_outside'],
             'matchdays' => $matchdays,
             'warnings' => array_values(array_filter($matchdays, fn (array $matchday) => $matchday['deficit'] > 0)),
         ];
     }
 
     /**
-     * Si algún partido no jugado tiene un horario que ya no existe entre los espacios actuales (ventana eliminada,
-     * bloqueo nuevo, cancha distinta o cambio de duración).
+     * Partidos no jugados con un horario que ya no existe entre los espacios actuales (ventana eliminada, bloqueo
+     * nuevo, cancha distinta o cambio de duración): `outdated` si algún partido no fijado lo tiene, y
+     * `locked_outside` con cuántos fijados a mano están fuera de los espacios (solo informativo).
      *
      * @param  list<array{weekday: int, field_id: int, start: int, end: int}>  $windows
      * @param  list<array{date: string, field_id: int|null, start: int|null, end: int|null}>  $blocks
+     * @return array{outdated: bool, locked_outside: int}
      */
-    private function outdated(Tournament $tournament, array $windows, array $blocks, int $duration, ?CarbonImmutable $startDate): bool
+    private function staleness(Tournament $tournament, array $windows, array $blocks, int $duration, ?CarbonImmutable $startDate): array
     {
-        $timed = $this->scheduleRepository->timedMatches($tournament->id);
-
-        if ($timed !== [] && $startDate === null) {
-            return true;
-        }
-
+        $outdated = false;
+        $lockedOutside = 0;
         $weekSlots = [];
 
-        foreach ($timed as $match) {
-            $monday = CarbonImmutable::parse($match['date'])->startOfWeek(CarbonImmutable::MONDAY);
-            $weekSlots[$monday->toDateString()] ??= array_map(
-                fn (array $slot) => "{$slot['date']}|{$slot['field_id']}|{$slot['start']}",
-                ScheduleCapacity::weekSlots($monday, $startDate, $windows, $blocks, $duration)
-            );
+        foreach ($this->scheduleRepository->timedMatches($tournament->id) as $match) {
+            $exists = false;
 
-            if (! in_array("{$match['date']}|{$match['field_id']}|{$match['start']}", $weekSlots[$monday->toDateString()], true)) {
-                return true;
+            if ($startDate !== null) {
+                $monday = CarbonImmutable::parse($match['date'])->startOfWeek(CarbonImmutable::MONDAY);
+                $weekSlots[$monday->toDateString()] ??= array_map(
+                    fn (array $slot) => "{$slot['date']}|{$slot['field_id']}|{$slot['start']}",
+                    ScheduleCapacity::weekSlots($monday, $startDate, $windows, $blocks, $duration)
+                );
+                $exists = in_array("{$match['date']}|{$match['field_id']}|{$match['start']}", $weekSlots[$monday->toDateString()], true);
+            }
+
+            if ($exists) {
+                continue;
+            }
+
+            if ($match['locked']) {
+                $lockedOutside++;
+            } else {
+                $outdated = true;
             }
         }
 
-        return false;
+        return ['outdated' => $outdated, 'locked_outside' => $lockedOutside];
     }
 
     private function startDate(Tournament $tournament): ?CarbonImmutable

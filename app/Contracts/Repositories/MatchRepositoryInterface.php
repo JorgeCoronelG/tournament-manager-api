@@ -6,6 +6,7 @@ use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
 use App\Models\GameMatch;
 use App\Models\Registration;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -87,9 +88,27 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
     public function regularMatches(int $tournamentId): Collection;
 
     /**
-     * Asigna fecha, hora y cancha: id del partido => [match_datetime (Y-m-d H:i:s) o null, field_id o null].
+     * Asigna fecha, hora y cancha: id del partido => [match_datetime (Y-m-d H:i:s) o null, field_id o null, si se
+     * reinician también árbitro y horario original].
      *
-     * @param  array<int, array{0: string|null, 1: int|null}>  $assignments
+     * @param  array<int, array{0: string|null, 1: int|null, 2: bool}>  $assignments
      */
     public function assignSchedule(array $assignments): void;
+
+    /**
+     * Partidos programados de la liga (todos los torneos, sin cancelados) con hora de inicio entre $from y $to, con
+     * torneo, equipos y cancha.
+     *
+     * @param  list<int>  $excludeIds
+     * @return Collection<int, GameMatch>
+     */
+    public function scheduledInLeague(int $leagueId, CarbonInterface $from, CarbonInterface $to, array $excludeIds = []): Collection;
+
+    /**
+     * Guarda columnas de horario de un partido (match_datetime, field_id, referee_user_id, schedule_locked,
+     * original_match_datetime).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function saveSchedule(GameMatch $match, array $attributes): GameMatch;
 }

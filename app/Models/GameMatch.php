@@ -30,12 +30,13 @@ class GameMatch extends Model
         'status' => MatchStatus::class,
         'match_datetime' => 'datetime',
         'scheduled_date' => 'date',
-        'original_datetime' => 'datetime',
+        'original_match_datetime' => 'datetime',
         'schedule_locked' => 'boolean',
         'leg' => 'integer',
         'round_index' => 'integer',
         'bracket_position' => 'integer',
         'field_id' => 'integer',
+        'referee_user_id' => 'integer',
         'home_registration_id' => 'integer',
         'away_registration_id' => 'integer',
     ];
@@ -62,6 +63,22 @@ class GameMatch extends Model
     public function field(): BelongsTo
     {
         return $this->belongsTo(Field::class)->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function referee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referee_user_id');
+    }
+
+    /**
+     * @return BelongsTo<Tournament, $this>
+     */
+    public function tournament(): BelongsTo
+    {
+        return $this->belongsTo(Tournament::class);
     }
 
     /**

@@ -157,6 +157,28 @@ class Message
 
     public const SCHEDULE_NOT_CONFIGURED = 'Configura los horarios del torneo primero.';
 
+    public const MATCH_SCHEDULE_ONLY_IN_PROGRESS = 'El horario solo se edita con el torneo en curso.';
+
+    public const MATCH_SCHEDULE_PLAYED = 'No se puede reprogramar un partido jugado.';
+
+    public const MATCH_SCHEDULE_FIELD_NEEDS_DATETIME = 'Indica la fecha y hora.';
+
+    public const MATCH_SCHEDULE_FIELD_UNAVAILABLE = 'La cancha no está disponible.';
+
+    public const MATCH_SCHEDULE_REFEREE_INACTIVE = 'El árbitro no está activo en la liga.';
+
+    public const MATCH_SCHEDULE_REFEREE_PLAYS = 'El árbitro juega en uno de los equipos.';
+
+    public const MATCH_SWAP_SAME_MATCH = 'Elige otro partido para intercambiar.';
+
+    public const MATCH_SWAP_DIFFERENT_TOURNAMENT = 'Solo se pueden intercambiar partidos del mismo torneo.';
+
+    public const MATCH_SWAP_NOT_FOUND = 'El partido indicado no existe en la liga.';
+
+    public const MATCH_WARNING_OUTSIDE_SCHEDULE = 'Fuera de los horarios configurados del torneo.';
+
+    public const MATCH_WARNING_PAST_DATE = 'La fecha ya pasó.';
+
     public static function getMessageMinMatchesExceed(int $minimum, string $group, int $matches): string
     {
         return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";

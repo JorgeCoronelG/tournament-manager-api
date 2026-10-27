@@ -57,4 +57,28 @@ interface ScheduleServiceInterface
      * @throws CustomErrorException
      */
     public function plan(Tournament $tournament, array $matchdays, int $limit): array;
+
+    /**
+     * Espacios configurados de una fecha (con ventanas, bloqueos y duración del torneo), ordenados por hora y cancha.
+     *
+     * @return list<array{date: string, field_id: int, start: int, end: int}>
+     *
+     * @throws CustomErrorException
+     */
+    public function slotsOfDate(Tournament $tournament, string $date): array;
+
+    /**
+     * Primera fecha con espacios en las próximas semanas, o null.
+     *
+     * @throws CustomErrorException
+     */
+    public function firstSlotDate(Tournament $tournament): ?string;
+
+    /**
+     * Si un partido que empieza en $at (en la cancha, si se indica) cae dentro de una ventana configurada y sin
+     * bloqueos. Null si el torneo no tiene horarios configurados.
+     *
+     * @throws CustomErrorException
+     */
+    public function fitsWindows(Tournament $tournament, CarbonImmutable $at, ?int $fieldId): ?bool;
 }

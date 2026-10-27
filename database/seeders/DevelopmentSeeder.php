@@ -91,6 +91,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedRosters($leagues);
         $this->seedPlayerScenarios($leagues);
         $this->seedTeamRosters($leagues);
+        $this->seedSchedulingScenarios($leagues);
     }
 
     /**
@@ -507,6 +508,123 @@ class DevelopmentSeeder extends Seeder
         ]];
 
         app(ScheduleRepositoryInterface::class)->replace($tournament, $monday->toDateString(), $windows, $blocks);
+
+        // Un partido ya fijado (sábado de la primera semana, 8:00 en la Cancha 1) para probar que el generador no lo mueve.
+        $first = $fields->first();
+        $locked = $tournament->matches()->where('matchday', 1)->orderBy('id')->first();
+
+        if ($first !== null && $locked !== null) {
+            $locked->forceFill([
+                'match_datetime' => $monday->addDays($saturday - 1)->setTime(8, 0)->toDateTimeString(),
+                'field_id' => $first->id,
+                'schedule_locked' => true,
+            ])->save();
+        }
+    }
+
+    /**
+     * Escenarios para probar la edición manual de horarios y el árbitro en la primera liga: 4 árbitros activos más
+     * (uno de ellos juega en «Torneo Impar»), 1 inactivo, y «Torneo Cruzado», un segundo torneo en curso con los mismos
+     * equipos y partidos ya programados y fijados en las canchas 1 y 2 de la primera semana, para probar conflictos
+     * entre torneos. No hace nada si ya existen.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedSchedulingScenarios(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || User::query()->where('user_code', 'ARB101')->exists()) {
+            return;
+        }
+
+        $referees = User::factory(5)
+            ->sequence(fn ($sequence) => ['user_code' => sprintf('ARB%03d', 101 + $sequence->index), 'phone' => $this->phone()])
+            ->create();
+
+        foreach ($referees as $index => $referee) {
+            $roles = $index === 4 ? [RoleEnum::REFEREE->value, RoleEnum::PLAYER->value] : [RoleEnum::REFEREE->value];
+            $referee->roles()->sync($roles);
+
+            $link = LeagueReferee::factory();
+            $link = $index === 3 ? $link->inactive() : $link;
+            $link->create(['league_id' => $league->id, 'user_id' => $referee->id]);
+        }
+
+        $this->seedRefereePlayer($league, $referees[4]);
+        $this->seedCrossTournament($league);
+    }
+
+    /**
+     * El árbitro también juega en el primer equipo de «Torneo Impar» (plantilla activa con el dorsal 99).
+     */
+    private function seedRefereePlayer(League $league, User $referee): void
+    {
+        $registration = $league->tournaments()->where('name', 'Torneo Impar')->first()?->registrations()->orderBy('id')->first();
+
+        if ($registration === null) {
+            return;
+        }
+
+        $player = Player::factory()->create(['user_id' => $referee->id]);
+        $row = new Roster;
+        $row->forceFill([
+            'registration_id' => $registration->id,
+            'tournament_id' => $registration->tournament_id,
+            'player_id' => $player->id,
+            'jersey_number' => 99,
+            'status' => RosterStatus::ACTIVE,
+            'requested_by_user_id' => $league->admin_user_id,
+            'requested_at' => now()->subDays(10),
+            'responded_at' => now()->subDays(9),
+        ])->save();
+    }
+
+    /**
+     * «Torneo Cruzado»: en curso, con los 4 primeros equipos activos de la liga (también juegan en «Torneo Impar») y su
+     * calendario de emparejamientos; dos partidos fijados el sábado de la primera semana (9:00 y 10:00, Cancha 1) y dos
+     * el domingo (8:00 y 9:00, Cancha 2), en las mismas canchas y fechas que los horarios de «Torneo Impar».
+     */
+    private function seedCrossTournament(League $league): void
+    {
+        if ($league->tournaments()->where('name', 'Torneo Cruzado')->exists()) {
+            return;
+        }
+
+        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo Cruzado',
+            'gender' => TournamentGender::MIXED,
+            'min_age' => null,
+            'max_age' => null,
+            'start_date' => now()->subWeek()->toDateString(),
+        ]);
+        $group = $tournament->groups()->firstOrFail();
+
+        foreach ($league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(4)->get() as $team) {
+            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
+        }
+
+        app(MatchServiceInterface::class)->generate($tournament, false);
+
+        $fields = $league->fields()->where('status', FieldStatus::ACTIVE)->orderBy('id')->take(2)->get();
+        $monday = now()->next(CarbonInterface::MONDAY)->startOfDay()->toImmutable();
+        $slots = [[5, 9, 0], [5, 10, 0], [6, 8, 1], [6, 9, 1]];
+
+        foreach ($tournament->matches()->orderBy('matchday')->orderBy('id')->take(4)->get()->values() as $index => $match) {
+            [$offset, $hour, $fieldIndex] = $slots[$index];
+            $field = $fields[$fieldIndex] ?? null;
+
+            if ($field === null) {
+                continue;
+            }
+
+            $match->forceFill([
+                'match_datetime' => $monday->addDays($offset)->setTime($hour, 0)->toDateTimeString(),
+                'field_id' => $field->id,
+                'schedule_locked' => true,
+            ])->save();
+        }
     }
 
     /**

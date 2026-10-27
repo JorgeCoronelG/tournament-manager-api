@@ -93,7 +93,7 @@ class MatchController extends BaseApiController
      */
     private function resultResponse(array $result): JsonResponse
     {
-        $match = $result['match']->load(['group', 'field', 'home.team', 'away.team']);
+        $match = $result['match']->load(['group', 'field', 'referee', 'home.team', 'away.team']);
 
         return $this->successResponse(
             (new MatchResource($match))->resolve() + ['tie' => $result['tie'], 'advanced_to' => $result['advanced_to']],

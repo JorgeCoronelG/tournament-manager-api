@@ -31,7 +31,8 @@ return new class extends Migration
             $table->date('scheduled_date')->nullable();
             // Nullable: un partido puede estar por programar.
             $table->dateTime('match_datetime')->nullable();
-            $table->dateTime('original_datetime')->nullable();
+            // Primer horario del partido antes de reprogramarlo a mano; se limpia si vuelve a ese horario.
+            $table->dateTime('original_match_datetime')->nullable();
             $table->enum('status', ['scheduled', 'played', 'cancelled'])->default('scheduled');
             // Nullable: un partido programado aún no tiene marcador.
             $table->unsignedTinyInteger('home_score')->nullable();

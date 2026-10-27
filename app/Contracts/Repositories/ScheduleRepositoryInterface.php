@@ -2,6 +2,7 @@
 
 namespace App\Contracts\Repositories;
 
+use App\Models\LeagueReferee;
 use App\Models\Tournament;
 use App\Models\TournamentScheduleBlock;
 use App\Models\TournamentScheduleWindow;
@@ -42,9 +43,9 @@ interface ScheduleRepositoryInterface
     public function countLeagueFields(int $leagueId, array $fieldIds, bool $onlyActive): int;
 
     /**
-     * Partidos de fase regular no jugados con hora asignada: fecha (Y-m-d), hora de inicio (minutos) y cancha.
+     * Partidos de fase regular no jugados con hora asignada: fecha (Y-m-d), hora de inicio (minutos), cancha y si está fijado.
      *
-     * @return list<array{date: string, start: int, field_id: int|null}>
+     * @return list<array{date: string, start: int, field_id: int|null, locked: bool}>
      */
     public function timedMatches(int $tournamentId): array;
 
@@ -54,4 +55,23 @@ interface ScheduleRepositoryInterface
      * @return array<int, int>
      */
     public function matchesPerMatchday(int $tournamentId): array;
+
+    /**
+     * Árbitros activos de la liga (con su usuario), por nombre.
+     *
+     * @return Collection<int, LeagueReferee>
+     */
+    public function activeReferees(int $leagueId): Collection;
+
+    /**
+     * Si el usuario es árbitro activo de la liga.
+     */
+    public function isActiveReferee(int $leagueId, int $userId): bool;
+
+    /**
+     * Si el usuario juega (plantilla activa) en alguna de las inscripciones.
+     *
+     * @param  list<int>  $registrationIds
+     */
+    public function playsInRegistrations(int $userId, array $registrationIds): bool;
 }
