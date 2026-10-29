@@ -355,6 +355,48 @@ class Message
         return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → liguilla → finalizado.";
     }
 
+    public static function getMessageLeagueHasActiveTournaments(string $leagueName): string
+    {
+        $name = e($leagueName);
+
+        return "La liga <b>{$name}</b> tiene torneos activos asociados. Para eliminarla, primero debes finalizar o eliminar esos torneos.";
+    }
+
+    public static function getMessageFieldHasScheduledMatches(string $fieldName): string
+    {
+        $name = e($fieldName);
+
+        return "La cancha <b>{$name}</b> tiene partidos programados. Reasígnalos a otra cancha o quítales el horario antes de eliminarla.";
+    }
+
+    public static function getMessageFieldDeactivateHasScheduledMatches(string $fieldName): string
+    {
+        $name = e($fieldName);
+
+        return "La cancha <b>{$name}</b> tiene partidos programados. Reasígnalos a otra cancha o quítales el horario antes de darla de baja.";
+    }
+
+    public static function getMessageFieldInOpenScheduleConfig(string $fieldName): string
+    {
+        $name = e($fieldName);
+
+        return "La cancha <b>{$name}</b> está en la configuración de horarios de un torneo que no ha terminado. Quítala de esa configuración antes de eliminarla.";
+    }
+
+    public static function getMessageRefereeHasAssignedMatches(string $refereeName): string
+    {
+        $name = e($refereeName);
+
+        return "El árbitro <b>{$name}</b> tiene partidos asignados en esta liga. Reasígnalos a otro árbitro antes de quitarlo.";
+    }
+
+    public static function getMessageRefereeDeactivateHasAssignedMatches(string $refereeName): string
+    {
+        $name = e($refereeName);
+
+        return "El árbitro <b>{$name}</b> tiene partidos asignados en esta liga. Reasígnalos a otro árbitro antes de darlo de baja.";
+    }
+
     public static function getMessageUserAdministersLeagues(int $leagues, string $action): string
     {
         $subject = $leagues === 1 ? 'una liga' : "{$leagues} ligas";

@@ -230,6 +230,15 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->get();
     }
 
+    public function hasMatchesWithRefereeInLeague(int $leagueId, int $userId, MatchStatus $status): bool
+    {
+        return $this->entity->newQuery()
+            ->whereHas('tournament', fn ($query) => $query->where('league_id', $leagueId))
+            ->where('referee_user_id', $userId)
+            ->where('status', $status)
+            ->exists();
+    }
+
     public function countUnscheduled(int $leagueId, ?int $tournamentId): int
     {
         return $this->entity->newQuery()

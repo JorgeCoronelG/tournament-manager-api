@@ -70,7 +70,7 @@ class GameMatch extends Model
      */
     public function referee(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'referee_user_id');
+        return $this->belongsTo(User::class, 'referee_user_id')->withTrashed();
     }
 
     /**

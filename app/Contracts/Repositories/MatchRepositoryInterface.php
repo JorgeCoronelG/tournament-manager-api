@@ -4,6 +4,7 @@ namespace App\Contracts\Repositories;
 
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
+use App\Core\Enum\MatchStatus;
 use App\Models\GameMatch;
 use App\Models\Registration;
 use Carbon\CarbonInterface;
@@ -126,6 +127,11 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
      * @return Collection<int, GameMatch>
      */
     public function agenda(int $leagueId, string $dateFrom, string $dateTo, array $filters): Collection;
+
+    /**
+     * Si el árbitro tiene partidos no eliminados con el estado indicado en torneos no eliminados de la liga.
+     */
+    public function hasMatchesWithRefereeInLeague(int $leagueId, int $userId, MatchStatus $status): bool;
 
     /**
      * Partidos sin hora (no jugados ni cancelados) de la liga, o de un torneo.

@@ -2,24 +2,34 @@
 
 namespace App\Services;
 
+use App\Contracts\Repositories\FieldRepositoryInterface;
 use App\Contracts\Repositories\LeagueRepositoryInterface;
+use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Contracts\Services\LeagueServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\Message;
 use App\Core\Enum\Role as RoleEnum;
+use App\Core\Enum\TournamentStatus;
 use App\Data\Leagues\LeagueData;
+use App\Exceptions\CustomErrorException;
 use App\Models\League;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Spatie\LaravelData\Data;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @extends BaseService<League>
  */
 class LeagueService extends BaseService implements LeagueServiceInterface
 {
-    public function __construct(protected LeagueRepositoryInterface $leagueRepository)
-    {
+    public function __construct(
+        protected LeagueRepositoryInterface $leagueRepository,
+        protected TournamentRepositoryInterface $tournamentRepository,
+        protected FieldRepositoryInterface $fieldRepository,
+    ) {
         parent::__construct($leagueRepository);
     }
 
@@ -49,6 +59,25 @@ class LeagueService extends BaseService implements LeagueServiceInterface
         ]);
 
         return $league->load('admin');
+    }
+
+    /**
+     * Elimina la liga y sus canchas en una transacción; solo se puede si todos sus torneos están finalizados.
+     *
+     * @throws CustomErrorException
+     */
+    public function delete(int|string $id): void
+    {
+        $league = $this->leagueRepository->findById($id);
+
+        if ($this->tournamentRepository->countByLeagueExceptStatus($league->id, TournamentStatus::FINISHED) > 0) {
+            throw new CustomErrorException(Message::getMessageLeagueHasActiveTournaments($league->name), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        DB::transaction(function () use ($league): void {
+            $this->fieldRepository->deleteByLeague($league->id);
+            $this->leagueRepository->delete($league->id);
+        });
     }
 
     public function paginateAccessible(ListQuery $query, User $user, ?string $search): LengthAwarePaginator

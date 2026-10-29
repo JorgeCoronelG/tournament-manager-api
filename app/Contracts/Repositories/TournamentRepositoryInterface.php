@@ -29,6 +29,11 @@ interface TournamentRepositoryInterface extends BaseRepositoryInterface
     ): LengthAwarePaginator;
 
     /**
+     * Torneos no eliminados de la liga cuyo estado es distinto del indicado.
+     */
+    public function countByLeagueExceptStatus(int $leagueId, TournamentStatus $status): int;
+
+    /**
      * Crea el torneo en la liga indicada, siempre en planeación.
      *
      * @param  array<string, mixed>  $data

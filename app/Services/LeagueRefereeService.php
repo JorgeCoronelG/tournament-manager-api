@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Contracts\Repositories\LeagueRefereeRepositoryInterface;
+use App\Contracts\Repositories\MatchRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Contracts\Services\LeagueRefereeServiceInterface;
 use App\Contracts\Services\UserServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\LeagueRefereeStatus;
+use App\Core\Enum\MatchStatus;
 use App\Core\Enum\Message;
 use App\Core\Enum\Role as RoleEnum;
 use App\Data\Referees\RefereeData;
@@ -30,6 +32,7 @@ class LeagueRefereeService extends BaseService implements LeagueRefereeServiceIn
     public function __construct(
         protected LeagueRefereeRepositoryInterface $leagueRefereeRepository,
         protected UserRepositoryInterface $userRepository,
+        protected MatchRepositoryInterface $matchRepository,
         protected UserServiceInterface $userService,
     ) {
         parent::__construct($leagueRefereeRepository);
@@ -96,13 +99,24 @@ class LeagueRefereeService extends BaseService implements LeagueRefereeServiceIn
     {
         $link = $this->leagueRefereeRepository->findLinked($league->id, $userId);
 
+        if (
+            $status === LeagueRefereeStatus::INACTIVE
+            && $link->status !== LeagueRefereeStatus::INACTIVE
+            && $this->matchRepository->hasMatchesWithRefereeInLeague($league->id, $userId, MatchStatus::SCHEDULED)
+        ) {
+            throw new CustomErrorException(Message::getMessageRefereeDeactivateHasAssignedMatches($this->displayName($link)), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         return $this->leagueRefereeRepository->updateStatus($link, $status)->load('user');
     }
 
     public function detach(League $league, int $userId): void
     {
-        // TODO: al existir partidos, bloquear si el árbitro tiene partidos asignados en esta liga.
         $link = $this->leagueRefereeRepository->findLinked($league->id, $userId);
+
+        if ($this->matchRepository->hasMatchesWithRefereeInLeague($league->id, $userId, MatchStatus::SCHEDULED)) {
+            throw new CustomErrorException(Message::getMessageRefereeHasAssignedMatches($this->displayName($link)), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         $this->delete($link->id);
     }
@@ -132,6 +146,18 @@ class LeagueRefereeService extends BaseService implements LeagueRefereeServiceIn
         $this->userService->resendInvitation($userId);
 
         return $link;
+    }
+
+    /**
+     * Nombre completo del árbitro; el correo si la cuenta pendiente aún no tiene nombre.
+     */
+    private function displayName(LeagueReferee $link): string
+    {
+        /** @var User $user */
+        $user = $link->user;
+        $name = trim($user->first_name.' '.$user->last_name);
+
+        return $name !== '' ? $name : $user->email;
     }
 
     /**

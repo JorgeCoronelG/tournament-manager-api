@@ -5,6 +5,8 @@ namespace App\Contracts\Repositories;
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
 use App\Core\Enum\FieldStatus;
+use App\Core\Enum\MatchStatus;
+use App\Core\Enum\TournamentStatus;
 use App\Models\Field;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -31,6 +33,21 @@ interface FieldRepositoryInterface extends BaseRepositoryInterface
      * @param  array<string, mixed>  $data
      */
     public function createInLeague(int $leagueId, array $data, FieldStatus $status = FieldStatus::ACTIVE): Field;
+
+    /**
+     * Si la cancha tiene partidos no eliminados con el estado indicado.
+     */
+    public function hasMatchesWithStatus(int $fieldId, MatchStatus $status): bool;
+
+    /**
+     * Si la cancha está en ventanas o bloqueos de horarios de un torneo no eliminado cuyo estado es distinto del indicado.
+     */
+    public function isInScheduleConfigExceptStatus(int $fieldId, TournamentStatus $status): bool;
+
+    /**
+     * Elimina (soft delete) todas las canchas de la liga.
+     */
+    public function deleteByLeague(int $leagueId): void;
 
     /**
      * @param  array<string, mixed>  $data
