@@ -41,8 +41,7 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
 
     public function lockOpenByRegistration(int $registrationId): Collection
     {
-        return $this->entity->newQuery()
-            ->where('registration_id', $registrationId)
+        return $this->currentTeam($this->entity->newQuery(), $registrationId)
             ->whereIn('status', [RosterStatus::PENDING, RosterStatus::ACTIVE])
             ->lockForUpdate()
             ->get();
@@ -81,8 +80,7 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
 
     public function paginateByRegistration(int $registrationId, ListQuery $query, ?string $search, ?RosterStatus $status): LengthAwarePaginator
     {
-        $builder = $this->entity->newQuery()
-            ->where('registration_id', $registrationId)
+        $builder = $this->currentTeam($this->entity->newQuery(), $registrationId)
             ->when($status !== null, fn (Builder $builder) => $builder->where('status', $status))
             ->when($search !== null, function (Builder $builder) use ($search) {
                 $builder->whereHas('player', fn (Builder $player) => $player->withTrashed()->whereHas('user', function (Builder $user) use ($search) {
@@ -109,12 +107,41 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
 
     public function countOpenByRegistration(int $registrationId): array
     {
-        $count = fn (RosterStatus $status): int => $this->entity->newQuery()
-            ->where('registration_id', $registrationId)
+        $count = fn (RosterStatus $status): int => $this->currentTeam($this->entity->newQuery(), $registrationId)
             ->where('status', $status)
             ->count();
 
         return ['active' => $count(RosterStatus::ACTIVE), 'pending' => $count(RosterStatus::PENDING)];
+    }
+
+    public function countByStatusOfRegistration(int $registrationId): array
+    {
+        $counts = $this->currentTeam($this->entity->newQuery(), $registrationId)
+            ->select('status', DB::raw('COUNT(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $byStatus = [];
+
+        foreach (RosterStatus::cases() as $status) {
+            $total = $counts[$status->value] ?? 0;
+            $byStatus[$status->value] = is_numeric($total) ? (int) $total : 0;
+        }
+
+        return $byStatus;
+    }
+
+    /**
+     * Solo las filas del equipo actual de la inscripción: tras un reemplazo, las del equipo anterior quedan aparte.
+     *
+     * @param  Builder<Roster>  $builder
+     * @return Builder<Roster>
+     */
+    private function currentTeam(Builder $builder, int $registrationId): Builder
+    {
+        return $builder
+            ->where('registration_id', $registrationId)
+            ->whereIn('team_id', Registration::query()->select('team_id')->whereKey($registrationId));
     }
 
     public function hasNewerRowOfPlayer(Roster $roster): bool
@@ -160,11 +187,12 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
         return ['removed' => $removed, 'cancelled' => $cancelled];
     }
 
-    public function createRequest(int $registrationId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster
+    public function createRequest(int $registrationId, int $teamId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster
     {
         $roster = $this->entity->newInstance();
         $roster->forceFill([
             'registration_id' => $registrationId,
+            'team_id' => $teamId,
             'tournament_id' => $tournamentId,
             'player_id' => $playerId,
             'jersey_number' => $jerseyNumber,
@@ -216,6 +244,14 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
             ->where('status', RosterStatus::PENDING)
             ->where('id', '!=', $exceptRosterId)
             ->update(['status' => RosterStatus::CANCELLED, 'responded_at' => now()]);
+    }
+
+    public function releaseOpenByRegistration(int $registrationId): int
+    {
+        return $this->entity->newQuery()
+            ->where('registration_id', $registrationId)
+            ->whereIn('status', [RosterStatus::PENDING, RosterStatus::ACTIVE])
+            ->update(['status' => RosterStatus::RELEASED, 'updated_at' => now()]);
     }
 
     public function cancelPendingOfTournament(int $tournamentId): int

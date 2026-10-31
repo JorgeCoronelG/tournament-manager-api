@@ -14,6 +14,10 @@ return new class extends Migration
             $table->foreignId('tournament_id')->constrained('tournaments');
             $table->foreignId('group_id')->nullable()->constrained('tournament_groups');
             $table->enum('status', ['active', 'withdrawn'])->default('active');
+            // Solo en bajas: cuándo, por qué y quién dio de baja al equipo.
+            $table->timestamp('withdrawn_at')->nullable();
+            $table->string('withdrawn_reason', 255)->nullable();
+            $table->foreignId('withdrawn_by_user_id')->nullable()->constrained('users');
             $table->timestamps();
             $table->softDeletes();
 

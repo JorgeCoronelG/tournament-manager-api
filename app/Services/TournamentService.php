@@ -61,6 +61,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
                     'sport' => ($data->sport ?? Sport::default())->value,
                     'rounds' => Tournament::DEFAULT_ROUNDS,
                     'match_duration_minutes' => Tournament::DEFAULT_MATCH_DURATION_MINUTES,
+                    'walkover_goals' => Tournament::DEFAULT_WALKOVER_GOALS,
                     'tiebreakers' => Tiebreaker::defaults(),
                 ],
                 $this->configAttributes($data)
@@ -95,11 +96,16 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
                 $this->assertConfigUnchanged($tournament, $data);
                 $this->assertRosterSizeFits($tournament, $data);
 
+                // Los goles del por default se editan en curso, no en liguilla; cambiarlos no toca los ya registrados.
+                if ($tournament->status === TournamentStatus::PLAYOFFS && $data->walkover_goals !== null && $data->walkover_goals !== $tournament->walkover_goals) {
+                    throw new CustomErrorException(Message::TOURNAMENT_WALKOVER_GOALS_LOCKED, Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+
                 return $this->tournamentRepository->updateModel($tournament, [
                     'name' => $data->name,
                     'max_roster_size' => $data->max_roster_size,
                     'min_matches_for_playoffs' => $data->min_matches_for_playoffs,
-                ]);
+                ] + ($data->walkover_goals !== null ? ['walkover_goals' => $data->walkover_goals] : []));
             default:
                 $this->assertRosterSizeFits($tournament, $data);
 
@@ -216,11 +222,11 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
      */
     private function baseAttributes(TournamentData $data): array
     {
-        return Arr::except($data->toArray(), ['rounds', 'match_duration_minutes', 'tiebreakers']);
+        return Arr::except($data->toArray(), ['rounds', 'match_duration_minutes', 'tiebreakers', 'walkover_goals']);
     }
 
     /**
-     * Vueltas, duración y desempates que llegaron en la petición; los omitidos conservan su valor (o el default al crear).
+     * Vueltas, duración, desempates y goles del por default que llegaron en la petición; los omitidos conservan su valor (o el default al crear).
      *
      * @return array<string, mixed>
      */
@@ -230,6 +236,7 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             'rounds' => $data->rounds,
             'match_duration_minutes' => $data->match_duration_minutes,
             'tiebreakers' => $data->tiebreakers,
+            'walkover_goals' => $data->walkover_goals,
         ], fn (mixed $value) => $value !== null);
     }
 

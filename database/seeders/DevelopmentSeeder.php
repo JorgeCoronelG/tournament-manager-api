@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Contracts\Repositories\ScheduleRepositoryInterface;
 use App\Contracts\Services\MatchServiceInterface;
 use App\Contracts\Services\PlayoffServiceInterface;
+use App\Contracts\Services\RegistrationChangeServiceInterface;
 use App\Core\Enum\FieldStatus;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
@@ -95,6 +96,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedFinishedTournament($leagues);
         $this->seedTwoPlayoffsTournament($leagues);
         $this->seedRoleTestUsers($leagues);
+        $this->seedWithdrawalTournament($leagues);
     }
 
     /**
@@ -577,6 +579,7 @@ class DevelopmentSeeder extends Seeder
         $row = new Roster;
         $row->forceFill([
             'registration_id' => $registration->id,
+            'team_id' => $registration->team_id,
             'tournament_id' => $registration->tournament_id,
             'player_id' => $player->id,
             'jersey_number' => 99,
@@ -701,6 +704,63 @@ class DevelopmentSeeder extends Seeder
     }
 
     /**
+     * «Torneo con Baja» en curso de la primera liga: 4 equipos a una vuelta, la primera jornada jugada, un partido de la
+     * segunda ganado por default porque un equipo no se presentó y el cuarto equipo dado de baja: uno de sus partidos
+     * pendientes ya se resolvió por default y el otro sigue pendiente, sin poder capturarse hasta resolverlo. No hace nada si ya existe.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedWithdrawalTournament(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || $league->tournaments()->where('name', 'Torneo con Baja')->exists()) {
+            return;
+        }
+
+        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo con Baja',
+            'rounds' => 1,
+            'start_date' => now()->subMonth()->toDateString(),
+        ]);
+        $group = $tournament->groups()->firstOrFail();
+
+        $registrations = $league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(4)->get()
+            ->map(fn (Team $team) => Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]));
+        $withdrawn = $registrations->last();
+
+        $matchService = app(MatchServiceInterface::class);
+        $matchService->generate($tournament, false);
+
+        $matches = GameMatch::query()->where('tournament_id', $tournament->id)->orderBy('matchday')->orderBy('id')->get();
+
+        foreach ($matches->where('matchday', 1) as $match) {
+            $matchService->recordResult($tournament, $match, 2, 1);
+        }
+
+        $noShow = $matches->where('matchday', 2)->first(fn (GameMatch $match) => $withdrawn instanceof Registration
+            && $match->home_registration_id !== $withdrawn->id && $match->away_registration_id !== $withdrawn->id);
+
+        if ($noShow instanceof GameMatch) {
+            $matchService->registerWalkover($tournament, $noShow, (int) $noShow->home_registration_id, 'No se presentó a la hora del partido.', $league->admin_user_id);
+        }
+
+        if ($withdrawn instanceof Registration) {
+            app(RegistrationChangeServiceInterface::class)->withdraw($tournament->refresh(), $withdrawn, 'El equipo abandonó el torneo.', (int) $league->admin_user_id);
+
+            // Un partido pendiente del equipo en baja se resuelve por default; los demás quedan pendientes (sin captura de marcador).
+            $pending = GameMatch::query()->where('tournament_id', $tournament->id)->where('status', MatchStatus::SCHEDULED)
+                ->where(fn ($query) => $query->where('home_registration_id', $withdrawn->id)->orWhere('away_registration_id', $withdrawn->id))
+                ->orderBy('matchday')->first();
+
+            if ($pending instanceof GameMatch) {
+                $matchService->registerWalkover($tournament->refresh(), $pending, $withdrawn->id, 'Equipo dado de baja.', (int) $league->admin_user_id);
+            }
+        }
+    }
+
+    /**
      * Usuarios para probar los 403 por rol, con la contraseña «password»: un árbitro activo de la primera liga
      * (arbitro.prueba@example.com) y un jugador con plantilla activa en su primer torneo (jugador.prueba@example.com).
      * No hace nada si ya existen.
@@ -732,6 +792,7 @@ class DevelopmentSeeder extends Seeder
         $row = new Roster;
         $row->forceFill([
             'registration_id' => $registration->id,
+            'team_id' => $registration->team_id,
             'tournament_id' => $registration->tournament_id,
             'player_id' => $player->id,
             'jersey_number' => 98,
@@ -1144,6 +1205,7 @@ class DevelopmentSeeder extends Seeder
 
         return [
             'registration_id' => $registration->id,
+            'team_id' => $registration->team_id,
             'tournament_id' => $registration->tournament_id,
             'player_id' => $player->id,
             'jersey_number' => $jersey,
@@ -1259,6 +1321,7 @@ class DevelopmentSeeder extends Seeder
                     $row = new Roster;
                     $row->forceFill([
                         'registration_id' => $registration->id,
+                        'team_id' => $registration->team_id,
                         'tournament_id' => $registration->tournament_id,
                         'player_id' => $players[$cursor++ % $players->count()]->id,
                         'jersey_number' => ++$jersey,
@@ -1422,6 +1485,7 @@ class DevelopmentSeeder extends Seeder
             $row = new Roster;
             $row->forceFill([
                 'registration_id' => $registration->id,
+                'team_id' => $registration->team_id,
                 'tournament_id' => $registration->tournament_id,
                 'player_id' => $player->id,
                 'jersey_number' => $jersey,

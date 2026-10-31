@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\PlayoffController;
 use App\Http\Controllers\Api\RefereeController;
+use App\Http\Controllers\Api\RegistrationChangeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RosterController;
@@ -105,6 +106,7 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::post('/tournaments/{tournament}/matches/generate', [MatchController::class, 'generate']);
             Route::delete('/tournaments/{tournament}/matches', [MatchController::class, 'destroy']);
             Route::patch('/tournaments/{tournament}/matches/{match}/result', [MatchController::class, 'updateResult'])->whereNumber('match');
+            Route::post('/tournaments/{tournament}/matches/{match}/walkover', [MatchController::class, 'walkover'])->whereNumber('match');
             Route::delete('/tournaments/{tournament}/matches/{match}/result', [MatchController::class, 'destroyResult'])->whereNumber('match');
 
             Route::get('/tournaments/{tournament}/close-regular-phase/preview', [PlayoffController::class, 'preview']);
@@ -132,6 +134,16 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::post('/tournaments/{tournament}/registrations', [RegistrationController::class, 'store']);
             Route::get('/tournaments/{tournament}/registrations/available-teams', [RegistrationController::class, 'availableTeams']);
             Route::delete('/tournaments/{tournament}/registrations/{registration}', [RegistrationController::class, 'destroy'])
+                ->whereNumber('registration');
+
+            // Baja y reemplazo de un equipo inscrito.
+            Route::get('/tournaments/{tournament}/registrations/{registration}/withdraw/preview', [RegistrationChangeController::class, 'withdrawPreview'])
+                ->whereNumber('registration');
+            Route::get('/tournaments/{tournament}/registrations/{registration}/team-changes', [RegistrationChangeController::class, 'teamChanges'])
+                ->whereNumber('registration');
+            Route::post('/tournaments/{tournament}/registrations/{registration}/withdraw', [RegistrationChangeController::class, 'withdraw'])
+                ->whereNumber('registration');
+            Route::post('/tournaments/{tournament}/registrations/{registration}/replace', [RegistrationChangeController::class, 'replace'])
                 ->whereNumber('registration');
 
             // Roster de una inscripción: solo consulta y moderación; las solicitudes son de la app.

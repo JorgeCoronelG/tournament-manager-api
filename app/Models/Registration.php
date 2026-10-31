@@ -39,6 +39,7 @@ class Registration extends Model
      */
     protected $casts = [
         'status' => RegistrationStatus::class,
+        'withdrawn_at' => 'datetime',
     ];
 
     /**

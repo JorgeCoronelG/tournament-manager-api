@@ -12,7 +12,9 @@ use App\Core\Classes\ListQuery;
 use App\Core\Enum\MatchPhase;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\Message;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TournamentStatus;
+use App\Core\Enum\WalkoverCause;
 use App\Exceptions\CustomErrorException;
 use App\Helpers\RoundRobin;
 use App\Models\GameMatch;
@@ -20,6 +22,7 @@ use App\Models\Tournament;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -98,9 +101,63 @@ class MatchService extends BaseService implements MatchServiceInterface
         });
     }
 
+    public function registerWalkover(Tournament $tournament, GameMatch $match, int $loserRegistrationId, ?string $reason, ?int $userId): array
+    {
+        $this->assertResultsOpen($tournament, $match);
+        $unprocessable = Response::HTTP_UNPROCESSABLE_ENTITY;
+
+        if ($match->home_registration_id === null || $match->away_registration_id === null) {
+            throw new CustomErrorException(Message::MATCH_NO_TEAMS, $unprocessable);
+        }
+
+        if (! in_array($loserRegistrationId, [$match->home_registration_id, $match->away_registration_id], true)) {
+            throw ValidationException::withMessages(['loser_registration_id' => Message::WALKOVER_LOSER_INVALID]);
+        }
+
+        if ($match->status === MatchStatus::CANCELLED) {
+            throw new CustomErrorException(Message::MATCH_CANCELLED, $unprocessable);
+        }
+
+        if ($match->status === MatchStatus::PLAYED) {
+            if (! $match->is_walkover) {
+                throw new CustomErrorException(Message::MATCH_ALREADY_PLAYED, $unprocessable);
+            }
+
+            if ($match->walkover_loser_registration_id !== $loserRegistrationId) {
+                throw new CustomErrorException(Message::WALKOVER_OTHER_LOSER, $unprocessable);
+            }
+
+            // Mismo perdedor: no hay nada que cambiar.
+            return ['match' => $match, 'tie' => $match->tie_id === null ? null : $this->playoffService->tieOf($match), 'advanced_to' => null];
+        }
+
+        $goals = $tournament->walkover_goals;
+        // Si quien pierde está dado de baja, la causa es la baja del equipo; si no, no se presentó.
+        $match->loadMissing(['home', 'away']);
+        $loser = $match->home_registration_id === $loserRegistrationId ? $match->home : $match->away;
+        $cause = $loser?->status === RegistrationStatus::WITHDRAWN ? WalkoverCause::TEAM_WITHDRAWN : WalkoverCause::NO_SHOW;
+
+        if ($match->tie_id !== null) {
+            return $this->playoffService->registerWalkover($match, $loserRegistrationId, $goals, $cause, $userId, $reason);
+        }
+
+        $homeLoses = $match->home_registration_id === $loserRegistrationId;
+        $saved = $this->matchRepository->markWalkover($match, $homeLoses ? 0 : $goals, $homeLoses ? $goals : 0, $loserRegistrationId, $cause, $userId, $reason);
+
+        return ['match' => $saved, 'tie' => null, 'advanced_to' => null];
+    }
+
     public function recordResult(Tournament $tournament, GameMatch $match, int $homeScore, int $awayScore, ?int $homePenalties = null, ?int $awayPenalties = null): array
     {
         $this->assertResultsOpen($tournament, $match);
+
+        if ($match->is_walkover) {
+            throw new CustomErrorException(Message::MATCH_WALKOVER_UNDO_FIRST, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($match->status === MatchStatus::SCHEDULED && $this->hasWithdrawnTeam($match)) {
+            throw new CustomErrorException(Message::MATCH_TEAM_WITHDRAWN, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if ($match->tie_id !== null) {
             return $this->playoffService->recordResult($match, $homeScore, $awayScore, $homePenalties, $awayPenalties);
@@ -116,6 +173,10 @@ class MatchService extends BaseService implements MatchServiceInterface
     public function clearResult(Tournament $tournament, GameMatch $match): array
     {
         $this->assertResultsOpen($tournament, $match);
+
+        if ($match->status === MatchStatus::CANCELLED) {
+            throw new CustomErrorException(Message::MATCH_CANCELLED, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if ($match->tie_id !== null) {
             return $this->playoffService->clearResult($match);
@@ -206,6 +267,16 @@ class MatchService extends BaseService implements MatchServiceInterface
         if ($match->phase !== MatchPhase::REGULAR_STAGE) {
             throw new CustomErrorException(Message::MATCH_RESULT_ONLY_REGULAR_STAGE, $unprocessable);
         }
+    }
+
+    /**
+     * Si alguna de las dos inscripciones del partido está dada de baja.
+     */
+    private function hasWithdrawnTeam(GameMatch $match): bool
+    {
+        $match->loadMissing(['home', 'away']);
+
+        return $match->home?->status === RegistrationStatus::WITHDRAWN || $match->away?->status === RegistrationStatus::WITHDRAWN;
     }
 
     private function assertInProgress(Tournament $tournament, string $message): void

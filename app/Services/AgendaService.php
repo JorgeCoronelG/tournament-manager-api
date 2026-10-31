@@ -7,6 +7,7 @@ use App\Contracts\Repositories\ScheduleRepositoryInterface;
 use App\Contracts\Services\AgendaServiceInterface;
 use App\Core\Enum\MatchPhase;
 use App\Core\Enum\Message;
+use App\Core\Enum\RegistrationStatus;
 use App\Exceptions\CustomErrorException;
 use App\Models\Field;
 use App\Models\GameMatch;
@@ -114,6 +115,8 @@ class AgendaService implements AgendaServiceInterface
             'end_datetime' => $at?->copy()->addMinutes($duration)->toIso8601String(),
             'field' => $match->field_id === null ? null : ['id' => $match->field_id, 'name' => $match->field?->name],
             'referee' => $match->referee_user_id === null ? null : ['id' => $match->referee_user_id, 'name' => $match->referee === null ? null : trim($match->referee->first_name.' '.$match->referee->last_name)],
+            'home_withdrawn' => $match->home?->status === RegistrationStatus::WITHDRAWN,
+            'away_withdrawn' => $match->away?->status === RegistrationStatus::WITHDRAWN,
             'status' => $match->status->value,
             'schedule_locked' => $match->schedule_locked,
         ];

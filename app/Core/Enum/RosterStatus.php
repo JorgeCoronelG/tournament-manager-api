@@ -9,6 +9,7 @@ enum RosterStatus: string
     case REJECTED = 'rejected';
     case CANCELLED = 'cancelled';
     case REMOVED = 'removed';
+    case RELEASED = 'released';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum RosterStatus: string
             self::REJECTED => 'Rechazado',
             self::CANCELLED => 'Cancelado',
             self::REMOVED => 'Removido',
+            self::RELEASED => 'Liberado',
         };
     }
 
@@ -38,7 +40,7 @@ enum RosterStatus: string
         return match ($this) {
             self::ACTIVE => ScanResult::VALID,
             self::REMOVED => ScanResult::REMOVED,
-            self::PENDING, self::REJECTED, self::CANCELLED => ScanResult::NOT_REGISTERED,
+            self::PENDING, self::REJECTED, self::CANCELLED, self::RELEASED => ScanResult::NOT_REGISTERED,
         };
     }
 }

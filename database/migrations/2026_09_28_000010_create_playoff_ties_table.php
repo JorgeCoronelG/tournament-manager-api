@@ -22,7 +22,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('seed_a')->nullable();
             $table->unsignedSmallInteger('seed_b')->nullable();
             $table->foreignId('winner_registration_id')->nullable()->constrained('registrations');
-            $table->enum('decided_by', ['goals', 'penalties'])->nullable();
+            $table->enum('decided_by', ['goals', 'penalties', 'walkover'])->nullable();
             $table->timestamps();
 
             $table->unique(['group_id', 'round_index', 'bracket_position']);

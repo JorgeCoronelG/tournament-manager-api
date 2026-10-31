@@ -28,6 +28,12 @@ class Tournament extends Model
 
     public const DEFAULT_ROUNDS = 1;
 
+    public const DEFAULT_WALKOVER_GOALS = 3;
+
+    public const MIN_WALKOVER_GOALS = 1;
+
+    public const MAX_WALKOVER_GOALS = 99;
+
     public const DEFAULT_MATCH_DURATION_MINUTES = 60;
 
     public const MIN_MATCH_DURATION_MINUTES = 20;
@@ -62,6 +68,7 @@ class Tournament extends Model
         'rounds',
         'match_duration_minutes',
         'tiebreakers',
+        'walkover_goals',
     ];
 
     /**
@@ -74,6 +81,7 @@ class Tournament extends Model
         'start_date' => 'date',
         'schedule_start_date' => 'date',
         'tiebreakers' => 'array',
+        'walkover_goals' => 'integer',
     ];
 
     /**

@@ -15,8 +15,9 @@ return new class extends Migration
             $table->foreignId('player_id')->constrained('players');
             $table->unsignedTinyInteger('jersey_number');
             // pending: solicitud del delegado; active: el jugador aceptó; rejected: lo rechazó; cancelled: se canceló
-            // sola (aceptó otra solicitud del mismo torneo o se cerraron las plantillas); removed: lo quitó el admin.
-            $table->enum('status', ['pending', 'active', 'rejected', 'cancelled', 'removed'])->default('pending');
+            // sola (aceptó otra solicitud del mismo torneo o se cerraron las plantillas); removed: lo quitó el admin;
+            // released: liberado por la baja o el reemplazo de su equipo (queda libre para otro equipo del torneo).
+            $table->enum('status', ['pending', 'active', 'rejected', 'cancelled', 'removed', 'released'])->default('pending');
             $table->foreignId('requested_by_user_id')->constrained('users');
             $table->timestamp('requested_at');
             $table->timestamp('responded_at')->nullable();
@@ -25,6 +26,9 @@ return new class extends Migration
             $table->string('removal_reason', 255)->nullable();
             // Solo en filas removed: el admin autoriza que el jugador se sume a otro equipo del mismo torneo.
             $table->timestamp('rejoin_authorized_at')->nullable();
+            // Equipo al que pertenecía el jugador al pedir la solicitud: si la inscripción cambia de equipo (reemplazo),
+            // la plantilla del equipo nuevo parte vacía y las filas del anterior conservan su equipo.
+            $table->foreignId('team_id')->constrained('teams');
             $table->timestamps();
 
             // MySQL no tiene índices parciales: estas columnas valen NULL cuando la fila no cuenta y NULL no choca

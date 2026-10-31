@@ -324,7 +324,7 @@ class Message
 
     public const ROSTER_REQUEST_DUPLICATE = 'El jugador ya tiene una solicitud abierta con este equipo.';
 
-    public const ROSTER_JERSEY_TAKEN = 'Ese dorsal ya está en uso en el equipo.';
+    public const ROSTER_JERSEY_TAKEN = 'Ese dorsal ya lo usa otro jugador del equipo.';
 
     /** Un solo mensaje para veto, baja sin autorización o jugador ya activo en otro equipo: no revela cuál. */
     public const ROSTER_PLAYER_UNAVAILABLE = 'No se puede enviar la solicitud a este jugador.';
@@ -353,6 +353,45 @@ class Message
     public static function getMessageInvalidTournamentTransition(string $from, string $to): string
     {
         return "No se puede pasar el torneo de «{$from}» a «{$to}». Solo se permite avanzar: planeación → en curso → liguilla → finalizado.";
+    }
+
+    // Victoria por default, baja y reemplazo de equipo.
+    public const MATCH_ALREADY_PLAYED = 'El partido ya tiene resultado.';
+
+    public const MATCH_CANCELLED = 'El partido está cancelado.';
+
+    public const WALKOVER_LOSER_INVALID = 'El equipo perdedor debe ser uno de los dos equipos del partido.';
+
+    public const WALKOVER_OTHER_LOSER = 'El partido ya se registró por default con otro equipo perdedor.';
+
+    public const MATCH_WALKOVER_UNDO_FIRST = 'Este partido se resolvió por default: deshaz el resultado antes de registrar otro marcador.';
+
+    public const MATCH_TEAM_WITHDRAWN = 'Uno de los equipos está dado de baja. Registra victoria por default o reemplaza al equipo.';
+
+    public const CLOSE_WITHDRAWN_PENDING_MATCHES = 'Hay partidos pendientes de un equipo en baja. Registra victoria por default o reemplaza al equipo antes de cerrar la fase regular.';
+
+    public const TOURNAMENT_WALKOVER_GOALS_LOCKED = 'Los goles de la victoria por default solo se editan con el torneo en planeación o en curso.';
+
+    public const REGISTRATION_WITHDRAW_ONLY_ACTIVE_TOURNAMENT = 'Solo se puede dar de baja a un equipo con el torneo en curso o en liguilla.';
+
+    public const REGISTRATION_ALREADY_WITHDRAWN = 'El equipo ya está dado de baja.';
+
+    public const REGISTRATION_REPLACE_ONLY_IN_PROGRESS = 'Solo se puede reemplazar un equipo con el torneo en curso.';
+
+    public const REGISTRATION_REPLACE_PLAYOFFS = 'En liguilla no se puede reemplazar un equipo; solo darlo de baja.';
+
+    public const REGISTRATION_REPLACE_ROSTER_WARNING = 'El equipo nuevo debe registrar su plantilla.';
+
+    public static function getMessageCloseWithdrawnNotQualified(int $withdrawn, int $qualified): string
+    {
+        return "Hay {$withdrawn} equipo(s) en baja que no clasifican, por lo que la liguilla queda con {$qualified} equipos. Reemplaza al equipo en baja o ajusta la configuración de la liguilla para continuar.";
+    }
+
+    public static function getMessageWithdrawKeepsResults(string $teamName, int $played): string
+    {
+        $name = e($teamName);
+
+        return "El equipo <b>{$name}</b> tiene {$played} resultados que se conservan.";
     }
 
     public static function getMessageLeagueHasActiveTournaments(string $leagueName): string

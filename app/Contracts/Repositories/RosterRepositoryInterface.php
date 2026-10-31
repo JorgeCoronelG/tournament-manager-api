@@ -27,7 +27,7 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
     public function lockByPlayerInTournament(int $playerId, int $tournamentId): Collection;
 
     /**
-     * Filas abiertas (pending o active) del equipo, bloqueadas: cuentan para el máximo de la plantilla y los dorsales.
+     * Filas abiertas (pending o active) del equipo actual de la inscripción, bloqueadas: cuentan para el máximo de la plantilla y los dorsales.
      *
      * @return Collection<int, Roster>
      */
@@ -46,7 +46,7 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
     public function largestOpenRoster(int $tournamentId): ?array;
 
     /**
-     * Roster paginado de la inscripción con jugador y responsables cargados. `$search` busca por nombre o clave del
+     * Roster paginado del equipo actual de la inscripción con jugador y responsables cargados. `$search` busca por nombre o clave del
      * jugador. Sin `sort`: activos, pendientes y el resto, y por dorsal.
      *
      * @return LengthAwarePaginator<int, Roster>
@@ -54,11 +54,18 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
     public function paginateByRegistration(int $registrationId, ListQuery $query, ?string $search, ?RosterStatus $status): LengthAwarePaginator;
 
     /**
-     * Filas activas y pendientes de la inscripción.
+     * Filas activas y pendientes del equipo actual de la inscripción.
      *
      * @return array{active: int, pending: int}
      */
     public function countOpenByRegistration(int $registrationId): array;
+
+    /**
+     * Filas del equipo actual de la inscripción por estado (todos los estados, con 0 si no hay): total del encabezado.
+     *
+     * @return array<string, int>
+     */
+    public function countByStatusOfRegistration(int $registrationId): array;
 
     /**
      * Si el jugador tiene en el torneo una fila posterior a la indicada (una solicitud nueva).
@@ -75,7 +82,7 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
      */
     public function releasePlayerInLeague(int $playerId, int $leagueId, int $removedByUserId, string $reason): array;
 
-    public function createRequest(int $registrationId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster;
+    public function createRequest(int $registrationId, int $teamId, int $tournamentId, int $playerId, int $jerseyNumber, int $requestedByUserId): Roster;
 
     public function accept(Roster $roster): Roster;
 
@@ -89,6 +96,12 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
      * Pasa a cancelled las solicitudes pending del jugador en el torneo, salvo la indicada.
      */
     public function cancelPendingOfPlayer(int $playerId, int $tournamentId, int $exceptRosterId): int;
+
+    /**
+     * Baja o reemplazo del equipo: las filas pending y active de la inscripción pasan a released (liberan al jugador
+     * y el dorsal). Devuelve cuántas liberó.
+     */
+    public function releaseOpenByRegistration(int $registrationId): int;
 
     /**
      * Pasa a cancelled todas las solicitudes pending del torneo (cierre de plantillas).

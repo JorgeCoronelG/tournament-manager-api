@@ -33,6 +33,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'MatchScheduleServiceInterface' => 'MatchScheduleService',
         'PlayoffScheduleServiceInterface' => 'PlayoffScheduleService',
         'AgendaServiceInterface' => 'AgendaService',
+        'RegistrationChangeServiceInterface' => 'RegistrationChangeService',
         'LogoProcessorInterface' => 'LogoImageProcessor',
     ];
 

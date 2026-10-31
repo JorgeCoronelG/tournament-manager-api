@@ -114,7 +114,7 @@ class MatchResultAndStandingsTest extends TestCase
         $this->deleteJson($this->base($league, $tournament).'/matches', [], $header)->assertStatus(422)->assertJsonPath('error', Message::MATCHES_DELETE_HAS_PLAYED);
     }
 
-    public function test_standings_count_only_played_matches_and_exclude_withdrawn_teams(): void
+    public function test_standings_count_only_played_matches_and_flag_withdrawn_teams(): void
     {
         [$league, $tournament, $header, $teams] = $this->runningTournament(4);
         $this->play($tournament, $teams[0], $teams[1], 2, 0);
@@ -124,7 +124,7 @@ class MatchResultAndStandingsTest extends TestCase
 
         $response = $this->getJson($this->base($league, $tournament).'/standings', $header)->assertOk()
             ->assertJsonCount(1, 'groups')
-            ->assertJsonCount(3, 'groups.0.rows')
+            ->assertJsonCount(4, 'groups.0.rows')
             ->assertJsonPath('groups.0.criteria', $tournament->fresh()->tiebreakers);
 
         $rows = collect($response->json('groups.0.rows'))->keyBy('registration_id');
@@ -132,7 +132,8 @@ class MatchResultAndStandingsTest extends TestCase
             collect($rows[$teams[0]->id])->only(['played', 'won', 'drawn', 'lost', 'goals_for', 'goals_against', 'goal_difference', 'points', 'position', 'tied'])->all());
         $this->assertSame(1, $rows[$teams[1]->id]['played']);
         $this->assertArrayHasKey('logo_url', $rows[$teams[0]->id]);
-        $this->assertArrayNotHasKey($teams[3]->id, $rows->all());
+        $this->assertTrue($rows[$teams[3]->id]['withdrawn']);
+        $this->assertFalse($rows[$teams[0]->id]['withdrawn']);
     }
 
     public function test_each_group_without_played_matches_lists_teams_in_registration_order(): void

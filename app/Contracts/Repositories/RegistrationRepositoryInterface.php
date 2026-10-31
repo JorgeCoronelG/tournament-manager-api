@@ -6,6 +6,7 @@ use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
 use App\Core\Enum\RegistrationStatus;
 use App\Models\Registration;
+use App\Models\RegistrationTeamChange;
 use App\Models\Team;
 use App\Models\Tournament;
 use Illuminate\Database\Eloquent\Collection;
@@ -95,6 +96,29 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
      * Si el equipo tiene alguna inscripción activa, en cualquier torneo.
      */
     public function teamHasActiveRegistrations(int $teamId): bool;
+
+    /**
+     * Si el equipo tiene alguna inscripción en el torneo, incluso dada de baja o eliminada: (team_id, tournament_id)
+     * es único aunque la fila no esté activa.
+     */
+    public function teamHasAnyRegistration(int $tournamentId, int $teamId): bool;
+
+    /**
+     * Da de baja la inscripción: status withdrawn con cuándo, motivo y quién.
+     */
+    public function markWithdrawn(Registration $registration, string $reason, int $userId): Registration;
+
+    /**
+     * Cambia el equipo de la inscripción (misma fila), la deja activa (quita la baja) y guarda el cambio en el historial.
+     */
+    public function replaceTeam(Registration $registration, int $newTeamId, string $reason, int $userId): Registration;
+
+    /**
+     * Reemplazos de equipo de la inscripción, del más reciente al más antiguo, con los equipos y quien lo hizo.
+     *
+     * @return Collection<int, RegistrationTeamChange>
+     */
+    public function teamChanges(int $registrationId): Collection;
 
     /**
      * Baja lógica de todas las inscripciones del torneo.

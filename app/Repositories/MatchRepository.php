@@ -9,6 +9,7 @@ use App\Core\Enum\MatchPhase;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TeamStatus;
+use App\Core\Enum\WalkoverCause;
 use App\Models\GameMatch;
 use App\Models\Registration;
 use App\Models\StandingManualOrder;
@@ -87,10 +88,56 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             'home_penalties' => $homePenalties,
             'away_penalties' => $awayPenalties,
             'status' => $homeScore === null ? MatchStatus::SCHEDULED : MatchStatus::PLAYED,
+            'is_walkover' => false,
+            'walkover_loser_registration_id' => null,
+            'walkover_cause' => null,
+            'walkover_registered_by_user_id' => null,
+            'walkover_reason' => null,
         ]);
         $match->saveOrFail();
 
         return $match;
+    }
+
+    public function markWalkover(GameMatch $match, int $homeScore, int $awayScore, int $loserRegistrationId, WalkoverCause $cause, ?int $userId, ?string $reason): GameMatch
+    {
+        $match->forceFill([
+            'home_score' => $homeScore,
+            'away_score' => $awayScore,
+            'home_penalties' => null,
+            'away_penalties' => null,
+            'status' => MatchStatus::PLAYED,
+            'is_walkover' => true,
+            'walkover_loser_registration_id' => $loserRegistrationId,
+            'walkover_cause' => $cause,
+            'walkover_registered_by_user_id' => $userId,
+            'walkover_reason' => $reason,
+        ]);
+        $match->saveOrFail();
+
+        return $match;
+    }
+
+    public function pendingOfRegistration(int $tournamentId, int $registrationId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('status', MatchStatus::SCHEDULED)
+            ->where(fn (Builder $query) => $query->where('home_registration_id', $registrationId)->orWhere('away_registration_id', $registrationId))
+            ->with(['home.team', 'away.team', 'group', 'tie'])
+            ->orderBy('scheduled_date')
+            ->orderBy('match_datetime')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function countPlayedOfRegistration(int $tournamentId, int $registrationId): int
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('status', MatchStatus::PLAYED)
+            ->where(fn (Builder $query) => $query->where('home_registration_id', $registrationId)->orWhere('away_registration_id', $registrationId))
+            ->count();
     }
 
     public function lastRegularDate(int $tournamentId): ?string
@@ -113,11 +160,11 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->get();
     }
 
-    public function activeRegistrationsOfGroup(int $groupId): Collection
+    public function registrationsOfGroup(int $groupId): Collection
     {
         return Registration::query()
             ->where('group_id', $groupId)
-            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereIn('status', [RegistrationStatus::ACTIVE, RegistrationStatus::WITHDRAWN])
             ->with('team')
             ->orderBy('id')
             ->get();

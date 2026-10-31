@@ -38,6 +38,16 @@ class Roster extends Model
     ];
 
     /**
+     * Equipo al que pertenecía el jugador cuando se creó la solicitud (puede estar eliminado).
+     *
+     * @return BelongsTo<Team, $this>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class)->withTrashed();
+    }
+
+    /**
      * @return BelongsTo<Player, $this>
      */
     public function player(): BelongsTo

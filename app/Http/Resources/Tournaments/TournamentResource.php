@@ -31,6 +31,7 @@ class TournamentResource extends JsonResource
             'min_matches_for_playoffs' => $this->resource->min_matches_for_playoffs,
             'rounds' => $this->resource->rounds,
             'match_duration_minutes' => $this->resource->match_duration_minutes,
+            'walkover_goals' => $this->resource->walkover_goals,
             'tiebreakers' => $this->resource->tiebreakers,
             'start_date' => $this->resource->start_date->format('Y-m-d'),
             'status' => $this->resource->status->value,

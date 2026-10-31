@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Matches;
 
+use App\Core\Enum\RegistrationStatus;
 use App\Models\GameMatch;
 use App\Models\Registration;
 use Illuminate\Http\Request;
@@ -45,6 +46,12 @@ class MatchResource extends JsonResource
             'away_score' => $match->away_score,
             'home_penalties' => $match->home_penalties,
             'away_penalties' => $match->away_penalties,
+            'home_withdrawn' => $match->home?->status === RegistrationStatus::WITHDRAWN,
+            'away_withdrawn' => $match->away?->status === RegistrationStatus::WITHDRAWN,
+            'is_walkover' => $match->is_walkover,
+            'walkover_cause' => $match->walkover_cause?->value,
+            'walkover_loser_registration_id' => $match->walkover_loser_registration_id,
+            'walkover_reason' => $match->walkover_reason,
         ];
     }
 

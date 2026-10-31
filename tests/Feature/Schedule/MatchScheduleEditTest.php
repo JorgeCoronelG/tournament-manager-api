@@ -264,7 +264,7 @@ class MatchScheduleEditTest extends TestCase
         $player = Player::factory()->create(['user_id' => $this->referee->id]);
         $row = new Roster;
         $row->forceFill([
-            'registration_id' => $match->home_registration_id, 'tournament_id' => $this->tournament->id, 'player_id' => $player->id, 'jersey_number' => 9,
+            'registration_id' => $match->home_registration_id, 'team_id' => Registration::query()->findOrFail($match->home_registration_id)->team_id, 'tournament_id' => $this->tournament->id, 'player_id' => $player->id, 'jersey_number' => 9,
             'status' => RosterStatus::ACTIVE, 'requested_by_user_id' => $this->referee->id, 'requested_at' => now(),
         ])->save();
 

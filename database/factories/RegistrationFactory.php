@@ -36,6 +36,11 @@ class RegistrationFactory extends Factory
         ];
     }
 
+    public function withdrawn(): static
+    {
+        return $this->state(['status' => RegistrationStatus::WITHDRAWN, 'withdrawn_at' => now(), 'withdrawn_reason' => 'Baja de prueba']);
+    }
+
     public function status(RegistrationStatus $status): static
     {
         return $this->state(['status' => $status]);

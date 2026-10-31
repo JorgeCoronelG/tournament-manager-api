@@ -25,6 +25,7 @@ class RosterFactory extends Factory
 
         return [
             'registration_id' => $registration->id,
+            'team_id' => $registration->team_id,
             'tournament_id' => $registration->tournament_id,
             'player_id' => Player::factory(),
             'jersey_number' => fake()->numberBetween(1, 99),
@@ -41,6 +42,6 @@ class RosterFactory extends Factory
 
     public function forRegistration(Registration $registration): static
     {
-        return $this->state(['registration_id' => $registration->id, 'tournament_id' => $registration->tournament_id]);
+        return $this->state(['registration_id' => $registration->id, 'tournament_id' => $registration->tournament_id, 'team_id' => $registration->team_id]);
     }
 }

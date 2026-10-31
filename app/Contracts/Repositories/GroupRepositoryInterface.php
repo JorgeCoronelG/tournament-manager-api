@@ -27,7 +27,7 @@ interface GroupRepositoryInterface extends BaseRepositoryInterface
     public function unassignedRegistrations(int $tournamentId): Collection;
 
     /**
-     * Inscripciones activas asignadas al grupo, con equipo y delegado.
+     * Inscripciones asignadas al grupo, activas y dadas de baja (conservan su grupo), con equipo y delegado.
      *
      * @return Collection<int, Registration>
      */

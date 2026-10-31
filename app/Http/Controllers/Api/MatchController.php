@@ -9,6 +9,7 @@ use App\Core\Enum\MatchPhase;
 use App\Core\Enum\MatchStatus;
 use App\Http\Requests\Matches\GenerateMatchesRequest;
 use App\Http\Requests\Matches\MatchResultRequest;
+use App\Http\Requests\Matches\WalkoverRequest;
 use App\Http\Resources\Matches\MatchResource;
 use App\Models\GameMatch;
 use App\Models\League;
@@ -69,6 +70,19 @@ class MatchController extends BaseApiController
             $request->awayGoals(),
             $request->homePenalties(),
             $request->awayPenalties()
+        );
+
+        return $this->resultResponse($result);
+    }
+
+    public function walkover(WalkoverRequest $request, League $league, Tournament $tournament, GameMatch $match): JsonResponse
+    {
+        $result = $this->matchService->registerWalkover(
+            $tournament,
+            $match,
+            $request->loserRegistrationId(),
+            $request->reason(),
+            $request->user()?->id
         );
 
         return $this->resultResponse($result);

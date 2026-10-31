@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Groups;
 
+use App\Core\Enum\RegistrationStatus;
 use App\Models\TournamentGroup;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,8 @@ class GroupDetailResource extends GroupResource
         $teams = $this->resource->registrations;
 
         return array_merge(parent::toArray($request), [
-            'teams_count' => $teams->count(),
+            // Los equipos dados de baja se listan con su grupo, pero no cuentan como equipos que juegan.
+            'teams_count' => $teams->where('status', RegistrationStatus::ACTIVE)->count(),
             'teams' => GroupRegistrationResource::collection($teams)->resolve($request),
         ]);
     }

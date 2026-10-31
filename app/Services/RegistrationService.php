@@ -68,7 +68,7 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
             $this->assertTeamsCanRegister($locked, $teamIds);
 
             return new Collection(array_map(
-                fn (int $teamId) => $this->registrationRepository->register($locked->id, $teamId)->load('team.manager'),
+                fn (int $teamId) => $this->registrationRepository->register($locked->id, $teamId)->load(['team.manager', 'group']),
                 $teamIds
             ));
         });

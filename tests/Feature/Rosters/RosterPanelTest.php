@@ -55,7 +55,8 @@ class RosterPanelTest extends TestCase
 
         $this->assertSame(['active', 'active', 'pending', 'rejected', 'removed'], array_column($response->json('data'), 'status'));
         $this->assertSame([5, 9], array_slice(array_column($response->json('data'), 'jersey_number'), 0, 2));
-        $response->assertJsonPath('summary', ['active' => 2, 'pending' => 1, 'max_roster_size' => 15])
+        $response->assertJsonPath('summary.active', 2)->assertJsonPath('summary.pending', 1)->assertJsonPath('summary.max_roster_size', 15)
+            ->assertJsonPath('summary.total', 5)->assertJsonPath('summary.by_status.removed', 1)->assertJsonPath('summary.by_status.released', 0)
             ->assertJsonStructure(['data' => [['id', 'player' => ['id', 'first_name', 'last_name', 'photo_url', 'user_code', 'gender'],
                 'jersey_number', 'status', 'requested_at', 'requested_by', 'responded_at', 'removed_by', 'removed_at', 'removal_reason', 'rejoin_authorized_at']]]);
 
@@ -78,7 +79,7 @@ class RosterPanelTest extends TestCase
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('meta.total', 5)
             ->assertJsonPath('meta.perPage', 2);
-        $page->assertJsonPath('summary', ['active' => 3, 'pending' => 2, 'max_roster_size' => 20]);
+        $page->assertJsonPath('summary.active', 3)->assertJsonPath('summary.pending', 2)->assertJsonPath('summary.max_roster_size', 20)->assertJsonPath('summary.total', 5);
 
         foreach (['zúñiga', 'jug900', 'Ana Z'] as $search) {
             $this->getJson($this->rosterUrl($registration, '?search='.urlencode($search)), $header)->assertOk()

@@ -40,6 +40,12 @@ return new class extends Migration
             $table->unsignedTinyInteger('home_penalties')->nullable();
             $table->unsignedTinyInteger('away_penalties')->nullable();
             $table->boolean('schedule_locked')->default(false);
+            // Victoria por default: el perdedor, por qué (no_show o team_withdrawn), quién la registró y la nota.
+            $table->boolean('is_walkover')->default(false);
+            $table->foreignId('walkover_loser_registration_id')->nullable()->constrained('registrations');
+            $table->enum('walkover_cause', ['no_show', 'team_withdrawn'])->nullable();
+            $table->foreignId('walkover_registered_by_user_id')->nullable()->constrained('users');
+            $table->string('walkover_reason', 255)->nullable();
             $table->timestamps();
             $table->softDeletes();
 

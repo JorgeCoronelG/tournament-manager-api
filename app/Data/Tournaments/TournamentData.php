@@ -19,6 +19,7 @@ class TournamentData extends Data
         public ?int $min_matches_for_playoffs = null,
         public ?int $rounds = null,
         public ?int $match_duration_minutes = null,
+        public ?int $walkover_goals = null,
         /** @var list<string>|null */
         public ?array $tiebreakers = null,
     ) {}

@@ -56,7 +56,7 @@ class RosterService extends BaseService implements RosterServiceInterface
             $this->assertPlayerCanJoin($registration, $player, $tournament);
             $this->assertRosterHasRoom($registration, $tournament, $player, $jerseyNumber);
 
-            return $this->rosterRepository->createRequest($registration->id, $tournament->id, $player->id, $jerseyNumber, $actor->id);
+            return $this->rosterRepository->createRequest($registration->id, $registration->team_id, $tournament->id, $player->id, $jerseyNumber, $actor->id);
         });
     }
 
@@ -152,10 +152,15 @@ class RosterService extends BaseService implements RosterServiceInterface
     public function listForRegistration(Registration $registration, ListQuery $query, ?string $search, ?RosterStatus $status): array
     {
         $tournament = Tournament::query()->findOrFail($registration->tournament_id);
+        $byStatus = $this->rosterRepository->countByStatusOfRegistration($registration->id);
 
         return [
             'rows' => $this->rosterRepository->paginateByRegistration($registration->id, $query, $search, $status),
-            'summary' => $this->rosterRepository->countOpenByRegistration($registration->id) + ['max_roster_size' => $tournament->max_roster_size],
+            'summary' => $this->rosterRepository->countOpenByRegistration($registration->id) + [
+                'max_roster_size' => $tournament->max_roster_size,
+                'total' => array_sum($byStatus),
+                'by_status' => $byStatus,
+            ],
         ];
     }
 
@@ -195,14 +200,14 @@ class RosterService extends BaseService implements RosterServiceInterface
         }
 
         $removedWithoutLeave = $rows->contains(fn (Roster $row) => $row->status === RosterStatus::REMOVED
-            && $row->registration_id !== $registration->id
+            && ($row->registration_id !== $registration->id || $row->team_id !== $registration->team_id)
             && $row->rejoin_authorized_at === null);
 
         if ($removedWithoutLeave) {
             throw $this->unavailable();
         }
 
-        if ($rows->contains(fn (Roster $row) => $row->registration_id === $registration->id && $row->status->isOpen())) {
+        if ($rows->contains(fn (Roster $row) => $row->registration_id === $registration->id && $row->team_id === $registration->team_id && $row->status->isOpen())) {
             throw new CustomErrorException(Message::ROSTER_REQUEST_DUPLICATE, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }

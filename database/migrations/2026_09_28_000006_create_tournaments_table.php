@@ -31,6 +31,8 @@ return new class extends Migration
             $table->json('tiebreakers');
             // Fecha desde la que corre el patrón de horarios: la jornada 1 es la semana (lunes a domingo) que la contiene.
             $table->date('schedule_start_date')->nullable();
+            // Goles a favor del rival en una victoria por default (1 a 99).
+            $table->unsignedTinyInteger('walkover_goals')->default(3);
             $table->timestamps();
             $table->softDeletes();
         });

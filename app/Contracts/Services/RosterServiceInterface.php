@@ -58,10 +58,11 @@ interface RosterServiceInterface extends BaseServiceInterface
 
     /**
      * Roster paginado de la inscripción (búsqueda por nombre o clave del jugador, estado y orden opcionales) y sus
-     * conteos sobre toda la plantilla, sin importar la página ni la búsqueda; los activos y pendientes cuentan
-     * para el máximo del torneo.
+     * conteos sobre toda la plantilla del equipo actual (los jugadores de un equipo anterior no aparecen), sin
+     * importar la página ni la búsqueda; los activos y pendientes cuentan para el máximo del torneo. `total` y
+     * `by_status` cuentan todas las filas del equipo actual.
      *
-     * @return array{rows: LengthAwarePaginator<int, Roster>, summary: array{active: int, pending: int, max_roster_size: int|null}}
+     * @return array{rows: LengthAwarePaginator<int, Roster>, summary: array{active: int, pending: int, max_roster_size: int|null, total: int, by_status: array<string, int>}}
      */
     public function listForRegistration(Registration $registration, ListQuery $query, ?string $search, ?RosterStatus $status): array;
 

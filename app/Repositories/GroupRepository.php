@@ -50,7 +50,7 @@ class GroupRepository extends BaseRepository implements GroupRepositoryInterface
     {
         return Registration::query()
             ->where('group_id', $groupId)
-            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereIn('status', [RegistrationStatus::ACTIVE, RegistrationStatus::WITHDRAWN])
             ->with('team.manager')
             ->orderBy('id')
             ->get();

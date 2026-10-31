@@ -75,7 +75,7 @@ class ScheduleRepository implements ScheduleRepositoryInterface
         $matches = GameMatch::query()
             ->where('tournament_id', $tournamentId)
             ->where('phase', MatchPhase::REGULAR_STAGE)
-            ->where('status', '!=', MatchStatus::PLAYED)
+            ->whereNotIn('status', [MatchStatus::PLAYED, MatchStatus::CANCELLED])
             ->whereNotNull('match_datetime')
             ->get(['match_datetime', 'field_id', 'schedule_locked']);
 

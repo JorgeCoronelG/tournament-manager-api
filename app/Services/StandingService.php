@@ -6,6 +6,7 @@ use App\Contracts\Repositories\GroupRepositoryInterface;
 use App\Contracts\Repositories\MatchRepositoryInterface;
 use App\Contracts\Services\StandingServiceInterface;
 use App\Core\Enum\Message;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\Tiebreaker;
 use App\Core\Enum\TournamentStatus;
 use App\Exceptions\CustomErrorException;
@@ -93,7 +94,7 @@ class StandingService implements StandingServiceInterface
      */
     private function groupStandings(Tournament $tournament, TournamentGroup $group, bool $useManualOrder): array
     {
-        $registrations = $this->matchRepository->activeRegistrationsOfGroup($group->id)->keyBy('id');
+        $registrations = $this->matchRepository->registrationsOfGroup($group->id)->keyBy('id');
         $matches = $this->matchRepository->playedOfGroup($group->id)->map(fn (GameMatch $match) => [
             'home' => $match->home_registration_id,
             'away' => $match->away_registration_id,
@@ -122,6 +123,7 @@ class StandingService implements StandingServiceInterface
                 'team_id' => $registration->team_id,
                 'team_name' => $registration->team->name ?? '',
                 'logo_url' => $registration->team?->logoUrl(),
+                'withdrawn' => $registration->status === RegistrationStatus::WITHDRAWN,
             ] + array_diff_key($row, ['position' => 1, 'registration_id' => 1]);
         }, $table['rows']);
 

@@ -2,6 +2,7 @@
 
 namespace App\Contracts\Services;
 
+use App\Core\Enum\WalkoverCause;
 use App\Exceptions\CustomErrorException;
 use App\Models\GameMatch;
 use App\Models\PlayoffSource;
@@ -72,4 +73,19 @@ interface PlayoffServiceInterface
      * @throws CustomErrorException
      */
     public function clearResult(GameMatch $match): array;
+
+    /**
+     * Partido de liguilla jugado por default: todos los partidos pendientes del cruce pasan a por default con el
+     * marcador dado, el rival queda como ganador (decided_by walkover) y avanza.
+     *
+     * @return array{match: GameMatch, tie: array<string, mixed>, advanced_to: array<string, mixed>|null}
+     */
+    public function registerWalkover(GameMatch $match, int $loserRegistrationId, int $goals, WalkoverCause $cause, ?int $userId, ?string $reason): array;
+
+    /**
+     * El cruce del partido, como se muestra en las respuestas de resultado.
+     *
+     * @return array<string, mixed>
+     */
+    public function tieOf(GameMatch $match): array;
 }

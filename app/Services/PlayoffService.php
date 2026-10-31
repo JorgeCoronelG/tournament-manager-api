@@ -12,8 +12,10 @@ use App\Contracts\Services\PlayoffServiceInterface;
 use App\Contracts\Services\StandingServiceInterface;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\Message;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
+use App\Core\Enum\WalkoverCause;
 use App\Exceptions\CustomErrorException;
 use App\Helpers\BestOfPosition;
 use App\Helpers\PlayoffBracket;
@@ -124,7 +126,9 @@ class PlayoffService implements PlayoffServiceInterface
         $analysis = $this->analyse($tournament);
 
         if ($analysis['blockers'] !== []) {
-            throw new CustomErrorException(Message::CLOSE_BLOCKED, Response::HTTP_UNPROCESSABLE_ENTITY, ['blockers' => $analysis['blockers']]);
+            $message = collect($analysis['blockers'])->contains('type', 'withdrawn_pending_matches') ? Message::CLOSE_WITHDRAWN_PENDING_MATCHES : Message::CLOSE_BLOCKED;
+
+            throw new CustomErrorException($message, Response::HTTP_UNPROCESSABLE_ENTITY, ['blockers' => $analysis['blockers']]);
         }
 
         $plans = $analysis['plans'];
@@ -224,10 +228,26 @@ class PlayoffService implements PlayoffServiceInterface
         });
     }
 
+    public function registerWalkover(GameMatch $match, int $loserRegistrationId, int $goals, WalkoverCause $cause, ?int $userId, ?string $reason): array
+    {
+        $tie = $this->playoffRepository->findTie((int) $match->tie_id);
+
+        return DB::transaction(fn () => $this->applyWalkover($tie, $match->id, $loserRegistrationId, $goals, $cause, $userId, $reason));
+    }
+
+    public function tieOf(GameMatch $match): array
+    {
+        return $this->describeTie($this->playoffRepository->findTie((int) $match->tie_id));
+    }
+
     public function clearResult(GameMatch $match): array
     {
         $tie = $this->playoffRepository->findTie((int) $match->tie_id);
         $match = $tie->matches->firstWhere('id', $match->id) ?? $match;
+
+        if ($match->is_walkover) {
+            return $this->clearWalkover($tie, $match);
+        }
 
         $this->assertCanModify($tie, $match);
 
@@ -235,6 +255,51 @@ class PlayoffService implements PlayoffServiceInterface
             $saved = $this->matchRepository->setResult($match, null, null);
 
             return $this->settle($tie->id, $saved);
+        });
+    }
+
+    /**
+     * Pasa a por default todos los partidos pendientes del cruce (el perdedor juega en todos), recalcula el cruce y,
+     * como todos quedan jugados, fija al rival como ganador y lo avanza.
+     *
+     * @return array{match: GameMatch, tie: array<string, mixed>, advanced_to: array<string, mixed>|null}
+     */
+    private function applyWalkover(PlayoffTie $tie, int $focusMatchId, int $loser, int $goals, WalkoverCause $cause, ?int $userId, ?string $reason): array
+    {
+        $focus = $tie->matches->firstWhere('id', $focusMatchId) ?? $tie->matches->firstOrFail();
+
+        foreach ($tie->matches as $match) {
+            if ($match->status !== MatchStatus::SCHEDULED || $match->home_registration_id === null || $match->away_registration_id === null) {
+                continue;
+            }
+
+            $homeLoses = $match->home_registration_id === $loser;
+            $this->matchRepository->markWalkover($match, $homeLoses ? 0 : $goals, $homeLoses ? $goals : 0, $loser, $cause, $userId, $reason);
+        }
+
+        return $this->settle($tie->id, $focus);
+    }
+
+    /**
+     * Deshace el por default de un cruce: todos sus partidos por default vuelven a pendientes y se retira al ganador.
+     *
+     * @return array{match: GameMatch, tie: array<string, mixed>, advanced_to: array<string, mixed>|null}
+     */
+    private function clearWalkover(PlayoffTie $tie, GameMatch $match): array
+    {
+        $next = $this->nextTie($tie);
+
+        if ($tie->winner_registration_id !== null && $next instanceof PlayoffTie
+            && $next->matches->contains(fn (GameMatch $m) => $m->status === MatchStatus::PLAYED)) {
+            throw new CustomErrorException(Message::MATCH_NEXT_ROUND_HAS_RESULTS, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return DB::transaction(function () use ($tie, $match) {
+            foreach ($tie->matches->filter(fn (GameMatch $m) => $m->is_walkover) as $walkover) {
+                $this->matchRepository->setResult($walkover, null, null);
+            }
+
+            return $this->settle($tie->id, $match);
         });
     }
 
@@ -254,7 +319,7 @@ class PlayoffService implements PlayoffServiceInterface
         }
 
         $playoff = $this->groupRepository->listByTournament($tournament->id)->firstWhere('id', $source->playoff_group_id);
-        $standings = collect($this->standingService->standings($tournament, null))->keyBy('group_id');
+        $standings = collect($this->standingService->standings($tournament, null))->map(fn (array $table) => $this->withoutWithdrawn($table))->keyBy('group_id');
 
         return ['candidates' => $playoff instanceof TournamentGroup ? $this->candidatesOf($playoff, $source, $standings->all()) : []];
     }
@@ -367,7 +432,8 @@ class PlayoffService implements PlayoffServiceInterface
     private function analyse(Tournament $tournament): array
     {
         $playoffs = $this->groupRepository->listByTournament($tournament->id)->where('type', TournamentGroupType::PLAYOFF)->values();
-        $standings = collect($this->standingService->standings($tournament, null))->keyBy('group_id');
+        $rawStandings = collect($this->standingService->standings($tournament, null))->keyBy('group_id');
+        $standings = $rawStandings->map(fn (array $table) => $this->withoutWithdrawn($table));
         $regular = $this->matchRepository->regularMatches($tournament->id);
         $blockers = [];
         $warnings = [];
@@ -379,6 +445,23 @@ class PlayoffService implements PlayoffServiceInterface
         }
 
         $pending = $regular->filter(fn (GameMatch $match) => $match->status === MatchStatus::SCHEDULED);
+        $withdrawnPending = $pending->filter(fn (GameMatch $match) => $match->home?->status === RegistrationStatus::WITHDRAWN || $match->away?->status === RegistrationStatus::WITHDRAWN);
+        $pending = $pending->reject(fn (GameMatch $match) => $withdrawnPending->contains('id', $match->id));
+
+        if ($withdrawnPending->isNotEmpty()) {
+            $blockers[] = [
+                'type' => 'withdrawn_pending_matches',
+                'message' => Message::CLOSE_WITHDRAWN_PENDING_MATCHES,
+                'count' => $withdrawnPending->count(),
+                'examples' => $withdrawnPending->take(self::MAX_EXAMPLES)->map(fn (GameMatch $match) => [
+                    'match_id' => $match->id,
+                    'group' => $match->group?->name,
+                    'matchday' => $match->matchday,
+                    'home' => $match->home?->team?->name,
+                    'away' => $match->away?->team?->name,
+                ])->values()->all(),
+            ];
+        }
 
         if ($pending->isNotEmpty()) {
             $blockers[] = [
@@ -454,7 +537,9 @@ class PlayoffService implements PlayoffServiceInterface
             }
 
             if (! PlayoffRounds::isValidTotal(count($qualified))) {
-                $blockers[] = ['type' => 'invalid_qualified', 'message' => Message::CLOSE_INVALID_QUALIFIED, 'group' => $playoff->name, 'count' => count($qualified)];
+                $withdrawn = $this->withdrawnQualifiers($playoff, $rawStandings->all());
+                $blockers[] = ['type' => 'invalid_qualified', 'message' => $withdrawn === [] ? Message::CLOSE_INVALID_QUALIFIED : Message::getMessageCloseWithdrawnNotQualified(count($withdrawn), count($qualified)), 'group' => $playoff->name, 'count' => count($qualified)]
+                    + ($withdrawn === [] ? [] : ['withdrawn_teams' => $withdrawn]);
 
                 continue;
             }
@@ -775,7 +860,13 @@ class PlayoffService implements PlayoffServiceInterface
             $goalsA = $matches->sum(fn (GameMatch $m) => $this->goalsOf($m, $a));
             $goalsB = $matches->sum(fn (GameMatch $m) => $this->goalsOf($m, $b));
 
-            if ($goalsA !== $goalsB) {
+            $walkover = $matches->first(fn (GameMatch $m) => $m->is_walkover && $m->walkover_loser_registration_id !== null);
+
+            if ($walkover instanceof GameMatch) {
+                // El por default fija al ganador aunque el global de los partidos ya jugados favorezca al otro.
+                $winner = $walkover->walkover_loser_registration_id === $a ? $b : $a;
+                $decidedBy = 'walkover';
+            } elseif ($goalsA !== $goalsB) {
                 $winner = $goalsA > $goalsB ? $a : $b;
                 $decidedBy = 'goals';
             } else {
@@ -847,6 +938,66 @@ class PlayoffService implements PlayoffServiceInterface
         return ['tie_id' => $next->id, 'round_index' => $next->round_index, 'bracket_position' => $next->bracket_position, 'slot' => $slot, 'match_ids' => $next->matches->pluck('id')->all(), 'warnings' => $warnings];
     }
 
+    /**
+     * Nombres de los equipos dados de baja que habrían clasificado por las posiciones de los grupos de origen (sin contar
+     * las fuentes de mejores de una posición).
+     *
+     * @param  array<int|string, array{rows: list<array<string, mixed>>}>  $standings  tablas con los equipos dados de baja
+     * @return list<string>
+     */
+    private function withdrawnQualifiers(TournamentGroup $playoff, array $standings): array
+    {
+        $names = [];
+
+        foreach ($playoff->sources->sortBy('id') as $source) {
+            $table = $source->isBestOfPosition() ? null : ($standings[(int) $source->source_group_id] ?? null);
+
+            for ($rank = (int) $source->position_start; $table !== null && $rank <= (int) $source->position_end; $rank++) {
+                $row = $table['rows'][$rank - 1] ?? null;
+
+                if ($row !== null && $row['withdrawn'] === true) {
+                    $names[] = $this->text($row['team_name'] ?? '');
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Tabla sin los equipos dados de baja, que no clasifican: los demás suben de lugar. Sus partidos jugados ya
+     * cuentan en los números de los demás, y los empates conservan su posición compartida.
+     *
+     * @param  array{group_id: int, group_name: string, criteria: list<string>, rows: list<array<string, mixed>>, ties: list<list<int>>}  $table
+     * @return array{group_id: int, group_name: string, criteria: list<string>, rows: list<array<string, mixed>>, ties: list<list<int>>}
+     */
+    private function withoutWithdrawn(array $table): array
+    {
+        $rows = array_values(array_filter($table['rows'], fn (array $row) => $row['withdrawn'] !== true));
+        $kept = array_column($rows, 'registration_id');
+        $previous = null;
+        $previousNew = 0;
+
+        foreach ($rows as $index => $row) {
+            $position = $row['position'] === $previous ? $previousNew : $index + 1;
+            $previous = $row['position'];
+            $previousNew = $position;
+            $rows[$index]['position'] = $position;
+        }
+
+        $ties = [];
+
+        foreach ($table['ties'] as $tie) {
+            $remaining = array_values(array_filter($tie, fn (int $id) => in_array($id, $kept, true)));
+
+            if (count($remaining) > 1) {
+                $ties[] = $remaining;
+            }
+        }
+
+        return ['rows' => $rows, 'ties' => $ties] + $table;
+    }
+
     private function text(mixed $value): string
     {
         return is_string($value) ? $value : '';
@@ -883,7 +1034,7 @@ class PlayoffService implements PlayoffServiceInterface
             return null;
         }
 
-        return ['registration_id' => $registration->id, 'team_id' => $registration->team_id, 'team_name' => $team->name, 'logo_url' => $team->logoUrl()];
+        return ['registration_id' => $registration->id, 'team_id' => $registration->team_id, 'team_name' => $team->name, 'logo_url' => $team->logoUrl(), 'withdrawn' => $registration->status === RegistrationStatus::WITHDRAWN];
     }
 
     /**
@@ -919,6 +1070,8 @@ class PlayoffService implements PlayoffServiceInterface
                 'home_penalties' => $m->home_penalties,
                 'away_penalties' => $m->away_penalties,
                 'status' => $m->status->value,
+                'is_walkover' => $m->is_walkover,
+                'walkover_cause' => $m->walkover_cause?->value,
             ])->values()->all(),
             'aggregate' => $played->isEmpty() ? null : [
                 'a' => $played->sum(fn (GameMatch $m) => $this->goalsOf($m, $a)),

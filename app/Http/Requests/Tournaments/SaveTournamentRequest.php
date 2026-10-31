@@ -47,6 +47,7 @@ class SaveTournamentRequest extends FormRequest
                 'sometimes', 'integer',
                 'between:'.Tournament::MIN_MATCH_DURATION_MINUTES.','.Tournament::MAX_MATCH_DURATION_MINUTES,
             ],
+            'walkover_goals' => ['sometimes', 'integer', 'between:'.Tournament::MIN_WALKOVER_GOALS.','.Tournament::MAX_WALKOVER_GOALS],
             'tiebreakers' => ['sometimes', 'array', 'min:1'],
             'tiebreakers.*' => ['string', 'distinct', Rule::in(Tiebreaker::values())],
         ];
@@ -68,6 +69,7 @@ class SaveTournamentRequest extends FormRequest
             'start_date' => 'fecha de inicio',
             'rounds' => 'vueltas',
             'match_duration_minutes' => 'duración del partido',
+            'walkover_goals' => 'goles de la victoria por default',
             'tiebreakers' => 'criterios de desempate',
             'tiebreakers.*' => 'criterio de desempate',
         ];

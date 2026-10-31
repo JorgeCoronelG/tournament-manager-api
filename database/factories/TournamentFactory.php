@@ -34,6 +34,7 @@ class TournamentFactory extends Factory
             'rounds' => Tournament::DEFAULT_ROUNDS,
             'match_duration_minutes' => Tournament::DEFAULT_MATCH_DURATION_MINUTES,
             'tiebreakers' => Tiebreaker::defaults(),
+            'walkover_goals' => Tournament::DEFAULT_WALKOVER_GOALS,
         ];
     }
 

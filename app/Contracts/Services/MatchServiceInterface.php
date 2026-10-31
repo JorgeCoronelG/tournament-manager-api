@@ -44,6 +44,18 @@ interface MatchServiceInterface extends BaseServiceInterface
     public function recordResult(Tournament $tournament, GameMatch $match, int $homeScore, int $awayScore, ?int $homePenalties = null, ?int $awayPenalties = null): array;
 
     /**
+     * Victoria por default del rival de `$loserRegistrationId`: marcador del torneo (walkover_goals) a favor del rival y
+     * 0 en contra, sin penales, conservando fecha, cancha y árbitro. En liguilla aplica a todos los partidos
+     * pendientes del cruce, lo decide a favor del rival (decided_by walkover) y lo avanza. Idempotente con el mismo
+     * perdedor; otro perdedor, un partido ya jugado o cancelado, o un partido sin equipos definidos se rechazan.
+     *
+     * @return array{match: GameMatch, tie: array<string, mixed>|null, advanced_to: array<string, mixed>|null}
+     *
+     * @throws CustomErrorException
+     */
+    public function registerWalkover(Tournament $tournament, GameMatch $match, int $loserRegistrationId, ?string $reason, ?int $userId): array;
+
+    /**
      * Anula el resultado: marcadores nulos y partido programado. Mismas restricciones que recordResult.
      *
      * @return array{match: GameMatch, tie: array<string, mixed>|null, advanced_to: array<string, mixed>|null}

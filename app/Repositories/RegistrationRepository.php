@@ -9,6 +9,7 @@ use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TeamStatus;
 use App\Core\Enum\TournamentGroupType;
 use App\Models\Registration;
+use App\Models\RegistrationTeamChange;
 use App\Models\Team;
 use App\Models\Tournament;
 use App\Models\TournamentGroup;
@@ -37,7 +38,7 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
             })
             ->tap(fn (Builder $builder) => $this->applySort($builder, $query->sort))
             ->orderByDesc('id')
-            ->with('team.manager');
+            ->with(['team.manager', 'group']);
 
         return $query->paginate($builder);
     }
@@ -100,6 +101,57 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
             ->all();
 
         return array_values($ids);
+    }
+
+    public function teamHasAnyRegistration(int $tournamentId, int $teamId): bool
+    {
+        return $this->entity->newQuery()->withTrashed()->where('tournament_id', $tournamentId)->where('team_id', $teamId)->exists();
+    }
+
+    public function teamChanges(int $registrationId): Collection
+    {
+        return RegistrationTeamChange::query()
+            ->where('registration_id', $registrationId)
+            ->with(['oldTeam', 'newTeam', 'changedBy'])
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function markWithdrawn(Registration $registration, string $reason, int $userId): Registration
+    {
+        $registration->forceFill([
+            'status' => RegistrationStatus::WITHDRAWN,
+            'withdrawn_at' => now(),
+            'withdrawn_reason' => $reason,
+            'withdrawn_by_user_id' => $userId,
+        ]);
+        $registration->saveOrFail();
+
+        return $registration;
+    }
+
+    public function replaceTeam(Registration $registration, int $newTeamId, string $reason, int $userId): Registration
+    {
+        $change = new RegistrationTeamChange;
+        $change->forceFill([
+            'registration_id' => $registration->id,
+            'old_team_id' => $registration->team_id,
+            'new_team_id' => $newTeamId,
+            'reason' => $reason,
+            'changed_by_user_id' => $userId,
+        ])->save();
+
+        $registration->forceFill([
+            'team_id' => $newTeamId,
+            'status' => RegistrationStatus::ACTIVE,
+            'withdrawn_at' => null,
+            'withdrawn_reason' => null,
+            'withdrawn_by_user_id' => null,
+        ]);
+        $registration->saveOrFail();
+        $registration->unsetRelation('team');
+
+        return $registration;
     }
 
     public function activeTeamNames(int $tournamentId): array

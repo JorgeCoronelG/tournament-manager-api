@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Core\Enum\MatchPhase;
 use App\Core\Enum\MatchStatus;
+use App\Core\Enum\WalkoverCause;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -32,6 +33,9 @@ class GameMatch extends Model
         'scheduled_date' => 'date',
         'original_match_datetime' => 'datetime',
         'schedule_locked' => 'boolean',
+        'is_walkover' => 'boolean',
+        'walkover_cause' => WalkoverCause::class,
+        'walkover_loser_registration_id' => 'integer',
         'leg' => 'integer',
         'round_index' => 'integer',
         'bracket_position' => 'integer',

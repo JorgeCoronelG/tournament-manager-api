@@ -5,6 +5,7 @@ namespace App\Contracts\Repositories;
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
 use App\Core\Enum\MatchStatus;
+use App\Core\Enum\WalkoverCause;
 use App\Models\GameMatch;
 use App\Models\Registration;
 use Carbon\CarbonInterface;
@@ -59,11 +60,12 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
     public function playedOfGroup(int $groupId): Collection;
 
     /**
-     * Inscripciones activas del grupo (con equipo), por id; incluye equipos vetados, que conservan su inscripción.
+     * Inscripciones del grupo (con equipo), por id: activas y dadas de baja (conservan sus partidos jugados); incluye
+     * equipos vetados, que conservan su inscripción.
      *
      * @return Collection<int, Registration>
      */
-    public function activeRegistrationsOfGroup(int $groupId): Collection;
+    public function registrationsOfGroup(int $groupId): Collection;
 
     /**
      * Orden manual guardado del grupo: registration_id => posición.
@@ -127,6 +129,24 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
      * @return Collection<int, GameMatch>
      */
     public function agenda(int $leagueId, string $dateFrom, string $dateTo, array $filters): Collection;
+
+    /**
+     * Marca el partido como jugado por default: marcador a favor del rival, sin penales, con perdedor, causa, quién lo
+     * registró y nota. Conserva fecha, cancha y árbitro.
+     */
+    public function markWalkover(GameMatch $match, int $homeScore, int $awayScore, int $loserRegistrationId, WalkoverCause $cause, ?int $userId, ?string $reason): GameMatch;
+
+    /**
+     * Partidos pendientes (scheduled, no eliminados) donde juega la inscripción, con equipos, grupo y cruce, por fecha e id.
+     *
+     * @return Collection<int, GameMatch>
+     */
+    public function pendingOfRegistration(int $tournamentId, int $registrationId): Collection;
+
+    /**
+     * Partidos jugados donde juega la inscripción.
+     */
+    public function countPlayedOfRegistration(int $tournamentId, int $registrationId): int;
 
     /**
      * Si el árbitro tiene partidos no eliminados con el estado indicado en torneos no eliminados de la liga.
