@@ -7,6 +7,7 @@ use App\Contracts\Services\RosterServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\Message;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\RosterStatus;
 use App\Core\Enum\TournamentStatus;
 use App\Exceptions\CustomErrorException;
@@ -18,6 +19,7 @@ use App\Models\Team;
 use App\Models\Tournament;
 use App\Models\User;
 use App\Policies\LeaguePolicy;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -79,6 +81,62 @@ class RosterService extends BaseService implements RosterServiceInterface
     public function reject(Roster $roster, User $actor): Roster
     {
         return DB::transaction(fn () => $this->rosterRepository->reject($this->lockPendingOf($roster, $actor)));
+    }
+
+    public function cancelRequest(Roster $roster, User $actor): Roster
+    {
+        return DB::transaction(function () use ($roster, $actor) {
+            $roster = $this->rosterRepository->lockById($roster->id);
+            $this->assertManagesRegistration(Registration::query()->withTrashed()->findOrFail($roster->registration_id), $actor);
+
+            if ($roster->status !== RosterStatus::PENDING) {
+                throw new CustomErrorException(Message::ROSTER_NOT_PENDING, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            return $this->rosterRepository->cancel($roster);
+        });
+    }
+
+    public function findPlayerByCode(string $userCode): Player
+    {
+        $player = Player::query()
+            ->whereHas('user', fn ($user) => $user->where('user_code', mb_strtoupper(trim($userCode))))
+            ->with('user')
+            ->first();
+
+        return $player ?? throw new CustomErrorException(Message::PLAYER_NOT_FOUND, Response::HTTP_NOT_FOUND);
+    }
+
+    public function registrationsOfManager(User $manager): Collection
+    {
+        $open = [TournamentStatus::PLANNING->value, TournamentStatus::IN_PROGRESS->value, TournamentStatus::PLAYOFFS->value];
+
+        return Registration::query()
+            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereHas('team', fn ($team) => $team->where('manager_user_id', $manager->id))
+            ->with(['team', 'tournament.league'])
+            ->withCount([
+                'rosters as active_count' => fn ($roster) => $roster->where('status', RosterStatus::ACTIVE),
+                'rosters as pending_count' => fn ($roster) => $roster->where('status', RosterStatus::PENDING),
+            ])
+            ->get()
+            ->sortBy(fn (Registration $registration) => [
+                in_array($registration->tournament?->status->value, $open, true) ? 0 : 1,
+                -($registration->tournament?->start_date?->getTimestamp() ?? 0),
+            ])
+            ->values();
+    }
+
+    public function rosterForManager(Registration $registration, User $manager): Collection
+    {
+        $this->assertManagesRegistration($registration, $manager);
+
+        return $this->rosterRepository->allByRegistration($registration->id);
+    }
+
+    public function pendingRequestsOf(User $player): Collection
+    {
+        return $this->rosterRepository->pendingOfUser($player->id);
     }
 
     public function removePlayer(Roster $roster, User $actor, string $reason): Roster
@@ -236,6 +294,18 @@ class RosterService extends BaseService implements RosterServiceInterface
         }
 
         return $roster;
+    }
+
+    /**
+     * El actor dirige el equipo de la inscripción.
+     */
+    private function assertManagesRegistration(Registration $registration, User $actor): void
+    {
+        $team = Team::query()->withTrashed()->findOrFail($registration->team_id);
+
+        if ($team->manager_user_id !== $actor->id) {
+            throw $this->forbidden();
+        }
     }
 
     private function assertLeagueAdmin(Tournament $tournament, User $actor): void
