@@ -40,6 +40,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'LogoProcessorInterface' => 'LogoImageProcessor',
         'PhotoProcessorInterface' => 'PhotoImageProcessor',
         'SignupServiceInterface' => 'SignupService',
+        'RefereeMatchServiceInterface' => 'RefereeMatchService',
     ];
 
     /**
