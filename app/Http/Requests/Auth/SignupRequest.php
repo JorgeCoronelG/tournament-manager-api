@@ -92,7 +92,7 @@ class SignupRequest extends FormRequest
             email: mb_strtolower(trim($this->string('email')->toString())),
             phone: $this->string('phone')->toString(),
             password: $this->string('password')->toString(),
-            birth_date: CarbonImmutable::createFromFormat('Y-m-d', $this->string('birth_date')->toString())->startOfDay(),
+            birth_date: CarbonImmutable::parse($this->string('birth_date')->toString())->startOfDay(),
             gender: PlayerGender::from($this->string('gender')->toString()),
             photo: $photo,
         );
