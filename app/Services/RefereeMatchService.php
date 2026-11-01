@@ -72,7 +72,7 @@ class RefereeMatchService implements RefereeMatchServiceInterface
             ->orderBy('jersey_number')
             ->get();
 
-        $playerIds = $rows->pluck('player_id')->unique()->values()->all();
+        $playerIds = $rows->pluck('player_id')->map(fn (mixed $id) => (int) (is_numeric($id) ? $id : 0))->unique()->values()->all();
         $banned = array_flip($this->bannedPlayerIds((int) $tournament->league_id, $playerIds));
         $suspended = array_flip($this->suspendedPlayerIds($tournament->id, $playerIds));
 
@@ -331,8 +331,8 @@ class RefereeMatchService implements RefereeMatchServiceInterface
     }
 
     /**
-     * @param  list<int>  $playerIds
-     * @return list<int>
+     * @param  array<int, int>  $playerIds
+     * @return array<int, int>
      */
     private function bannedPlayerIds(int $leagueId, array $playerIds): array
     {
@@ -341,7 +341,7 @@ class RefereeMatchService implements RefereeMatchServiceInterface
             ->whereNull('lifted_at')
             ->whereIn('player_id', $playerIds)
             ->pluck('player_id')
-            ->map(fn (mixed $id) => (int) $id)
+            ->map(fn (mixed $id) => (int) (is_numeric($id) ? $id : 0))
             ->unique()
             ->values()
             ->all();
@@ -350,8 +350,8 @@ class RefereeMatchService implements RefereeMatchServiceInterface
     /**
      * Sanción vigente en el torneo (sin cumplir y sin borrar).
      *
-     * @param  list<int>  $playerIds
-     * @return list<int>
+     * @param  array<int, int>  $playerIds
+     * @return array<int, int>
      */
     private function suspendedPlayerIds(int $tournamentId, array $playerIds): array
     {
@@ -361,7 +361,7 @@ class RefereeMatchService implements RefereeMatchServiceInterface
             ->whereNull('deleted_at')
             ->whereIn('player_id', $playerIds)
             ->pluck('player_id')
-            ->map(fn (mixed $id) => (int) $id)
+            ->map(fn (mixed $id) => (int) (is_numeric($id) ? $id : 0))
             ->unique()
             ->values()
             ->all();
@@ -386,6 +386,8 @@ class RefereeMatchService implements RefereeMatchServiceInterface
      */
     private function deviceTime(string $value): Carbon
     {
-        return Carbon::parse($value)->setTimezone((string) config('app.timezone'));
+        $timezone = config('app.timezone');
+
+        return Carbon::parse($value)->setTimezone(is_string($timezone) ? $timezone : 'UTC');
     }
 }
