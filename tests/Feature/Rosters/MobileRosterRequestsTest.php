@@ -36,6 +36,9 @@ class MobileRosterRequestsTest extends TestCase
      */
     private function headerFor(User $user): array
     {
+        // El guard de Sanctum guarda al usuario de la petición anterior; se olvida para autenticar con este token.
+        $this->app['auth']->forgetGuards();
+
         return $this->authHeader($user->createToken('t')->plainTextToken) + ['Accept' => 'application/json'];
     }
 
