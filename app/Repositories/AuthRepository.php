@@ -13,6 +13,11 @@ class AuthRepository implements AuthRepositoryInterface
         return User::query()->where('email', $email)->first();
     }
 
+    public function findByPhone(string $phone): ?User
+    {
+        return User::query()->where('phone', $phone)->first();
+    }
+
     public function createToken(User $user, string $name = 'auth_token'): string
     {
         return $user->createToken($name)->plainTextToken;

@@ -20,7 +20,9 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email'],
+            // La app móvil entra con correo o con teléfono: basta uno de los dos.
+            'email' => ['required_without:phone', 'nullable', 'email'],
+            'phone' => ['required_without:email', 'nullable', 'string', 'digits:10'],
             'password' => ['required', 'string'],
             'client' => ['required', Rule::enum(LoginClient::class)],
         ];
@@ -33,6 +35,7 @@ class LoginRequest extends FormRequest
     {
         return [
             'email' => 'correo electrónico',
+            'phone' => 'teléfono',
             'password' => 'contraseña',
             'client' => 'cliente',
         ];
