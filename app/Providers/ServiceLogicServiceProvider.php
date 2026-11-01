@@ -43,6 +43,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'FeedServiceInterface' => 'FeedService',
         'PlayerProfileServiceInterface' => 'PlayerProfileService',
         'ManagerTeamSummaryServiceInterface' => 'ManagerTeamSummaryService',
+        'RefereeMatchServiceInterface' => 'RefereeMatchService',
     ];
 
     /**

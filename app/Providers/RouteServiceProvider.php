@@ -72,6 +72,11 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by('referee-lookup:'.($request->user()?->id ?: $request->ip()));
         });
 
+        // El celular del árbitro reintenta solo (al guardar, al recuperar señal y cada minuto); esto solo frena abusos.
+        RateLimiter::for('referee-sync', function (Request $request) {
+            return Limit::perMinute(60)->by('referee-sync:'.($request->user()?->id ?: $request->ip()));
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')
