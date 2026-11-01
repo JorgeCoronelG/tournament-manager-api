@@ -11,6 +11,7 @@ use App\Models\Registration;
 use App\Models\Roster;
 use App\Models\Tournament;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -39,6 +40,41 @@ interface RosterServiceInterface extends BaseServiceInterface
      * El propio jugador rechaza: pasa a rejected y el lugar y el dorsal quedan libres.
      */
     public function reject(Roster $roster, User $actor): Roster;
+
+    /**
+     * El delegado del equipo retira una solicitud que sigue pendiente: pasa a cancelled y el lugar y el dorsal
+     * quedan libres. A un jugador ya aceptado solo lo quita el admin de la liga (removePlayer).
+     */
+    public function cancelRequest(Roster $roster, User $actor): Roster;
+
+    /**
+     * Jugador por su clave exacta, para que el delegado lo vea antes de mandarle la solicitud. 404 neutro si la
+     * clave no existe o no es de un jugador.
+     */
+    public function findPlayerByCode(string $userCode): Player;
+
+    /**
+     * Inscripciones de los equipos que dirige el delegado, con equipo, torneo y liga cargados y los conteos de
+     * su plantilla (`active_count`, `pending_count`). Primero las de torneos abiertos.
+     *
+     * @return Collection<int, Registration>
+     */
+    public function registrationsOfManager(User $manager): Collection;
+
+    /**
+     * Plantilla completa de una inscripción para su delegado (403 si el equipo no es suyo): activos, pendientes y
+     * el resto, por dorsal.
+     *
+     * @return Collection<int, Roster>
+     */
+    public function rosterForManager(Registration $registration, User $manager): Collection;
+
+    /**
+     * Solicitudes pendientes del jugador (la más reciente primero), con equipo, torneo y delegado cargados.
+     *
+     * @return Collection<int, Roster>
+     */
+    public function pendingRequestsOf(User $player): Collection;
 
     /**
      * Solo el admin de la liga o el superadmin, con el torneo en planeación o en curso y con motivo obligatorio.

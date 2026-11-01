@@ -95,6 +95,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedFinishedTournament($leagues);
         $this->seedTwoPlayoffsTournament($leagues);
         $this->seedRoleTestUsers($leagues);
+        $this->seedMobileRosterTestData($leagues);
     }
 
     /**
@@ -698,6 +699,48 @@ class DevelopmentSeeder extends Seeder
         ]);
 
         $this->seedScheduleWindows($tournament, $league, $saturday->subDays(5)->toDateString(), [[6, 0, '08:00', '12:00'], [6, 1, '08:00', '12:00']]);
+    }
+
+    /**
+     * Datos para probar en la app las solicitudes de plantilla, con la contraseña «password»: el delegado
+     * delegado.prueba@example.com dirige «Halcones Prueba», inscrito en «Torneo Prueba App» (en planeación, mixto,
+     * sin límite de edad, máximo 15). Dos jugadores libres para invitar por clave: PRUEBA01 (varonil) y
+     * PRUEBA02 (femenil). No hace nada si ya existen.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedMobileRosterTestData(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || User::query()->where('email', 'delegado.prueba@example.com')->exists()) {
+            return;
+        }
+
+        $manager = User::factory()->create([
+            'email' => 'delegado.prueba@example.com', 'first_name' => 'Delegado', 'last_name' => 'Prueba',
+            'user_code' => 'DELPRUEB', 'phone' => $this->phone(),
+        ]);
+        $manager->roles()->sync([RoleEnum::MANAGER->value]);
+
+        $team = Team::factory()->create(['league_id' => $league->id, 'manager_user_id' => $manager->id, 'name' => 'Halcones Prueba']);
+        $tournament = Tournament::factory()->status(TournamentStatus::PLANNING)->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo Prueba App',
+            'gender' => TournamentGender::MIXED,
+            'max_roster_size' => 15,
+            'start_date' => now()->addMonth()->toDateString(),
+        ]);
+        Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
+
+        foreach ([['PRUEBA01', 'Pedro', PlayerGender::MALE], ['PRUEBA02', 'Paula', PlayerGender::FEMALE]] as [$code, $name, $gender]) {
+            $user = User::factory()->create([
+                'email' => strtolower($code).'@example.com', 'first_name' => $name, 'last_name' => 'Prueba',
+                'user_code' => $code, 'phone' => $this->phone(),
+            ]);
+            $user->roles()->sync([RoleEnum::PLAYER->value]);
+            Player::factory()->gender($gender)->create(['user_id' => $user->id, 'birth_date' => '1998-03-15']);
+        }
     }
 
     /**

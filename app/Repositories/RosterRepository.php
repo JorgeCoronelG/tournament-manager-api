@@ -187,6 +187,37 @@ class RosterRepository extends BaseRepository implements RosterRepositoryInterfa
         return $this->respond($roster, RosterStatus::REJECTED);
     }
 
+    public function cancel(Roster $roster): Roster
+    {
+        return $this->respond($roster, RosterStatus::CANCELLED);
+    }
+
+    public function allByRegistration(int $registrationId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('registration_id', $registrationId)
+            ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
+            ->orderBy('jersey_number')
+            ->orderByDesc('id')
+            ->with(['player' => fn ($player) => $player->withTrashed()->with('user')])
+            ->get();
+    }
+
+    public function pendingOfUser(int $userId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('status', RosterStatus::PENDING)
+            ->whereHas('player', fn (Builder $player) => $player->where('user_id', $userId))
+            ->with([
+                'registration' => fn ($registration) => $registration->withTrashed()->with('team'),
+                'tournament.league',
+                'requestedBy',
+            ])
+            ->orderByDesc('requested_at')
+            ->orderByDesc('id')
+            ->get();
+    }
+
     public function remove(Roster $roster, int $removedByUserId, string $reason): Roster
     {
         $roster->forceFill([

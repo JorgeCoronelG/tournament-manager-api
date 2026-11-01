@@ -6,11 +6,13 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
+use App\Http\Controllers\Api\ManagerRosterController;
 use App\Http\Controllers\Api\MatchController;
 use App\Http\Controllers\Api\MatchScheduleController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\PlayerRosterRequestController;
 use App\Http\Controllers\Api\PlayoffController;
 use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -51,6 +53,24 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/user', [AuthController::class, 'me']);
 
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:change-password');
+});
+
+// App móvil, rol Delegado: plantilla por solicitudes. El servicio comprueba que el equipo sea suyo (403).
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::MANAGER->value])->prefix('/manager')->group(function (): void {
+    Route::get('/registrations', [ManagerRosterController::class, 'registrations']);
+    Route::get('/registrations/{registration}/roster', [ManagerRosterController::class, 'roster'])->whereNumber('registration');
+    Route::post('/registrations/{registration}/roster', [ManagerRosterController::class, 'store'])
+        ->whereNumber('registration')->middleware('throttle:referee-lookup');
+    Route::patch('/registrations/{registration}/roster/{roster}/cancel', [ManagerRosterController::class, 'cancel'])
+        ->whereNumber(['registration', 'roster'])->scopeBindings();
+    Route::get('/player-lookup', [ManagerRosterController::class, 'lookup'])->middleware('throttle:referee-lookup');
+});
+
+// App móvil, rol Jugador: sus solicitudes de plantilla. El servicio comprueba que la solicitud sea suya (403).
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::PLAYER->value])->prefix('/player')->group(function (): void {
+    Route::get('/roster-requests', [PlayerRosterRequestController::class, 'index']);
+    Route::post('/roster-requests/{roster}/accept', [PlayerRosterRequestController::class, 'accept'])->whereNumber('roster');
+    Route::post('/roster-requests/{roster}/reject', [PlayerRosterRequestController::class, 'reject'])->whereNumber('roster');
 });
 
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','.RoleEnum::LEAGUE_ADMIN->value])->group(function (): void {

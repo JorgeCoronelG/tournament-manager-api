@@ -81,6 +81,25 @@ interface RosterRepositoryInterface extends BaseRepositoryInterface
 
     public function reject(Roster $roster): Roster;
 
+    /**
+     * El delegado retira una solicitud pending: pasa a cancelled.
+     */
+    public function cancel(Roster $roster): Roster;
+
+    /**
+     * Todas las filas de la inscripción con su jugador: activos, pendientes y el resto, por dorsal.
+     *
+     * @return Collection<int, Roster>
+     */
+    public function allByRegistration(int $registrationId): Collection;
+
+    /**
+     * Solicitudes pending del usuario jugador, la más reciente primero, con equipo, torneo, liga y delegado.
+     *
+     * @return Collection<int, Roster>
+     */
+    public function pendingOfUser(int $userId): Collection;
+
     public function remove(Roster $roster, int $removedByUserId, string $reason): Roster;
 
     public function authorizeRejoin(Roster $roster): Roster;
