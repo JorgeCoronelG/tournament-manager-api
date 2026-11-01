@@ -79,11 +79,11 @@ class SyncRefereeMatchRequest extends FormRequest
 
         foreach ($this->items('scans') as $scan) {
             $scans[] = [
-                'client_uuid' => $this->str($scan['client_uuid'] ?? null) ?? '',
-                'method' => ScanMethod::tryFrom($this->str($scan['method'] ?? null) ?? '') ?? ScanMethod::QR,
-                'scanned_code' => $this->str($scan['scanned_code'] ?? null),
+                'client_uuid' => $this->text($scan['client_uuid'] ?? null) ?? '',
+                'method' => ScanMethod::tryFrom($this->text($scan['method'] ?? null) ?? '') ?? ScanMethod::QR,
+                'scanned_code' => $this->text($scan['scanned_code'] ?? null),
                 'player_id' => $this->int($scan['player_id'] ?? null),
-                'scanned_at' => $this->str($scan['scanned_at'] ?? null) ?? '',
+                'scanned_at' => $this->text($scan['scanned_at'] ?? null) ?? '',
             ];
         }
 
@@ -91,14 +91,14 @@ class SyncRefereeMatchRequest extends FormRequest
 
         foreach ($this->items('events') as $event) {
             $events[] = [
-                'client_uuid' => $this->str($event['client_uuid'] ?? null) ?? '',
+                'client_uuid' => $this->text($event['client_uuid'] ?? null) ?? '',
                 'registration_id' => $this->int($event['registration_id'] ?? null) ?? 0,
                 'player_id' => $this->int($event['player_id'] ?? null),
                 'related_player_id' => $this->int($event['related_player_id'] ?? null),
-                'type' => MatchEventType::from($this->str($event['type'] ?? null) ?? ''),
+                'type' => MatchEventType::from($this->text($event['type'] ?? null) ?? ''),
                 'minute' => $this->int($event['minute'] ?? null),
-                'period' => MatchPeriod::tryFrom($this->str($event['period'] ?? null) ?? ''),
-                'recorded_at' => $this->str($event['recorded_at'] ?? null) ?? '',
+                'period' => MatchPeriod::tryFrom($this->text($event['period'] ?? null) ?? ''),
+                'recorded_at' => $this->text($event['recorded_at'] ?? null) ?? '',
                 'is_voided' => filter_var($event['is_voided'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
         }
@@ -124,7 +124,7 @@ class SyncRefereeMatchRequest extends FormRequest
         return is_array($items) ? array_values(array_filter($items, 'is_array')) : [];
     }
 
-    private function str(mixed $value): ?string
+    private function text(mixed $value): ?string
     {
         return is_scalar($value) && (string) $value !== '' ? (string) $value : null;
     }
