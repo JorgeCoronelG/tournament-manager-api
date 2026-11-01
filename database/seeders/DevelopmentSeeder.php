@@ -131,6 +131,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedDemoLeagues();
         $this->seedInactiveLeague();
         $this->seedMobileRosterTestData($leagues);
+        $this->seedRefereeTestMatches($leagues);
     }
 
     /**
@@ -590,6 +591,39 @@ class DevelopmentSeeder extends Seeder
             'requested_at' => now()->subDays(10),
             'responded_at' => now()->subDays(9),
         ])->save();
+    }
+
+    /**
+     * Partidos de «Torneo Impar» para probar el modo árbitro de la app: arbitro.prueba@example.com pita hoy dos (en una
+     * hora y en tres, el primero con el equipo de jugador.prueba) y uno mañana, en la primera cancha de la liga. Las
+     * horas salen del momento en que se corre el seeder. No hace nada si el árbitro ya tiene partidos.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedRefereeTestMatches(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+        $referee = User::query()->where('email', 'arbitro.prueba@example.com')->first();
+        $tournament = $league?->tournaments()->where('name', 'Torneo Impar')->first();
+
+        if ($league === null || $referee === null || $tournament === null
+            || GameMatch::query()->where('referee_user_id', $referee->id)->exists()) {
+            return;
+        }
+
+        $first = (int) $tournament->registrations()->orderBy('id')->value('id');
+        $free = fn () => GameMatch::query()->where('tournament_id', $tournament->id)->whereNull('match_datetime')->orderBy('matchday')->orderBy('id');
+        $matches = $free()->where(fn ($q) => $q->where('home_registration_id', $first)->orWhere('away_registration_id', $first))->take(1)->get()
+            ->concat($free()->where('home_registration_id', '!=', $first)->where('away_registration_id', '!=', $first)->take(2)->get())
+            ->values();
+
+        $start = now()->addHour()->startOfHour();
+        $times = [$start, $start->copy()->addHours(2), $start->copy()->addDay()];
+        $fieldId = $league->fields()->orderBy('id')->value('id');
+
+        foreach ($matches as $index => $match) {
+            $match->forceFill(['referee_user_id' => $referee->id, 'match_datetime' => $times[$index], 'field_id' => $fieldId])->save();
+        }
     }
 
     /**

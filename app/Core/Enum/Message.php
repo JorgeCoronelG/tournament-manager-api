@@ -277,6 +277,14 @@ class Message
 
     public const MATCH_NEXT_ROUND_HAS_RESULTS = 'No se puede modificar: ya hay resultados posteriores.';
 
+    public const REFEREE_EVENT_TEAM_NOT_IN_MATCH = 'El equipo del evento no juega este partido.';
+
+    public const REFEREE_EVENT_PLAYER_NOT_IN_TEAM = 'El jugador del evento no pertenece a ese equipo.';
+
+    public const REFEREE_RESULT_ALREADY_RECORDED = 'El encargado de la liga ya capturó otro marcador para este partido.';
+
+    public const REFEREE_SYNC_UUID_TAKEN = 'Uno de los registros ya pertenece a otro partido.';
+
     public const MATCH_TOURNAMENT_FINISHED = 'El torneo ya terminó: no se pueden modificar resultados.';
 
     public const REGULAR_STAGE_CLOSED = 'La fase regular ya está cerrada.';
