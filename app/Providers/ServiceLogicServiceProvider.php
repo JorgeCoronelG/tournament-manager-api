@@ -38,6 +38,8 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'TeamBanServiceInterface' => 'TeamBanService',
         'DashboardServiceInterface' => 'DashboardService',
         'LogoProcessorInterface' => 'LogoImageProcessor',
+        'PhotoProcessorInterface' => 'PhotoImageProcessor',
+        'SignupServiceInterface' => 'SignupService',
     ];
 
     /**

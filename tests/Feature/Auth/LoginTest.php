@@ -250,4 +250,30 @@ class LoginTest extends TestCase
             ->assertStatus(403)
             ->assertExactJson(['code' => 403, 'error' => Message::ACCOUNT_INACTIVE]);
     }
+
+    public function test_mobile_users_can_log_in_with_their_phone(): void
+    {
+        $this->createUserWithRoles([RoleEnum::PLAYER], ['phone' => '5512345678']);
+
+        $this->postJson('/api/login', ['phone' => '5512345678', 'password' => 'password', 'client' => 'mobile'])
+            ->assertOk()
+            ->assertJsonPath('user.email', 'jorge@test.com');
+    }
+
+    public function test_login_by_phone_fails_with_an_unknown_phone_or_wrong_password(): void
+    {
+        $this->createUserWithRoles([RoleEnum::PLAYER], ['phone' => '5512345678']);
+
+        $this->postJson('/api/login', ['phone' => '5500000000', 'password' => 'password', 'client' => 'mobile'])
+            ->assertUnauthorized();
+        $this->postJson('/api/login', ['phone' => '5512345678', 'password' => 'otra', 'client' => 'mobile'])
+            ->assertUnauthorized();
+    }
+
+    public function test_login_requires_an_email_or_a_phone(): void
+    {
+        $this->postJson('/api/login', ['password' => 'password', 'client' => 'mobile'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'phone']);
+    }
 }

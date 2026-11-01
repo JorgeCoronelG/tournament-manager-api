@@ -8,6 +8,8 @@ interface AuthRepositoryInterface
 {
     public function findByEmail(string $email): ?User;
 
+    public function findByPhone(string $phone): ?User;
+
     /**
      * El nombre del token guarda el cliente (web o mobile) para auditoría.
      */
