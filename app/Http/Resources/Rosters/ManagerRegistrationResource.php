@@ -44,8 +44,18 @@ class ManagerRegistrationResource extends JsonResource
             ],
             'league' => $league === null ? null : ['id' => $league->id, 'name' => $league->name],
             'rosters_open' => $rostersOpen,
-            'active_count' => (int) $this->resource->getAttribute('active_count'),
-            'pending_count' => (int) $this->resource->getAttribute('pending_count'),
+            'active_count' => $this->countOf('active_count'),
+            'pending_count' => $this->countOf('pending_count'),
         ];
+    }
+
+    /**
+     * Conteo que agrega `withCount` en la consulta.
+     */
+    private function countOf(string $attribute): int
+    {
+        $value = $this->resource->getAttribute($attribute);
+
+        return is_numeric($value) ? (int) $value : 0;
     }
 }
