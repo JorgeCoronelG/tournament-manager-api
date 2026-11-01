@@ -29,4 +29,9 @@ interface UserServiceInterface extends BaseServiceInterface
      * cambia, invalida el código anterior y reenvía la invitación.
      */
     public function updateProfile(User $user, string $firstName, string $lastName, string $email, ?string $phone): User;
+
+    /**
+     * Clave única (`users.user_code`) para un usuario nuevo.
+     */
+    public function generateUserCode(): string;
 }

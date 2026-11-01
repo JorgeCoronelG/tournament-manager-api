@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RosterController;
 use App\Http\Controllers\Api\ScheduleConfigController;
 use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\SignupController;
 use App\Http\Controllers\Api\StandingController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
@@ -36,6 +37,9 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// Registro propio de jugadores desde la app móvil.
+Route::post('/register', [SignupController::class, 'store'])->middleware('throttle:register');
 
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->middleware('throttle:forgot-password');
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->middleware('throttle:reset-password');

@@ -257,7 +257,10 @@ class UserService extends BaseService implements UserServiceInterface
         $user->notify(new AccountInvitationNotification($code, self::ACTIVATION_CODE_EXPIRES_IN_HOURS));
     }
 
-    private function generateUserCode(): string
+    /**
+     * Clave de 8 caracteres sin letras ni números que se confundan al dictarla (sin I, L, O, 0 ni 1).
+     */
+    public function generateUserCode(): string
     {
         do {
             $code = '';
