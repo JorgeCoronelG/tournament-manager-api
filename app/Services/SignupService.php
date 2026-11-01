@@ -68,8 +68,7 @@ class SignupService implements SignupServiceInterface
                     'birth_date' => $data->birth_date,
                     'gender' => $data->gender,
                 ]);
-                $player->user_id = $user->id;
-                $player->qr_code = $this->generateQrCode();
+                $player->forceFill(['user_id' => $user->id, 'qr_code' => $this->generateQrCode()]);
                 $player->save();
 
                 return $user;

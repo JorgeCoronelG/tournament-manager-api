@@ -274,6 +274,6 @@ class LoginTest extends TestCase
     {
         $this->postJson('/api/login', ['password' => 'password', 'client' => 'mobile'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['email', 'phone']);
+            ->assertJsonValidationErrors(['email', 'phone'], 'error');
     }
 }

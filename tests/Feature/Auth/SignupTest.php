@@ -82,7 +82,7 @@ class SignupTest extends TestCase
     {
         $this->signup(['photo' => null, 'phone' => null, 'birth_date' => null, 'gender' => null])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['photo', 'phone', 'birth_date', 'gender']);
+            ->assertJsonValidationErrors(['photo', 'phone', 'birth_date', 'gender'], 'error');
 
         $this->assertDatabaseCount('users', 0);
     }
@@ -93,7 +93,7 @@ class SignupTest extends TestCase
 
         $this->signup(['birth_date' => $birth])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['birth_date']);
+            ->assertJsonValidationErrors(['birth_date'], 'error');
 
         $exactly18 = CarbonImmutable::today()->subYears(18)->toDateString();
         $this->signup(['birth_date' => $exactly18])->assertCreated();
@@ -103,11 +103,11 @@ class SignupTest extends TestCase
     {
         $this->signup(['photo' => UploadedFile::fake()->create('selfie.pdf', 100, 'application/pdf')])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['photo']);
+            ->assertJsonValidationErrors(['photo'], 'error');
 
         $this->signup(['photo' => UploadedFile::fake()->image('selfie.jpg', 120, 120)])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['photo']);
+            ->assertJsonValidationErrors(['photo'], 'error');
     }
 
     public function test_rejects_an_email_or_phone_already_in_use(): void
@@ -115,15 +115,15 @@ class SignupTest extends TestCase
         User::factory()->create(['email' => 'uriel@test.com']);
         User::factory()->create(['phone' => '5599999999']);
 
-        $this->signup()->assertUnprocessable()->assertJsonValidationErrors(['email']);
+        $this->signup()->assertUnprocessable()->assertJsonValidationErrors(['email'], 'error');
         $this->signup(['email' => 'otro@test.com', 'phone' => '5599999999'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['phone']);
+            ->assertJsonValidationErrors(['phone'], 'error');
     }
 
     public function test_only_the_mobile_client_can_register(): void
     {
-        $this->signup(['client' => 'web'])->assertUnprocessable()->assertJsonValidationErrors(['client']);
+        $this->signup(['client' => 'web'])->assertUnprocessable()->assertJsonValidationErrors(['client'], 'error');
     }
 
     public function test_ignores_roles_sent_by_the_client(): void
