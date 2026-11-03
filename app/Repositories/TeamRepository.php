@@ -109,9 +109,10 @@ class TeamRepository extends BaseRepository implements TeamRepositoryInterface
             ->contains(fn (string $existing) => Names::normalize($existing) === $wanted);
     }
 
-    public function updateStatus(Team $team, TeamStatus $status): Team
+    public function updateStatus(Team $team, TeamStatus $status, ?string $banReason = null): Team
     {
-        $team->forceFill(['status' => $status]);
+        // El motivo solo se guarda mientras el equipo está vetado.
+        $team->forceFill(['status' => $status, 'ban_reason' => $status === TeamStatus::BANNED ? $banReason : null]);
         $team->saveOrFail();
 
         return $team;

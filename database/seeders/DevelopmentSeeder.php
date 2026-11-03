@@ -320,14 +320,16 @@ class DevelopmentSeeder extends Seeder
             $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$regular, 1, 4]], $closed ? [2, 1] : null);
 
             if ($closed) {
+                // Semifinales el lunes y el jueves del próximo lunes y final el miércoles de la semana siguiente.
+                $monday = now()->next(CarbonInterface::MONDAY)->startOfDay()->toImmutable();
                 app(PlayoffServiceInterface::class)->close($tournament, [[
                     'group_id' => $playoff->id,
-                    'round_dates' => ['2026-12-07', '2026-12-10', '2026-12-16'],
+                    'round_dates' => [$monday->toDateString(), $monday->addDays(3)->toDateString(), $monday->addDays(9)->toDateString()],
                 ]]);
                 $this->seedSemifinalResults($tournament->refresh(), $playoff);
 
                 // Horarios que cubren las semifinales (lunes y jueves) pero no la final (miércoles): déficit de la final.
-                $this->seedScheduleWindows($tournament, $league, '2026-12-01', [[1, 0, '18:00', '21:00'], [1, 1, '18:00', '21:00'], [4, 0, '18:00', '21:00'], [4, 1, '18:00', '21:00']]);
+                $this->seedScheduleWindows($tournament, $league, $monday->subDays(6)->toDateString(), [[1, 0, '18:00', '21:00'], [1, 1, '18:00', '21:00'], [4, 0, '18:00', '21:00'], [4, 1, '18:00', '21:00']]);
             }
         }
     }

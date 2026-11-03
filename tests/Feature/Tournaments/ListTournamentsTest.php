@@ -4,6 +4,7 @@ namespace Tests\Feature\Tournaments;
 
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
+use App\Models\League;
 use App\Models\Tournament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -73,13 +74,12 @@ class ListTournamentsTest extends TestCase
         $this->assertSame([], $ids('search=Plata&gender=female'));
     }
 
-    public function test_invalid_gender_or_status_responds_400_and_empty_params_are_ignored(): void
+    public function test_invalid_gender_responds_400_and_empty_params_are_ignored(): void
     {
         [$league, $header] = $this->leagueWithAdminHeader();
         Tournament::factory()->count(2)->create(['league_id' => $league->id]);
 
         $this->getJson("/api/leagues/{$league->id}/tournaments?gender=other", $header)->assertStatus(400);
-        $this->getJson("/api/leagues/{$league->id}/tournaments?status=nope", $header)->assertStatus(400);
         $this->getJson("/api/leagues/{$league->id}/tournaments?search=&gender=&status=&sort=", $header)
             ->assertOk()->assertJsonCount(2, 'data');
     }
@@ -93,5 +93,58 @@ class ListTournamentsTest extends TestCase
 
         $this->getJson("/api/leagues/{$league->id}/tournaments", $header)
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $visible->id);
+    }
+
+    /**
+     * @return list<int> ids de los torneos de la liga con cada estado: planning, in_progress, playoffs, finished
+     */
+    private function oneOfEachStatus(League $league): array
+    {
+        return array_map(
+            fn (TournamentStatus $status) => Tournament::factory()->status($status)->create(['league_id' => $league->id])->id,
+            TournamentStatus::cases()
+        );
+    }
+
+    public function test_filters_by_one_or_several_statuses_and_excluded_statuses(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        [$planning, $inProgress, $playoffs, $finished] = $this->oneOfEachStatus($league);
+        $ids = fn (string $qs) => collect($this->getJson("/api/leagues/{$league->id}/tournaments?{$qs}", $header)->assertOk()->json('data.*.id'))->sort()->values()->all();
+
+        $this->assertSame([$planning, $inProgress, $playoffs, $finished], $ids(''));
+        $this->assertSame([$inProgress], $ids('status=in_progress'));
+        $this->assertSame([$inProgress], $ids('status[]=in_progress'));
+        $this->assertSame([$planning, $inProgress, $playoffs], $ids('status[]=planning&status[]=in_progress&status[]=playoffs'));
+        $this->assertSame([$planning, $inProgress, $playoffs], $ids('exclude_status=finished'));
+        $this->assertSame([$planning, $playoffs], $ids('exclude_status[]=finished&exclude_status[]=in_progress'));
+        $this->assertSame([$playoffs], $ids('status[]=in_progress&status[]=playoffs&exclude_status=in_progress'));
+        $this->assertSame([], $ids('status=finished&exclude_status=finished'));
+        $this->assertSame([$planning, $inProgress, $playoffs, $finished], $ids('status[]=&exclude_status='));
+    }
+
+    public function test_an_invalid_status_responds_422(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        $this->oneOfEachStatus($league);
+
+        foreach (['status=nope', 'status[]=planning&status[]=nope', 'exclude_status=nope', 'status[][]=planning'] as $qs) {
+            $this->getJson("/api/leagues/{$league->id}/tournaments?{$qs}", $header)->assertStatus(422)
+                ->assertExactJson(['code' => 422, 'error' => 'Estado de torneo inválido.']);
+        }
+    }
+
+    public function test_the_total_reflects_the_status_filter_with_pagination(): void
+    {
+        [$league, $header] = $this->leagueWithAdminHeader();
+        Tournament::factory()->count(3)->status(TournamentStatus::IN_PROGRESS)->create(['league_id' => $league->id]);
+        Tournament::factory()->count(2)->status(TournamentStatus::PLAYOFFS)->create(['league_id' => $league->id]);
+        Tournament::factory()->count(4)->status(TournamentStatus::FINISHED)->create(['league_id' => $league->id]);
+
+        $this->getJson("/api/leagues/{$league->id}/tournaments?status[]=in_progress&status[]=playoffs&per_page=2&page=2", $header)->assertOk()
+            ->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 5)->assertJsonPath('meta.currentPage', 2);
+        $this->getJson("/api/leagues/{$league->id}/tournaments?exclude_status=finished&per_page=2", $header)->assertOk()
+            ->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 5);
+        $this->getJson("/api/leagues/{$league->id}/tournaments?per_page=2", $header)->assertOk()->assertJsonPath('meta.total', 9);
     }
 }

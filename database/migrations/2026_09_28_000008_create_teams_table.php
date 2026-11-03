@@ -16,6 +16,8 @@ return new class extends Migration
             $table->enum('sport', ['football'])->default('football');
             $table->string('logo_url')->nullable();
             $table->enum('status', ['active', 'banned'])->default('active');
+            // Motivo del veto; nulo mientras el equipo no está vetado.
+            $table->string('ban_reason', 255)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

@@ -234,6 +234,25 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
             ->count();
     }
 
+    public function activeOfTeam(int $teamId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('team_id', $teamId)
+            ->where('status', RegistrationStatus::ACTIVE)
+            ->whereHas('tournament')
+            ->with('tournament')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function countWithdrawnByTournament(int $tournamentId): int
+    {
+        return $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('status', RegistrationStatus::WITHDRAWN)
+            ->count();
+    }
+
     public function countBannedTeamsByTournament(int $tournamentId): int
     {
         return $this->entity->newQuery()

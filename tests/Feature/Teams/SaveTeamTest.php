@@ -30,7 +30,7 @@ class SaveTeamTest extends TestCase
             ->assertJsonPath('manager', null);
 
         $this->assertSame(
-            ['id', 'league_id', 'name', 'sport', 'sport_label', 'status', 'logo_url', 'manager', 'created_at', 'updated_at'],
+            ['id', 'league_id', 'name', 'sport', 'sport_label', 'status', 'ban_reason', 'logo_url', 'manager', 'created_at', 'updated_at'],
             array_keys($response->json())
         );
         $this->assertDatabaseHas('teams', ['id' => $response->json('id'), 'manager_user_id' => null, 'logo_path' => null]);
@@ -115,7 +115,7 @@ class SaveTeamTest extends TestCase
         $team = Team::factory()->create(['league_id' => $league->id]);
         $url = "/api/leagues/{$league->id}/teams/{$team->id}/status";
 
-        $this->patchJson($url, ['status' => 'banned'], $header)->assertOk()->assertJsonPath('status', 'banned');
+        $this->patchJson($url, ['status' => 'banned', 'reason' => 'Falta grave'], $header)->assertOk()->assertJsonPath('status', 'banned');
         $this->patchJson($url, ['status' => 'active'], $header)->assertOk()->assertJsonPath('status', 'active');
         $this->patchJson($url, ['status' => 'bogus'], $header)->assertStatus(422)->assertJsonStructure(['error' => ['status']]);
         $this->patchJson($url, [], $header)->assertStatus(422)->assertJsonStructure(['error' => ['status']]);

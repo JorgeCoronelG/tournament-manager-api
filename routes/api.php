@@ -171,6 +171,7 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
             Route::get('/teams/{team}', [TeamController::class, 'show']);
             Route::put('/teams/{team}', [TeamController::class, 'update']);
             Route::patch('/teams/{team}/status', [TeamController::class, 'updateStatus']);
+            Route::get('/teams/{team}/ban/preview', [TeamController::class, 'banPreview']);
             Route::delete('/teams/{team}', [TeamController::class, 'destroy']);
             Route::post('/teams/{team}/logo', [TeamController::class, 'uploadLogo']);
             Route::delete('/teams/{team}/logo', [TeamController::class, 'destroyLogo']);

@@ -193,6 +193,6 @@ class StoreRegistrationTest extends TestCase
         $team = Team::factory()->create(['league_id' => $league->id]);
         Registration::factory()->create(['team_id' => $team->id, 'tournament_id' => $tournament->id]);
 
-        $this->patchJson("/api/leagues/{$league->id}/teams/{$team->id}/status", ['status' => 'banned'], $header)->assertOk();
+        $this->patchJson("/api/leagues/{$league->id}/teams/{$team->id}/status", ['status' => 'banned', 'reason' => 'Falta grave'], $header)->assertOk();
     }
 }

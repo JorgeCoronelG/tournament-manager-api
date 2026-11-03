@@ -16,8 +16,10 @@ use Illuminate\Pagination\LengthAwarePaginator;
 interface TournamentRepositoryInterface extends BaseRepositoryInterface
 {
     /**
-     * Torneos no eliminados de una liga. `search` filtra por nombre.
+     * Torneos no eliminados de una liga. `search` filtra por nombre; `$statuses` y `$excludeStatuses` por estado.
      *
+     * @param  list<TournamentStatus>  $statuses
+     * @param  list<TournamentStatus>  $excludeStatuses
      * @return LengthAwarePaginator<int, Tournament>
      */
     public function paginateByLeague(
@@ -25,7 +27,8 @@ interface TournamentRepositoryInterface extends BaseRepositoryInterface
         ListQuery $query,
         ?string $search,
         ?TournamentGender $gender,
-        ?TournamentStatus $status
+        array $statuses = [],
+        array $excludeStatuses = []
     ): LengthAwarePaginator;
 
     /**

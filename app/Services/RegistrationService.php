@@ -48,6 +48,11 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
         ];
     }
 
+    public function countWithdrawn(Tournament $tournament): int
+    {
+        return $this->registrationRepository->countWithdrawnByTournament($tournament->id);
+    }
+
     public function assertNoBannedTeams(Tournament $tournament): void
     {
         if ($this->registrationRepository->countBannedTeamsByTournament($tournament->id) > 0) {

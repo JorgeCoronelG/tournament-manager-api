@@ -28,14 +28,16 @@ class TournamentRepository extends BaseRepository implements TournamentRepositor
         ListQuery $query,
         ?string $search,
         ?TournamentGender $gender,
-        ?TournamentStatus $status
+        array $statuses = [],
+        array $excludeStatuses = []
     ): LengthAwarePaginator {
         return $this->entity->newQuery()
             ->where('league_id', $leagueId)
             ->filter($query->filters)
             ->when($search !== null, fn (Builder $builder) => $builder->where('name', 'LIKE', "%{$search}%"))
             ->when($gender !== null, fn (Builder $builder) => $builder->where('gender', $gender))
-            ->when($status !== null, fn (Builder $builder) => $builder->where('status', $status))
+            ->when($statuses !== [], fn (Builder $builder) => $builder->whereIn('status', $statuses))
+            ->when($excludeStatuses !== [], fn (Builder $builder) => $builder->whereNotIn('status', $excludeStatuses))
             ->applySort($query->sort)
             ->orderByDesc('id')
             ->paginate($query->perPage)

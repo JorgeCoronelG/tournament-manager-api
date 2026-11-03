@@ -47,9 +47,10 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
         ListQuery $query,
         ?string $search,
         ?TournamentGender $gender,
-        ?TournamentStatus $status
+        array $statuses = [],
+        array $excludeStatuses = []
     ): LengthAwarePaginator {
-        return $this->tournamentRepository->paginateByLeague($league->id, $query, $search, $gender, $status);
+        return $this->tournamentRepository->paginateByLeague($league->id, $query, $search, $gender, $statuses, $excludeStatuses);
     }
 
     public function createInLeague(League $league, TournamentData $data): Tournament

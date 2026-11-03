@@ -19,12 +19,20 @@ interface TournamentServiceInterface extends BaseServiceInterface
     /**
      * @return LengthAwarePaginator<int, Tournament>
      */
+    /**
+     * Torneos de la liga; `$statuses` deja solo esos estados y `$excludeStatuses` quita esos (se aplican ambos); vacíos no filtran.
+     *
+     * @param  list<TournamentStatus>  $statuses
+     * @param  list<TournamentStatus>  $excludeStatuses
+     * @return LengthAwarePaginator<int, Tournament>
+     */
     public function paginateByLeague(
         League $league,
         ListQuery $query,
         ?string $search,
         ?TournamentGender $gender,
-        ?TournamentStatus $status
+        array $statuses = [],
+        array $excludeStatuses = []
     ): LengthAwarePaginator;
 
     public function createInLeague(League $league, TournamentData $data): Tournament;

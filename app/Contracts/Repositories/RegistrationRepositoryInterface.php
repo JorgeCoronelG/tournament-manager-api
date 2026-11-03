@@ -88,6 +88,18 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
     public function countActiveByTournament(int $tournamentId): int;
 
     /**
+     * Inscripciones dadas de baja del torneo (no eliminadas).
+     */
+    public function countWithdrawnByTournament(int $tournamentId): int;
+
+    /**
+     * Inscripciones activas del equipo en torneos no eliminados, con el torneo cargado.
+     *
+     * @return Collection<int, Registration>
+     */
+    public function activeOfTeam(int $teamId): Collection;
+
+    /**
      * Inscripciones activas del torneo cuyo equipo está vetado: conservan su lugar pero no participan.
      */
     public function countBannedTeamsByTournament(int $tournamentId): int;

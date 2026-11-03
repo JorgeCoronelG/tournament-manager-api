@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\Services\TournamentServiceInterface;
 use App\Core\BaseApiController;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\Message;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
+use App\Exceptions\CustomErrorException;
 use App\Http\Requests\Tournaments\SaveTournamentRequest;
 use App\Http\Requests\Tournaments\UpdateTournamentStatusRequest;
 use App\Http\Resources\Tournaments\TournamentResource;
@@ -30,7 +32,8 @@ class TournamentController extends BaseApiController
             $listQuery,
             $this->parseSearch($request),
             $this->parseEnum($request, 'gender', TournamentGender::class),
-            $this->parseEnum($request, 'status', TournamentStatus::class)
+            $this->parseStatuses($request, 'status'),
+            $this->parseStatuses($request, 'exclude_status')
         );
 
         return $this->showAll(TournamentResource::collection($tournaments));
@@ -67,5 +70,33 @@ class TournamentController extends BaseApiController
         $this->tournamentService->deleteTournament($tournament);
 
         return $this->noContentResponse();
+    }
+
+    /**
+     * Estados de la query: `key=in_progress` o `key[]=planning&key[]=playoffs`. Los vacíos se ignoran y uno inválido es 422.
+     *
+     * @return list<TournamentStatus>
+     */
+    private function parseStatuses(Request $request, string $key): array
+    {
+        $raw = $request->query($key);
+        $values = is_array($raw) ? $raw : [$raw];
+        $statuses = [];
+
+        foreach ($values as $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $status = is_string($value) ? TournamentStatus::tryFrom($value) : null;
+
+            if ($status === null) {
+                throw new CustomErrorException(Message::TOURNAMENT_INVALID_STATUS_FILTER, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $statuses[$status->value] = $status;
+        }
+
+        return array_values($statuses);
     }
 }

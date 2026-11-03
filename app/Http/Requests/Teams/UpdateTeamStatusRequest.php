@@ -13,13 +13,25 @@ class UpdateTeamStatusRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $reason = $this->input('reason');
+
+        if (is_string($reason)) {
+            $this->merge(['reason' => trim($reason)]);
+        }
+    }
+
     /**
+     * El motivo es obligatorio solo al vetar.
+     *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
             'status' => ['required', Rule::enum(TeamStatus::class)],
+            'reason' => ['required_if:status,'.TeamStatus::BANNED->value, 'nullable', 'string', 'min:5', 'max:255'],
         ];
     }
 
@@ -30,6 +42,12 @@ class UpdateTeamStatusRequest extends FormRequest
     {
         return [
             'status' => 'estado',
+            'reason' => 'motivo',
         ];
+    }
+
+    public function reason(): string
+    {
+        return $this->string('reason')->toString();
     }
 }

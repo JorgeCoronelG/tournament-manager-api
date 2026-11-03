@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Services\TeamBanServiceInterface;
 use App\Contracts\Services\TeamServiceInterface;
 use App\Core\BaseApiController;
 use App\Core\Classes\ListQuery;
@@ -25,7 +26,7 @@ use Illuminate\Http\Response;
 
 class TeamController extends BaseApiController
 {
-    public function __construct(protected TeamServiceInterface $teamService) {}
+    public function __construct(protected TeamServiceInterface $teamService, protected TeamBanServiceInterface $teamBanService) {}
 
     public function index(Request $request, League $league): JsonResponse
     {
@@ -70,7 +71,18 @@ class TeamController extends BaseApiController
     {
         $status = TeamStatus::from($request->string('status')->toString());
 
+        if ($status === TeamStatus::BANNED) {
+            $result = $this->teamBanService->ban($team, $request->reason(), (int) $request->user()?->id);
+
+            return $this->successResponse((new TeamResource($result['team']))->resolve() + ['ban_effects' => $result['effects']], Response::HTTP_OK);
+        }
+
         return $this->showOne(new TeamResource($this->teamService->changeStatus($team, $status)));
+    }
+
+    public function banPreview(League $league, Team $team): JsonResponse
+    {
+        return $this->successResponse($this->teamBanService->preview($team), Response::HTTP_OK);
     }
 
     public function destroy(League $league, Team $team): Response

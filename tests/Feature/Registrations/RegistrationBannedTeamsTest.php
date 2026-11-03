@@ -61,18 +61,18 @@ class RegistrationBannedTeamsTest extends TestCase
         $this->patchJson($url, ['status' => 'in_progress'], $header)->assertOk();
     }
 
-    public function test_banning_and_reactivating_keeps_the_registration(): void
+    public function test_banning_removes_the_planning_registration_and_reactivating_does_not_restore_it(): void
     {
         [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
         $registration = $this->enroll($tournament);
         $url = "/api/leagues/{$league->id}/teams/{$registration->team_id}/status";
 
-        $this->patchJson($url, ['status' => 'banned'], $header)->assertOk();
-        $this->assertNotSoftDeleted('registrations', ['id' => $registration->id, 'status' => 'active']);
+        $this->patchJson($url, ['status' => 'banned', 'reason' => 'Falta grave'], $header)->assertOk();
+        $this->assertSoftDeleted('registrations', ['id' => $registration->id]);
 
         $this->patchJson($url, ['status' => 'active'], $header)->assertOk();
-        $this->assertNotSoftDeleted('registrations', ['id' => $registration->id, 'status' => 'active']);
-        $this->getJson($this->registrationsUrl($league, $tournament), $header)->assertJsonPath('summary.banned', 0)->assertJsonPath('data.0.id', $registration->id);
+        $this->assertSoftDeleted('registrations', ['id' => $registration->id]);
+        $this->getJson($this->registrationsUrl($league, $tournament), $header)->assertJsonPath('summary.registered', 0)->assertJsonCount(0, 'data');
     }
 
     public function test_a_banned_team_registration_can_be_removed_in_planning(): void

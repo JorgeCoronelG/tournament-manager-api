@@ -382,6 +382,8 @@ class Message
 
     public const REGISTRATION_REPLACE_ROSTER_WARNING = 'El equipo nuevo debe registrar su plantilla.';
 
+    public const TOURNAMENT_INVALID_STATUS_FILTER = 'Estado de torneo inválido.';
+
     public static function getMessageCloseWithdrawnNotQualified(int $withdrawn, int $qualified): string
     {
         return "Hay {$withdrawn} equipo(s) en baja que no clasifican, por lo que la liguilla queda con {$qualified} equipos. Reemplaza al equipo en baja o ajusta la configuración de la liguilla para continuar.";

@@ -36,6 +36,11 @@ interface RegistrationServiceInterface extends BaseServiceInterface
     public function countsByTournament(Tournament $tournament): array;
 
     /**
+     * Inscripciones dadas de baja del torneo, sin importar búsqueda ni filtros del listado.
+     */
+    public function countWithdrawn(Tournament $tournament): int;
+
+    /**
      * Regla para el módulo de grupos y calendario: no se puede generar el calendario con equipos vetados
      * inscritos (422). Aún no la llama nadie.
      */

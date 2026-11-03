@@ -58,7 +58,10 @@ interface TeamRepositoryInterface extends BaseRepositoryInterface
      */
     public function existsWithNameAndManager(int $leagueId, Sport $sport, string $name, ?int $managerUserId, ?int $exceptTeamId = null): bool;
 
-    public function updateStatus(Team $team, TeamStatus $status): Team;
+    /**
+     * Cambia el estado; `$banReason` se guarda solo al vetar y se limpia al reactivar.
+     */
+    public function updateStatus(Team $team, TeamStatus $status, ?string $banReason = null): Team;
 
     public function setManager(Team $team, ?int $managerUserId): Team;
 
