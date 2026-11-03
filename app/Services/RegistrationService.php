@@ -88,15 +88,13 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
         return $this->registrationRepository->assignGroup($registration, $groupId);
     }
 
-    public function removeRegistration(Tournament $tournament, Registration $registration): void
+    public function removeRegistration(Tournament $tournament, Registration $registration, int $userId, ?string $reason = null): void
     {
         if ($tournament->status !== TournamentStatus::PLANNING) {
             throw new CustomErrorException(Message::REGISTRATION_REMOVE_ONLY_PLANNING, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // La baja deja a la inscripción sin grupo.
-        $this->registrationRepository->assignGroup($registration, null);
-        $this->delete($registration->id);
+        $this->registrationRepository->remove($registration, $userId, $reason);
     }
 
     /**

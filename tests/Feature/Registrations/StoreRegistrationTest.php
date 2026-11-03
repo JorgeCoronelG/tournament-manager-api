@@ -144,10 +144,10 @@ class StoreRegistrationTest extends TestCase
 
         $this->postJson($this->registrationsUrl($league, $tournament), ['team_ids' => [$team->id]], $header)
             ->assertCreated()
-            ->assertJsonPath('0.id', $registration->id);
+            ->assertJsonPath('0.id', fn (int $id) => $id !== $registration->id);
 
-        $this->assertDatabaseCount('registrations', 1);
-        $this->assertNull($registration->fresh()->deleted_at);
+        $this->assertDatabaseCount('registrations', 2);
+        $this->assertSoftDeleted('registrations', ['id' => $registration->id]);
     }
 
     public function test_rejects_a_tournament_that_is_not_in_planning(): void

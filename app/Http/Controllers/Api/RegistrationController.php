@@ -57,9 +57,9 @@ class RegistrationController extends BaseApiController
         return $this->showAll(RegistrationResource::collection($registrations), Response::HTTP_CREATED);
     }
 
-    public function destroy(League $league, Tournament $tournament, Registration $registration): Response
+    public function destroy(Request $request, League $league, Tournament $tournament, Registration $registration): Response
     {
-        $this->registrationService->removeRegistration($tournament, $registration);
+        $this->registrationService->removeRegistration($tournament, $registration, (int) $request->user()?->id);
 
         return $this->noContentResponse();
     }

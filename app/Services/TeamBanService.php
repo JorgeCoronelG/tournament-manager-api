@@ -86,7 +86,7 @@ class TeamBanService implements TeamBanServiceInterface
 
                 if ($action === 'removed') {
                     $effects['players_released'] += $this->rosterRepository->releaseOpenByRegistration($registration->id);
-                    $this->registrationService->removeRegistration($tournament, $registration);
+                    $this->registrationService->removeRegistration($tournament, $registration, $userId, $withdrawReason);
                     $effects['removed_tournaments']++;
 
                     continue;

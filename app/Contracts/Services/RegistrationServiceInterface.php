@@ -58,14 +58,16 @@ interface RegistrationServiceInterface extends BaseServiceInterface
     public function registerTeams(Tournament $tournament, array $teamIds): Collection;
 
     /**
-     * Baja lógica de la inscripción, solo con el torneo en planeación (422 si no).
-     */
-    /**
      * Asigna el grupo de fase regular a la inscripción; debe ser del mismo torneo.
      *
      * @throws CustomErrorException
      */
     public function assignGroup(Registration $registration, int $groupId): Registration;
 
-    public function removeRegistration(Tournament $tournament, Registration $registration): void;
+    /**
+     * Baja lógica de la inscripción, solo con el torneo en planeación (422 si no). Guarda quién la quitó y el motivo.
+     *
+     * @throws CustomErrorException
+     */
+    public function removeRegistration(Tournament $tournament, Registration $registration, int $userId, ?string $reason = null): void;
 }

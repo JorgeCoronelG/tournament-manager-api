@@ -62,10 +62,15 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
     public function activeTeamNames(int $tournamentId): array;
 
     /**
-     * Inscribe el equipo, activo. Si hubo una inscripción eliminada de ese equipo en el torneo la restaura,
-     * porque (team_id, tournament_id) es único aunque la fila esté eliminada.
+     * Inscribe el equipo, activo, en una fila nueva: las inscripciones eliminadas del equipo en el torneo se conservan
+     * como historial con su plantilla y sus datos.
      */
     public function register(int $tournamentId, int $teamId): Registration;
+
+    /**
+     * Quita la inscripción (baja lógica) dejándola sin grupo y registrando quién la quitó y el motivo, si lo hay.
+     */
+    public function remove(Registration $registration, int $userId, ?string $reason): void;
 
     /**
      * Inscripciones activas del torneo que aún no tienen grupo.
@@ -110,8 +115,8 @@ interface RegistrationRepositoryInterface extends BaseRepositoryInterface
     public function teamHasActiveRegistrations(int $teamId): bool;
 
     /**
-     * Si el equipo tiene alguna inscripción en el torneo, incluso dada de baja o eliminada: (team_id, tournament_id)
-     * es único aunque la fila no esté activa.
+     * Si el equipo tiene una inscripción no eliminada en el torneo, activa o en baja. Las eliminadas son historial
+     * y no cuentan.
      */
     public function teamHasAnyRegistration(int $tournamentId, int $teamId): bool;
 

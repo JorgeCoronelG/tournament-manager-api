@@ -105,7 +105,7 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
 
     public function teamHasAnyRegistration(int $tournamentId, int $teamId): bool
     {
-        return $this->entity->newQuery()->withTrashed()->where('tournament_id', $tournamentId)->where('team_id', $teamId)->exists();
+        return $this->entity->newQuery()->where('tournament_id', $tournamentId)->where('team_id', $teamId)->exists();
     }
 
     public function teamChanges(int $registrationId): Collection
@@ -170,17 +170,13 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
 
     public function register(int $tournamentId, int $teamId): Registration
     {
-        $registration = $this->entity->newQuery()->withTrashed()
-            ->where('tournament_id', $tournamentId)
-            ->where('team_id', $teamId)
-            ->first() ?? $this->entity->newInstance();
-
+        // Siempre una fila nueva: las eliminadas del mismo equipo quedan como historial.
+        $registration = $this->entity->newInstance();
         $registration->forceFill([
             'tournament_id' => $tournamentId,
             'team_id' => $teamId,
             'status' => RegistrationStatus::ACTIVE,
             'group_id' => $this->singleRegularGroupId($tournamentId),
-            'deleted_at' => null,
         ]);
         $registration->saveOrFail();
 
@@ -268,6 +264,17 @@ class RegistrationRepository extends BaseRepository implements RegistrationRepos
             ->where('team_id', $teamId)
             ->where('status', RegistrationStatus::ACTIVE)
             ->exists();
+    }
+
+    public function remove(Registration $registration, int $userId, ?string $reason): void
+    {
+        $registration->forceFill([
+            'group_id' => null,
+            'removed_by_user_id' => $userId,
+            'removal_reason' => $reason,
+        ]);
+        $registration->saveOrFail();
+        $registration->delete();
     }
 
     public function deleteByTournament(int $tournamentId): void

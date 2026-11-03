@@ -53,6 +53,16 @@ class Registration extends Model
     }
 
     /**
+     * Quién quitó la inscripción en planeación; el cuándo es deleted_at.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function removedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'removed_by_user_id')->withTrashed();
+    }
+
+    /**
      * @return HasMany<Roster, $this>
      */
     public function rosters(): HasMany
