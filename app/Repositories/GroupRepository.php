@@ -111,6 +111,7 @@ class GroupRepository extends BaseRepository implements GroupRepositoryInterface
     {
         $sources = PlayoffSource::query()
             ->whereHas('playoffGroup', fn (Builder $group) => $group->where('tournament_id', $tournamentId))
+            ->with('playoffGroup')
             ->when($exceptGroupId !== null, fn (Builder $builder) => $builder->where('playoff_group_id', '!=', $exceptGroupId))
             ->get()
             ->map(fn (PlayoffSource $source) => [
@@ -119,6 +120,8 @@ class GroupRepository extends BaseRepository implements GroupRepositoryInterface
                 'position_start' => (int) $source->position_start,
                 'position_end' => (int) $source->position_end,
                 'best_count' => $source->best_count === null ? null : (int) $source->best_count,
+                'playoff_id' => (int) $source->playoff_group_id,
+                'playoff_name' => (string) $source->playoffGroup?->name,
             ])
             ->all();
 

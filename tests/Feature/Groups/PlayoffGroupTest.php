@@ -294,15 +294,22 @@ class PlayoffGroupTest extends TestCase
         $messages = fn (array $sources) => collect($this->postJson($url, ['type' => 'playoff', 'name' => 'Liguilla', 'sources' => $sources], $header)
             ->assertStatus(422)->json('error'))->flatten()->all();
 
-        $this->assertSame([Message::getMessagePlayoffOverlap('Fase regular')], $messages([$source($a, 1, 2), $source($a, 1, 2)]));
-        $this->assertSame([Message::getMessagePlayoffOverlap('Fase regular')], $messages([$source($a, 1, 2), $source($a, 1, 2), $source($a, 2, 3)]));
+        $this->assertSame([Message::getMessagePlayoffOverlapSame('Fase regular', 1, 2)], $messages([$source($a, 1, 2), $source($a, 1, 2)]));
+        $this->assertSame([Message::getMessagePlayoffOverlapSame('Fase regular', 1, 2)], $messages([$source($a, 1, 2), $source($a, 1, 2), $source($a, 2, 3)]));
         $this->assertSame(
-            [Message::getMessagePlayoffOverlap('Fase regular'), Message::getMessagePlayoffOverlap('Grupo B')],
+            [Message::getMessagePlayoffOverlapSame('Fase regular', 1, 2), Message::getMessagePlayoffOverlapSame('Grupo B', 1, 1)],
             $messages([$source($a, 1, 2), $source($a, 1, 2), $source($b, 1, 1), $source($b, 1, 1)])
         );
-        $this->assertSame('Las posiciones de Grupo B se traslapan con otra fuente de liguilla.', Message::getMessagePlayoffOverlap('Grupo B'));
+        $this->assertSame(
+            '<b>Estas posiciones ya están asignadas a otra liguilla.</b><br>Las posiciones 1 y 2 del Grupo A ya se utilizan en la liguilla "Finalísima". Revisa las fuentes antes de guardar.',
+            Message::getMessagePlayoffOverlapOther('Grupo A', 1, 2, 'Finalísima')
+        );
 
         $this->postJson($url, ['type' => 'playoff', 'name' => 'Liguilla', 'sources' => [$source($a, 1, 2), $source($a, 3, 4)]], $header)->assertCreated();
+        $this->assertSame(
+            [Message::getMessagePlayoffOverlapOther('Fase regular', 1, 2, 'Liguilla')],
+            collect($this->postJson($url, ['type' => 'playoff', 'name' => 'Otra', 'sources' => [$source($a, 1, 2)]], $header)->assertStatus(422)->json('error'))->flatten()->all()
+        );
     }
 
     public function test_round_names(): void

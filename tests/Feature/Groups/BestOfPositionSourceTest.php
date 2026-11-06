@@ -85,10 +85,10 @@ class BestOfPositionSourceTest extends TestCase
     /**
      * @param  list<array<string, mixed>>  $sources
      */
-    private function createPlayoff(League $league, Tournament $tournament, array $header, array $sources, string $name = 'Liguilla'): int
+    private function createPlayoff(League $league, Tournament $tournament, array $header, array $sources, string $name = 'Liguilla', array $legs = [1, 1, 1, 1]): int
     {
         return $this->postJson($this->groupsUrl($league, $tournament), [
-            'type' => 'playoff', 'name' => $name, 'round_legs' => [1, 1, 1, 1], 'sources' => $sources,
+            'type' => 'playoff', 'name' => $name, 'round_legs' => $legs, 'sources' => $sources,
         ], $header)->assertCreated()->json('id');
     }
 
@@ -127,10 +127,11 @@ class BestOfPositionSourceTest extends TestCase
         $url = $this->groupsUrl($league, $tournament);
         $body = fn (array $sources) => ['type' => 'playoff', 'name' => 'Liguilla', 'sources' => $sources];
 
-        // a) los mejores: al menos 1 y menos que los candidatos (5).
-        foreach ([0, 5, 6] as $count) {
-            $this->assertSame(Message::PLAYOFF_BEST_COUNT, $this->errors($this->postJson($url, $body($this->sources($groups, $count)), $header))['sources.5.best_count'][0]);
-        }
+        // a) los mejores: al menos 1 y no más que los candidatos (5).
+        $this->assertSame(Message::getMessagePlayoffBestCountMin(4), $this->errors($this->postJson($url, $body($this->sources($groups, 0)), $header))['sources.5.best_count'][0]);
+
+        $message = $this->errors($this->postJson($url, $body($this->sources($groups, 6)), $header))['sources.5.best_count'][0];
+        $this->assertStringContainsString('<b>Solicitaste 6 clasificados de la posición 4, pero solo hay 5 disponibles.</b><br>', $message);
         $this->postJson($url, $body([...array_slice($this->sources($groups), 0, 5), ['kind' => 'best_of_position', 'position_start' => 4]]), $header)->assertStatus(422);
 
         // b) la posición debe existir en todos los candidatos.
@@ -145,6 +146,128 @@ class BestOfPositionSourceTest extends TestCase
 
         // Tipo desconocido.
         $this->postJson($url, $body([['kind' => 'otra', 'source_group_id' => $groups[0]->id, 'position_start' => 1, 'position_end' => 2]]), $header)->assertStatus(422);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function bestOnly(int $position, int $bestCount): array
+    {
+        return ['type' => 'playoff', 'name' => 'Liguilla', 'sources' => [['kind' => 'best_of_position', 'position_start' => $position, 'best_count' => $bestCount]]];
+    }
+
+    public function test_all_the_candidates_of_a_position_can_qualify(): void
+    {
+        // 2 grupos, posición 1, clasifican 2.
+        [$league, $tournament, $header] = $this->groupsOfTeams([3, 3]);
+        $this->postJson($this->groupsUrl($league, $tournament), $this->bestOnly(1, 2), $header)->assertCreated()->assertJsonPath('total_teams', 2);
+
+    }
+
+    public function test_some_of_the_candidates_of_a_later_position_can_qualify(): void
+    {
+        [$league, $tournament, $header] = $this->groupsOfTeams([3, 3, 3, 3]);
+
+        $this->postJson($this->groupsUrl($league, $tournament), $this->bestOnly(3, 2), $header)->assertCreated()->assertJsonPath('total_teams', 2);
+    }
+
+    public function test_all_the_candidates_of_four_groups_can_qualify_in_position_one(): void
+    {
+        [$league, $tournament, $header] = $this->groupsOfTeams([3, 3, 3, 3]);
+        $this->postJson($this->groupsUrl($league, $tournament), $this->bestOnly(1, 4), $header)->assertCreated()->assertJsonPath('total_teams', 4);
+    }
+
+    public function test_asking_for_more_candidates_than_there_are_is_rejected(): void
+    {
+        [$league, $tournament, $header] = $this->groupsOfTeams([3, 3]);
+
+        $this->assertSame(
+            Message::getMessagePlayoffBestCountTooHigh(1, 3, 2, []),
+            $this->errors($this->postJson($this->groupsUrl($league, $tournament), $this->bestOnly(1, 3), $header))['sources.0.best_count'][0]
+        );
+        $this->assertStringStartsWith('<b>Solicitaste 3 clasificados de la posición 1, pero solo hay 2 disponibles.</b>', Message::getMessagePlayoffBestCountTooHigh(1, 3, 2, []));
+    }
+
+    public function test_closing_with_every_candidate_qualified_seeds_them_all(): void
+    {
+        [$league, $tournament, $header] = $this->groupsOfTeams([3, 3, 3, 3]);
+        $playoffId = $this->createPlayoff($league, $tournament, $header, [['kind' => 'best_of_position', 'position_start' => 1, 'best_count' => 4]], 'Liguilla', [1, 1]);
+        $this->play($league, $tournament, $header);
+
+        $preview = $this->getJson($this->base($league, $tournament).'/close-regular-phase/preview', $header)->assertOk()->assertJsonPath('blockers', []);
+        $this->assertSame([true, true, true, true], array_column($preview->json('playoffs.0.best_of.0.table'), 'qualified'));
+        $this->assertCount(4, $preview->json('playoffs.0.qualified'));
+
+        $this->postJson($this->base($league, $tournament).'/close-regular-phase', ['liguillas' => [['group_id' => $playoffId, 'round_dates' => ['2026-12-01', '2026-12-08']]]], $header)
+            ->assertOk()->assertJsonPath('status', 'playoffs');
+        $this->assertSame(3, PlayoffTie::query()->count());
+    }
+
+    public function test_a_range_cannot_include_the_position_of_a_best_of_source_of_another_playoff(): void
+    {
+        [$league, $tournament, $header, $groups] = $this->groupsOfTeams([3, 3]);
+        $url = $this->groupsUrl($league, $tournament);
+        $this->postJson($url, $this->bestOnly(1, 2), $header)->assertCreated();
+
+        $response = $this->postJson($url, ['type' => 'playoff', 'name' => 'Otra', 'sources' => [
+            ['source_group_id' => $groups[1]->id, 'position_start' => 1, 'position_end' => 2],
+        ]], $header);
+
+        $this->assertSame(
+            Message::getMessagePlayoffRangeTakenByBestOf('Grupo B', 1, 'Liguilla'),
+            $this->errors($response)['sources.0.position_start'][0]
+        );
+        $this->assertStringContainsString('La posición 1 del Grupo B ya se utiliza en la liguilla "Liguilla" (mejores 1.º lugares)', Message::getMessagePlayoffRangeTakenByBestOf('Grupo B', 1, 'Liguilla'));
+    }
+
+    public function test_sources_without_overlap_are_valid_and_a_playoff_does_not_clash_with_itself(): void
+    {
+        [$league, $tournament, $header, $groups] = $this->groupsOfTeams([3, 3]);
+        $url = $this->groupsUrl($league, $tournament);
+
+        // Dos mejores de posiciones distintas, y rangos de distintos grupos.
+        $first = $this->postJson($url, $this->bestOnly(1, 2), $header)->assertCreated()->json('id');
+        $this->postJson($url, ['type' => 'playoff', 'name' => 'Segunda', 'sources' => [['kind' => 'best_of_position', 'position_start' => 2, 'best_count' => 2]]], $header)->assertCreated();
+        $range = $this->postJson($url, ['type' => 'playoff', 'name' => 'Rango', 'sources' => [['source_group_id' => $groups[0]->id, 'position_start' => 3, 'position_end' => 3], ['source_group_id' => $groups[1]->id, 'position_start' => 3, 'position_end' => 3]]], $header)->assertCreated()->json('id');
+
+        // Editar sin cambiar las fuentes no choca consigo misma.
+        $this->patchJson("{$url}/{$first}", ['sources' => $this->bestOnly(1, 2)['sources']], $header)->assertOk();
+        $this->patchJson("{$url}/{$range}", ['sources' => [['source_group_id' => $groups[0]->id, 'position_start' => 3, 'position_end' => 3], ['source_group_id' => $groups[1]->id, 'position_start' => 3, 'position_end' => 3]]], $header)->assertOk();
+    }
+
+    public function test_closing_blocks_when_a_team_qualifies_in_two_playoffs(): void
+    {
+        [$league, $tournament, $header, $groups] = $this->groupsOfTeams([3, 3]);
+        $this->createPlayoff($league, $tournament, $header, [['kind' => 'best_of_position', 'position_start' => 1, 'best_count' => 2]], 'Mejores', [1]);
+        $rangeId = $this->createPlayoff($league, $tournament, $header, [['source_group_id' => $groups[1]->id, 'position_start' => 2, 'position_end' => 3]], 'Rango', [1]);
+        // Datos previos al arreglo: el rango se traslapa con la fuente de mejores.
+        PlayoffSource::query()->where('playoff_group_id', $rangeId)->update(['position_start' => 1, 'position_end' => 2]);
+        $this->play($league, $tournament, $header);
+
+        $blocker = collect($this->getJson($this->base($league, $tournament).'/close-regular-phase/preview', $header)->assertOk()->json('blockers'))->firstWhere('type', 'team_in_several_playoffs');
+        $this->assertNotNull($blocker);
+        $this->assertSame(Message::getMessageCloseTeamInTwoPlayoffs($blocker['team'], ['Mejores', 'Rango']), $blocker['message']);
+
+        $this->postJson($this->base($league, $tournament).'/close-regular-phase', ['liguillas' => []], $header)->assertStatus(422);
+        $this->assertSame(0, PlayoffTie::query()->count());
+    }
+
+    public function test_a_best_of_source_reports_the_candidates_that_belong_to_another_playoff(): void
+    {
+        [$league, $tournament, $header, $groups] = $this->groupsOfTeams([5, 5]);
+        $url = $this->groupsUrl($league, $tournament);
+        $this->postJson($url, ['type' => 'playoff', 'name' => 'Finalísima', 'sources' => [
+            ['source_group_id' => $groups[0]->id, 'position_start' => 1, 'position_end' => 2],
+        ]], $header)->assertCreated();
+
+        $response = $this->postJson($url, ['type' => 'playoff', 'name' => 'Otra', 'sources' => [
+            ['kind' => 'best_of_position', 'position_start' => 1, 'best_count' => 2],
+        ]], $header);
+
+        $this->assertSame(
+            '<b>Solicitaste 2 clasificados de la posición 1, pero solo hay 1 disponible.</b><br>El equipo del Grupo A ya pertenece a la liguilla "Finalísima". Reduce la cantidad de clasificados o ajusta las fuentes.',
+            $this->errors($response)['sources.0.position_start'][0]
+        );
     }
 
     public function test_the_position_must_exist_in_every_candidate_group(): void

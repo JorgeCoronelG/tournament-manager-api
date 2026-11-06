@@ -479,6 +479,8 @@ class PlayoffService implements PlayoffServiceInterface
         }
 
         $seenTies = [];
+        /** @var array<int, array{team: string, playoffs: list<string>}> $qualifiedIn */
+        $qualifiedIn = [];
 
         foreach ($playoffs as $playoff) {
             $qualified = [];
@@ -536,6 +538,12 @@ class PlayoffService implements PlayoffServiceInterface
                 array_push($blockers, ...$best['blockers']);
             }
 
+            foreach ($qualified as $row) {
+                $registrationId = $this->int($row['registration_id']);
+                $qualifiedIn[$registrationId] ??= ['team' => $this->text($row['team_name'] ?? ''), 'playoffs' => []];
+                $qualifiedIn[$registrationId]['playoffs'][] = $playoff->name;
+            }
+
             if (! PlayoffRounds::isValidTotal(count($qualified))) {
                 $withdrawn = $this->withdrawnQualifiers($playoff, $rawStandings->all());
                 $blockers[] = ['type' => 'invalid_qualified', 'message' => $withdrawn === [] ? Message::CLOSE_INVALID_QUALIFIED : Message::getMessageCloseWithdrawnNotQualified(count($withdrawn), count($qualified)), 'group' => $playoff->name, 'count' => count($qualified)]
@@ -562,6 +570,19 @@ class PlayoffService implements PlayoffServiceInterface
                 'qualified' => $seeded,
                 'pairs' => PlayoffBracket::firstRound(count($seeded), $groupBySeed),
             ];
+        }
+
+        // Red de seguridad: un equipo no puede clasificar en dos liguillas (datos guardados con fuentes traslapadas).
+        foreach ($qualifiedIn as $registrationId => $item) {
+            if (count($item['playoffs']) > 1) {
+                $blockers[] = [
+                    'type' => 'team_in_several_playoffs',
+                    'message' => Message::getMessageCloseTeamInTwoPlayoffs($item['team'], $item['playoffs']),
+                    'registration_id' => $registrationId,
+                    'team' => $item['team'],
+                    'playoffs' => $item['playoffs'],
+                ];
+            }
         }
 
         return ['blockers' => $blockers, 'warnings' => $warnings, 'plans' => $plans, 'best_of' => $bestOf, 'playoffs' => $playoffs];

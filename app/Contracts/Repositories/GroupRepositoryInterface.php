@@ -72,7 +72,7 @@ interface GroupRepositoryInterface extends BaseRepositoryInterface
     /**
      * Fuentes de las demás liguillas del torneo (todas si `$exceptGroupId` es null).
      *
-     * @return list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null}>
+     * @return list<array{kind: string, source_group_id: int|null, position_start: int, position_end: int, best_count: int|null, playoff_id: int, playoff_name: string}>
      */
     public function sourcesOfOtherPlayoffs(int $tournamentId, ?int $exceptGroupId): array;
 

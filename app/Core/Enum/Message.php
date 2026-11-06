@@ -194,7 +194,32 @@ class Message
         return "Los partidos mínimos para liguilla ({$minimum}) superan los que jugará cada equipo en el grupo {$group} ({$matches}).";
     }
 
-    public const PLAYOFF_BEST_COUNT = 'Los mejores deben ser menos que los equipos candidatos de esa posición.';
+    public static function getMessagePlayoffBestCountMin(int $position): string
+    {
+        return "Indica al menos 1 mejor de la posición {$position}.";
+    }
+
+    /**
+     * @param  int  $available  Equipos candidatos para esa posición
+     * @param  list<string>  $covered  Grupos cuya posición ya está incluida en otra fuente de la liguilla
+     */
+    public static function getMessagePlayoffBestCountTooHigh(int $position, int $bestCount, int $available, array $covered): string
+    {
+        $availability = match ($available) {
+            0 => 'no hay ninguno disponible',
+            1 => 'solo hay 1 disponible',
+            default => "solo hay {$available} disponibles",
+        };
+        $message = "<b>Solicitaste {$bestCount} clasificados de la posición {$position}, pero {$availability}.</b><br>";
+
+        if ($covered !== []) {
+            $message .= count($covered) === 1
+                ? "El equipo del {$covered[0]} ya está incluido en otra fuente. "
+                : 'Los equipos de '.implode(', ', $covered).' ya están incluidos en otras fuentes. ';
+        }
+
+        return $message.'Reduce la cantidad de clasificados o ajusta las otras fuentes.';
+    }
 
     public const PLAYOFF_BEST_POSITION = 'Esa posición no existe en todos los grupos.';
 
@@ -270,7 +295,7 @@ class Message
 
     public const PLAYOFF_ROUND_DATES_FIRST_START = 'La primera fecha de las rondas debe ser igual a la fecha de inicio.';
 
-    public const GROUP_NAME_TAKEN = 'Ya hay un grupo con ese nombre en este torneo.';
+    public const GROUP_NAME_TAKEN = 'Ya existe un grupo con este nombre en el torneo.';
 
     public const GROUP_DELETE_LAST_REGULAR = 'No se puede eliminar el último grupo de fase regular del torneo.';
 
@@ -301,11 +326,65 @@ class Message
 
     public const PLAYOFF_ROUND_DATES_ORDER = 'Las fechas de las rondas deben ir en orden.';
 
-    public const PLAYOFF_BEST_OTHER_PLAYOFF = 'Los candidatos de esa posición ya pertenecen a otra liguilla.';
-
-    public static function getMessagePlayoffOverlap(string $group): string
+    /**
+     * @param  list<array{group: string|null, playoff: string}>  $taken  Candidatos que ya son de otra liguilla; `group` null si lo es toda la posición
+     */
+    public static function getMessagePlayoffBestOtherPlayoff(int $position, int $bestCount, int $available, array $taken): string
     {
-        return "Las posiciones de {$group} se traslapan con otra fuente de liguilla.";
+        $availability = match ($available) {
+            0 => 'no hay ninguno disponible',
+            1 => 'solo hay 1 disponible',
+            default => "hay {$available} disponibles",
+        };
+        $first = $available < $bestCount
+            ? "Solicitaste {$bestCount} clasificados de la posición {$position}, pero {$availability}."
+            : "Hay equipos de la posición {$position} que ya pertenecen a otra liguilla.";
+
+        $lines = array_map(fn (array $item) => $item['group'] === null
+            ? "Los equipos de la posición {$position} ya pertenecen a la liguilla \"{$item['playoff']}\"."
+            : "El equipo del {$item['group']} ya pertenece a la liguilla \"{$item['playoff']}\".", $taken);
+
+        return "<b>{$first}</b><br>".implode(' ', $lines).' Reduce la cantidad de clasificados o ajusta las fuentes.';
+    }
+
+    /**
+     * "La posición 1", "Las posiciones 1 y 2" o "Las posiciones 1 a 3".
+     */
+    private static function positionsLabel(int $from, int $to): string
+    {
+        return match (true) {
+            $from === $to => "La posición {$from}",
+            $to === $from + 1 => "Las posiciones {$from} y {$to}",
+            default => "Las posiciones {$from} a {$to}",
+        };
+    }
+
+    public static function getMessagePlayoffOverlapOther(string $group, int $from, int $to, string $playoff): string
+    {
+        $verb = $from === $to ? 'ya se utiliza' : 'ya se utilizan';
+
+        return '<b>Estas posiciones ya están asignadas a otra liguilla.</b><br>'
+            .self::positionsLabel($from, $to)." del {$group} {$verb} en la liguilla \"{$playoff}\". Revisa las fuentes antes de guardar.";
+    }
+
+    public static function getMessagePlayoffRangeTakenByBestOf(string $group, int $position, string $playoff): string
+    {
+        return '<b>Estas posiciones ya están asignadas a otra liguilla.</b><br>'
+            ."La posición {$position} del {$group} ya se utiliza en la liguilla \"{$playoff}\" (mejores {$position}.º lugares). Revisa las fuentes antes de guardar.";
+    }
+
+    /**
+     * @param  list<string>  $playoffs
+     */
+    public static function getMessageCloseTeamInTwoPlayoffs(string $team, array $playoffs): string
+    {
+        return "El equipo {$team} clasifica en más de una liguilla (".implode(', ', $playoffs).'). Corrige las fuentes de las liguillas antes de cerrar la fase regular.';
+    }
+
+    public static function getMessagePlayoffOverlapSame(string $group, int $from, int $to): string
+    {
+        return '<b>Estas posiciones se repiten en las fuentes.</b><br>'
+            .self::positionsLabel($from, $to)." del {$group} ".($from === $to ? 'aparece' : 'aparecen').' en más de una fuente. Ajusta los rangos para evitar duplicados.';
     }
 
     public static function getMessageGroupNeedsTeams(string $group): string
