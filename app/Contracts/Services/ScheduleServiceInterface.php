@@ -30,6 +30,8 @@ interface ScheduleServiceInterface
 
     /**
      * Espacios por semana y, con calendario de emparejamientos, partidos requeridos contra espacios por jornada.
+     * De los espacios configurados de cada jornada se descuentan los que ocupan partidos de otros torneos de la liga
+     * (slots_configured, slots_occupied, slots_available, deficit y occupied_by_others).
      *
      * @return array<string, mixed>
      *
@@ -39,6 +41,8 @@ interface ScheduleServiceInterface
 
     /**
      * Lo mismo que capacity(), pero con la configuración recibida (sin guardarla): para ver el efecto de los cambios antes de guardar.
+     * Agrega config_overlaps: ventanas de otros torneos de la liga (en planeación o en curso) que coinciden en día de
+     * la semana, cancha y horario. Solo informa.
      *
      * @param  array{schedule_start_date: string|null, windows: list<array{weekday: int, field_id: int, start_time: string, end_time: string}>, blocks: list<array{date: string, field_id: int|null, start_time: string|null, end_time: string|null, reason: string|null}>}  $data
      * @return array<string, mixed>

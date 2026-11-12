@@ -221,7 +221,7 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
         }
     }
 
-    public function scheduledInLeague(int $leagueId, CarbonInterface $from, CarbonInterface $to, array $excludeIds = []): Collection
+    public function scheduledInLeague(int $leagueId, CarbonInterface $from, CarbonInterface $to, array $excludeIds = [], bool $lock = false): Collection
     {
         return $this->entity->newQuery()
             ->whereHas('tournament', fn ($query) => $query->where('league_id', $leagueId))
@@ -229,6 +229,7 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->where('status', '!=', MatchStatus::CANCELLED)
             ->whereBetween('match_datetime', [$from, $to])
             ->when($excludeIds !== [], fn ($query) => $query->whereNotIn('id', $excludeIds))
+            ->when($lock, fn ($query) => $query->lockForUpdate())
             ->with(['tournament', 'home.team', 'away.team', 'field'])
             ->orderBy('match_datetime')
             ->orderBy('id')

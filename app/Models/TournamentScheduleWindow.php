@@ -22,4 +22,12 @@ class TournamentScheduleWindow extends Model
     {
         return $this->belongsTo(Field::class)->withTrashed();
     }
+
+    /**
+     * @return BelongsTo<Tournament, $this>
+     */
+    public function tournament(): BelongsTo
+    {
+        return $this->belongsTo(Tournament::class);
+    }
 }

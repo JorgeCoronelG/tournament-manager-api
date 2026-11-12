@@ -8,6 +8,7 @@ use App\Core\Enum\LeagueRefereeStatus;
 use App\Core\Enum\MatchPhase;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\RosterStatus;
+use App\Core\Enum\TournamentStatus;
 use App\Models\Field;
 use App\Models\GameMatch;
 use App\Models\LeagueReferee;
@@ -39,6 +40,21 @@ class ScheduleRepository implements ScheduleRepositoryInterface
             ->orderBy('date')
             ->orderBy('start_time')
             ->orderBy('id')
+            ->get();
+    }
+
+    public function windowsOfOtherTournaments(int $leagueId, int $exceptTournamentId): Collection
+    {
+        return TournamentScheduleWindow::query()
+            ->where('tournament_id', '!=', $exceptTournamentId)
+            ->whereHas('tournament', fn ($query) => $query
+                ->where('league_id', $leagueId)
+                ->whereIn('status', [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS]))
+            ->with(['field', 'tournament'])
+            ->orderBy('tournament_id')
+            ->orderBy('weekday')
+            ->orderBy('field_id')
+            ->orderBy('start_time')
             ->get();
     }
 

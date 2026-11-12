@@ -37,6 +37,7 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
         protected GroupRepositoryInterface $groupRepository,
         protected ScheduleRepositoryInterface $scheduleRepository,
         protected ScheduleServiceInterface $scheduleService,
+        protected FieldAvailability $fieldAvailability,
     ) {}
 
     public function preview(Tournament $tournament, string $scope, bool $alignFinals): array
@@ -413,28 +414,12 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
         }
 
         $day = CarbonImmutable::parse($date)->startOfDay();
-        $others = $this->matchRepository->scheduledInLeague($tournament->league_id, $day->subMinutes(self::LOOKBACK_MINUTES), $day->endOfDay(), $excludeIds);
-        $free = [];
+        $others = $this->fieldAvailability->forRange($tournament->league_id, $day, $day->endOfDay(), $excludeIds);
 
-        foreach ($slots as $slot) {
-            $from = $day->addMinutes($slot['start']);
-            $to = $day->addMinutes($slot['end']);
-            $taken = $others->contains(function (GameMatch $other) use ($slot, $from, $to) {
-                if ($other->field_id !== $slot['field_id'] || $other->match_datetime === null) {
-                    return false;
-                }
-
-                $start = CarbonImmutable::instance($other->match_datetime);
-
-                return $start->lt($to) && $from->lt($start->addMinutes(max(1, (int) $other->tournament?->match_duration_minutes)));
-            });
-
-            if (! $taken) {
-                $free[] = $slot;
-            }
-        }
-
-        return $free;
+        return array_values(array_filter(
+            $slots,
+            fn (array $slot) => ! $others->isTaken($slot['field_id'], $slot['date'], $slot['start'], $slot['end'] - $slot['start'])
+        ));
     }
 
     /**

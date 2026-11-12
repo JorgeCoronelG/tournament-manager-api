@@ -27,13 +27,6 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
     private int $duration = 0;
 
     /**
-     * Partidos de otros torneos de la liga (misma hora, cancha o equipo), solo durante compute().
-     *
-     * @var list<GameMatch>
-     */
-    private array $foreign = [];
-
-    /**
      * Intervalos (minutos desde la época) en que un equipo ya juega en otros torneos de la liga.
      *
      * @var array<int, list<array{0: int, 1: int}>>
@@ -43,6 +36,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
     public function __construct(
         protected MatchRepositoryInterface $matchRepository,
         protected ScheduleServiceInterface $scheduleService,
+        protected FieldAvailability $fieldAvailability,
     ) {}
 
     public function preview(Tournament $tournament, string $mode, string $scope, ?int $seed): array
@@ -53,10 +47,113 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
     public function generate(Tournament $tournament, string $mode, string $scope, ?int $seed): array
     {
         $computed = $this->compute($tournament, $mode, $scope, $seed);
+        $assignments = $computed['assignments'];
 
-        DB::transaction(fn () => $this->matchRepository->assignSchedule($computed['assignments']));
+        // Entre el cálculo y el guardado pudo cambiar la liga: dentro de la transacción se vuelven a leer (con bloqueo)
+        // los partidos del rango y cada asignación se revalida. La que ya choca no se guarda; el resto sí.
+        $taken = DB::transaction(function () use ($tournament, $computed, &$assignments) {
+            $taken = $this->revalidate($tournament, $assignments, $computed['range']);
 
-        return $computed['result'];
+            foreach (array_keys($taken) as $matchId) {
+                $assignments[$matchId] = [null, null, $assignments[$matchId][2]];
+            }
+
+            $this->matchRepository->assignSchedule($assignments);
+
+            return $taken;
+        });
+
+        return $this->withSlotTaken($computed['result'], $taken);
+    }
+
+    /**
+     * Asignaciones cuyo espacio ya ocupa otro partido de la liga: id del partido => partido que lo ocupa.
+     *
+     * @param  array<int, array{0: string|null, 1: int|null, 2: bool}>  $assignments
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}|null  $range
+     * @return array<int, GameMatch>
+     */
+    private function revalidate(Tournament $tournament, array $assignments, ?array $range): array
+    {
+        if ($range === null) {
+            return [];
+        }
+
+        $current = $this->fieldAvailability->forRange($tournament->league_id, $range[0], $range[1], array_keys($assignments), true);
+        $taken = [];
+
+        foreach ($assignments as $matchId => [$datetime, $fieldId]) {
+            $occupant = $datetime === null || $fieldId === null
+                ? null
+                : $current->occupantAt($fieldId, CarbonImmutable::parse($datetime), $this->duration);
+
+            if ($occupant !== null) {
+                $taken[$matchId] = $occupant;
+            }
+        }
+
+        return $taken;
+    }
+
+    /**
+     * Deja sin horario en la respuesta los partidos cuyo espacio se ocupó y agrega un aviso `slot_taken` por cada uno.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  array<int, GameMatch>  $taken
+     * @return array<string, mixed>
+     */
+    private function withSlotTaken(array $result, array $taken): array
+    {
+        if ($taken === []) {
+            return $result;
+        }
+
+        /** @var list<array{id: int, matchday: int, group: string|null, home_team: string|null, away_team: string|null, match_datetime: string|null, field: array{id: int, name: string|null}|null}> $matches */
+        $matches = $result['matches'];
+        /** @var list<array{matchday: int, week_start: string|null, week_end: string|null, matches: int, scheduled: int, unscheduled: int, occupied_by_others: list<array<string, mixed>>}> $matchdays */
+        $matchdays = $result['matchdays'];
+        /** @var list<array<string, mixed>> $warnings */
+        $warnings = $result['warnings'];
+        /** @var int $scheduled */
+        $scheduled = $result['scheduled'];
+        /** @var int $unscheduled */
+        $unscheduled = $result['unscheduled'];
+
+        foreach ($matches as $index => $listed) {
+            $occupant = $taken[$listed['id']] ?? null;
+
+            if ($occupant === null) {
+                continue;
+            }
+
+            $listed = ['match_datetime' => null, 'field' => null] + $listed;
+            $matches[$index] = $listed;
+            $by = FieldAvailability::describe($occupant);
+
+            foreach ($matchdays as $key => $summary) {
+                if ($summary['matchday'] === $listed['matchday']) {
+                    $matchdays[$key]['scheduled']--;
+                    $matchdays[$key]['unscheduled']++;
+                }
+            }
+
+            $warnings[] = [
+                'code' => 'slot_taken',
+                'matchday' => $listed['matchday'],
+                'unscheduled' => 1,
+                'message' => "El partido {$listed['home_team']} vs {$listed['away_team']} de la jornada {$listed['matchday']} quedó sin horario: su espacio lo ocupó {$by['tournament_name']} mientras se asignaba.",
+                'match' => $listed,
+                'occupied_by' => $by,
+            ];
+        }
+
+        return [
+            'scheduled' => $scheduled - count($taken),
+            'unscheduled' => $unscheduled + count($taken),
+            'matchdays' => $matchdays,
+            'warnings' => $warnings,
+            'matches' => $matches,
+        ] + $result;
     }
 
     public function clear(Tournament $tournament): array
@@ -83,7 +180,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
     }
 
     /**
-     * @return array{result: array<string, mixed>, assignments: array<int, array{0: string|null, 1: int|null, 2: bool}>}
+     * @return array{result: array<string, mixed>, assignments: array<int, array{0: string|null, 1: int|null, 2: bool}>, range: array{0: CarbonImmutable, 1: CarbonImmutable}|null}
      */
     private function compute(Tournament $tournament, string $mode, string $scope, ?int $seed): array
     {
@@ -94,12 +191,15 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
         sort($matchdays);
         $plan = $this->scheduleService->plan($tournament, $matchdays, ScheduleService::MAX_WEEKS);
 
-        $this->loadForeign($tournament, $plan['weeks']);
+        $this->duration = max(1, (int) $tournament->match_duration_minutes);
+        $range = $plan['weeks'] === [] ? null : [$plan['weeks'][0]['monday'], $plan['weeks'][array_key_last($plan['weeks'])]['monday']->addDays(7)];
+        $league = $range === null ? $this->fieldAvailability : $this->fieldAvailability->forRange($tournament->league_id, $range[0], $range[1]);
+        $others = $league->withoutTournament($tournament->id);
+        $this->loadForeignBusy($others);
 
         $playedKept = 0;
         $lockedKept = 0;
         $assignedKept = 0;
-        $occupied = [];
         $teamDays = [];
         $pool = [];
 
@@ -120,7 +220,6 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
 
             if ($at !== null) {
                 $date = $at->format('Y-m-d');
-                $occupied[$date.'|'.$match->field_id.'|'.((int) $at->format('G') * 60 + (int) $at->format('i'))] = true;
 
                 foreach ([$match->home_registration_id, $match->away_registration_id] as $team) {
                     if ($team !== null) {
@@ -129,6 +228,10 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
                 }
             }
         }
+
+        // Ocupan cancha todos los partidos de la liga que no se van a mover: los de otros torneos y los que este torneo
+        // conserva (jugados, fijados y, con "unscheduled", los que ya tenían horario).
+        $taken = $league->withoutMatches(array_map(fn (GameMatch $match) => $match->id, array_merge(...array_values($pool))));
 
         $seed = $mode === self::MODE_RANDOM ? ($seed ?? random_int(0, 2147483647)) : null;
         $randomizer = $seed === null ? null : new Randomizer(new Mt19937($seed));
@@ -145,7 +248,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
             $week = $weekIndex === null ? null : $plan['weeks'][$weekIndex];
             $free = $week === null ? [] : array_values(array_filter(
                 $week['slots'],
-                fn (array $slot) => ! isset($occupied[$slot['date'].'|'.$slot['field_id'].'|'.$slot['start']]) && ! $this->takenByForeign($slot)
+                fn (array $slot) => ! $taken->isTaken($slot['field_id'], $slot['date'], $slot['start'], $this->duration)
             ));
 
             $placed = $randomizer !== null
@@ -163,6 +266,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
                 'matches' => count($dayMatches),
                 'scheduled' => count($placed),
                 'unscheduled' => $rest,
+                'occupied_by_others' => $rest > 0 && $week !== null ? $this->occupiedByOthers($others, $week['slots']) : [],
             ];
 
             if ($rest > 0) {
@@ -205,7 +309,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
             'matches' => $listed,
         ];
 
-        return ['result' => $result, 'assignments' => $assignments];
+        return ['result' => $result, 'assignments' => $assignments, 'range' => $range];
     }
 
     /**
@@ -385,7 +489,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
             }
 
             foreach ($this->foreignBusy[$registration->team_id] ?? [] as [$busyFrom, $busyTo]) {
-                if ($busyFrom < $to && $from < $busyTo) {
+                if (FieldAvailability::overlaps($from, $to, $busyFrom, $busyTo)) {
                     return false;
                 }
             }
@@ -395,62 +499,46 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
     }
 
     /**
-     * Carga los partidos de otros torneos de la liga que caen en las semanas del patrón.
-     *
-     * @param  list<array{week: int, monday: CarbonImmutable, slots: list<Slot>, matchday: int|null}>  $weeks
+     * Horarios en que cada equipo ya juega en otros torneos de la liga.
      */
-    private function loadForeign(Tournament $tournament, array $weeks): void
+    private function loadForeignBusy(FieldAvailability $others): void
     {
-        $this->duration = max(1, (int) $tournament->match_duration_minutes);
-        $this->foreign = [];
         $this->foreignBusy = [];
 
-        if ($weeks === []) {
-            return;
-        }
+        foreach ($others->matches() as $other) {
+            $interval = FieldAvailability::interval($other);
 
-        $from = $weeks[0]['monday']->subMinutes(Tournament::MAX_MATCH_DURATION_MINUTES);
-        $to = $weeks[array_key_last($weeks)]['monday']->addDays(7);
-
-        foreach ($this->matchRepository->scheduledInLeague($tournament->league_id, $from, $to) as $other) {
-            if ($other->tournament_id === $tournament->id || $other->match_datetime === null) {
+            if ($interval === null) {
                 continue;
             }
 
-            $this->foreign[] = $other;
-            $start = intdiv($other->match_datetime->getTimestamp(), 60);
-            $end = $start + max(1, (int) $other->tournament?->match_duration_minutes);
-
             foreach ([$other->home, $other->away] as $registration) {
                 if ($registration !== null) {
-                    $this->foreignBusy[$registration->team_id][] = [$start, $end];
+                    $this->foreignBusy[$registration->team_id][] = $interval;
                 }
             }
         }
     }
 
     /**
-     * Si un partido de otro torneo ocupa esa cancha en un horario que se traslapa con el espacio.
+     * Partidos de otros torneos que ocupan espacios de la semana (sin repetir), para explicar los espacios faltantes.
      *
-     * @param  Slot  $slot
+     * @param  list<Slot>  $slots
+     * @return list<array<string, mixed>>
      */
-    private function takenByForeign(array $slot): bool
+    private function occupiedByOthers(FieldAvailability $others, array $slots): array
     {
-        [$from, $to] = $this->interval($slot);
+        $occupiedBy = [];
 
-        foreach ($this->foreign as $other) {
-            if ($other->field_id !== $slot['field_id'] || $other->match_datetime === null) {
-                continue;
-            }
+        foreach ($slots as $slot) {
+            $occupant = $others->occupant($slot['field_id'], $slot['date'], $slot['start'], $this->duration);
 
-            $start = intdiv($other->match_datetime->getTimestamp(), 60);
-
-            if ($start < $to && $from < $start + max(1, (int) $other->tournament?->match_duration_minutes)) {
-                return true;
+            if ($occupant !== null) {
+                $occupiedBy[$occupant->id] = FieldAvailability::describe($occupant);
             }
         }
 
-        return false;
+        return array_values($occupiedBy);
     }
 
     /**
@@ -461,7 +549,7 @@ class ScheduleGeneratorService implements ScheduleGeneratorServiceInterface
      */
     private function interval(array $slot): array
     {
-        $from = intdiv(CarbonImmutable::parse($slot['date'])->getTimestamp(), 60) + $slot['start'];
+        $from = intdiv(FieldAvailability::slotStart($slot['date'], $slot['start'])->getTimestamp(), 60);
 
         return [$from, $from + $this->duration];
     }

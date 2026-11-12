@@ -31,10 +31,15 @@ class MatchScheduleService implements MatchScheduleServiceInterface
 
     private const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+    private const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+    private const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
     public function __construct(
         protected MatchRepositoryInterface $matchRepository,
         protected ScheduleRepositoryInterface $scheduleRepository,
         protected ScheduleServiceInterface $scheduleService,
+        protected FieldAvailability $fieldAvailability,
     ) {}
 
     public function update(League $league, GameMatch $match, array $data): array
@@ -179,7 +184,7 @@ class MatchScheduleService implements MatchScheduleServiceInterface
 
         $slots = $this->scheduleService->slotsOfDate($tournament, $day);
         $dayStart = CarbonImmutable::parse($day)->startOfDay();
-        $others = $this->matchRepository->scheduledInLeague($league->id, $dayStart->subMinutes(self::LOOKBACK_MINUTES), $dayStart->endOfDay(), [$match->id]);
+        $others = $this->fieldAvailability->forRange($league->id, $dayStart, $dayStart->endOfDay(), [$match->id]);
         $duration = $this->duration($tournament);
         $teams = $this->teamIds($match);
         $names = [];
@@ -191,9 +196,11 @@ class MatchScheduleService implements MatchScheduleServiceInterface
         $free = [];
 
         foreach ($slots as $slot) {
-            $at = CarbonImmutable::parse($slot['date'])->addMinutes($slot['start']);
-            $busy = $others->contains(fn (GameMatch $other) => $this->overlaps($at, $duration, $other)
-                && ($other->field_id === $slot['field_id'] || array_intersect($teams, $this->teamIds($other)) !== []));
+            $busy = false;
+
+            foreach ($others->overlapping(FieldAvailability::slotStart($slot['date'], $slot['start']), $duration) as $other) {
+                $busy = $busy || $other->field_id === $slot['field_id'] || array_intersect($teams, $this->teamIds($other)) !== [];
+            }
 
             if (! $busy) {
                 $free[] = [
@@ -334,15 +341,14 @@ class MatchScheduleService implements MatchScheduleServiceInterface
         }
 
         $duration = $this->duration($this->tournament($match));
-        $others = $this->matchRepository
-            ->scheduledInLeague($this->tournament($match)->league_id, $at->subMinutes(self::LOOKBACK_MINUTES), $at->addMinutes($duration), [$match->id, ...$exclude])
-            ->filter(fn (GameMatch $other) => $this->overlaps($at, $duration, $other));
+        $availability = $this->fieldAvailability
+            ->forRange($this->tournament($match)->league_id, $at, $at->addMinutes($duration), [$match->id, ...$exclude]);
+        $others = $availability->overlapping($at, $duration);
         $teams = $this->teamIds($match);
+        $occupant = $fieldId === null ? null : $availability->occupantAt($fieldId, $at, $duration);
 
-        foreach ($others as $other) {
-            if ($fieldId !== null && $other->field_id === $fieldId) {
-                $this->conflict(self::CODE_FIELD_CONFLICT, 'La cancha ya está ocupada por '.$this->describe($other).'.');
-            }
+        if ($occupant !== null) {
+            $this->conflict(self::CODE_FIELD_CONFLICT, $this->fieldTakenMessage($occupant), $occupant);
         }
 
         foreach ($others as $other) {
@@ -363,9 +369,32 @@ class MatchScheduleService implements MatchScheduleServiceInterface
     /**
      * @throws CustomErrorException
      */
-    private function conflict(string $code, string $message): never
+    private function conflict(string $code, string $message, ?GameMatch $other = null): never
     {
-        throw new CustomErrorException($message, Response::HTTP_UNPROCESSABLE_ENTITY, ['code' => $code, 'message' => $message]);
+        $payload = ['code' => $code, 'message' => $message];
+
+        if ($other !== null) {
+            $payload += [
+                'tournament_id' => $other->tournament_id,
+                'tournament_name' => $other->tournament?->name,
+                'match' => ['id' => $other->id, 'home_team' => $other->home?->team?->name, 'away_team' => $other->away?->team?->name]
+                    + FieldAvailability::describe($other),
+            ];
+        }
+
+        throw new CustomErrorException($message, Response::HTTP_UNPROCESSABLE_ENTITY, $payload);
+    }
+
+    /**
+     * «La cancha ya está ocupada por Torneo Uno el domingo 3 de enero, de 8:00 a 9:00.»
+     */
+    private function fieldTakenMessage(GameMatch $other): string
+    {
+        $start = $this->toDate($other->match_datetime) ?? CarbonImmutable::now();
+        $end = $start->addMinutes(FieldAvailability::duration($other->tournament));
+        $day = self::WEEKDAY_NAMES[$start->dayOfWeek].' '.$start->day.' de '.self::MONTH_NAMES[$start->month - 1];
+
+        return 'La cancha ya está ocupada por '.($other->tournament->name ?? 'otro torneo').' el '.$day.', de '.$start->format('G:i').' a '.$end->format('G:i').'.';
     }
 
     /**
@@ -468,10 +497,10 @@ class MatchScheduleService implements MatchScheduleServiceInterface
             return false;
         }
 
-        $start = CarbonImmutable::instance($other->match_datetime);
-        $otherDuration = $this->duration($this->tournament($other));
+        $interval = FieldAvailability::interval($other);
+        $from = intdiv($at->getTimestamp(), 60);
 
-        return $start->lt($at->addMinutes($duration)) && $at->lt($start->addMinutes($otherDuration));
+        return $interval !== null && FieldAvailability::overlaps($from, $from + $duration, $interval[0], $interval[1]);
     }
 
     /**

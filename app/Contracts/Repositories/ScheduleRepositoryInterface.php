@@ -29,6 +29,13 @@ interface ScheduleRepositoryInterface
     public function blocks(int $tournamentId): Collection;
 
     /**
+     * Ventanas (con cancha y torneo) de los otros torneos de la liga en planeación o en curso.
+     *
+     * @return Collection<int, TournamentScheduleWindow>
+     */
+    public function windowsOfOtherTournaments(int $leagueId, int $exceptTournamentId): Collection;
+
+    /**
      * Reemplaza fecha de inicio, ventanas y bloqueos en una sola operación.
      *
      * @param  list<array{weekday: int, field_id: int, start_time: string, end_time: string}>  $windows

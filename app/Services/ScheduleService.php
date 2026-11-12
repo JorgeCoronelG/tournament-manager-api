@@ -20,7 +20,10 @@ class ScheduleService implements ScheduleServiceInterface
     /** Tope de semanas que se recorren para ubicar las jornadas. */
     public const MAX_WEEKS = 52;
 
-    public function __construct(protected ScheduleRepositoryInterface $scheduleRepository) {}
+    public function __construct(
+        protected ScheduleRepositoryInterface $scheduleRepository,
+        protected FieldAvailability $fieldAvailability,
+    ) {}
 
     public function show(Tournament $tournament): array
     {
@@ -187,7 +190,44 @@ class ScheduleService implements ScheduleServiceInterface
         ], $data['blocks']);
         $startDate = $data['schedule_start_date'] === null ? null : CarbonImmutable::parse($data['schedule_start_date']);
 
-        return $this->computeCapacity($tournament, $startDate, $windows, $blocks);
+        return $this->computeCapacity($tournament, $startDate, $windows, $blocks)
+            + ['config_overlaps' => $this->configOverlaps($tournament, $windows)];
+    }
+
+    /**
+     * Ventanas de otros torneos de la liga (en planeación o en curso) que coinciden con las recibidas en día de la
+     * semana, cancha y horario (no se comparan fechas). El rango devuelto es la intersección. Solo informa.
+     *
+     * @param  list<array{weekday: int, field_id: int, start: int, end: int}>  $windows
+     * @return list<array{tournament_id: int, tournament_name: string|null, field_id: int, field_name: string|null, weekday: int, start_time: string, end_time: string}>
+     */
+    private function configOverlaps(Tournament $tournament, array $windows): array
+    {
+        $overlaps = [];
+
+        foreach ($this->scheduleRepository->windowsOfOtherTournaments($tournament->league_id, $tournament->id) as $other) {
+            $range = ['start' => ScheduleCapacity::minutes($other->start_time), 'end' => ScheduleCapacity::minutes($other->end_time)];
+
+            foreach ($windows as $window) {
+                if ($window['weekday'] !== (int) $other->weekday || $window['field_id'] !== (int) $other->field_id || ! ScheduleCapacity::overlap($window, $range)) {
+                    continue;
+                }
+
+                $overlaps[] = [
+                    'tournament_id' => (int) $other->tournament_id,
+                    'tournament_name' => $other->tournament?->name,
+                    'field_id' => (int) $other->field_id,
+                    'field_name' => $other->field?->name,
+                    'weekday' => (int) $other->weekday,
+                    'start_time' => ScheduleCapacity::time(max($window['start'], $range['start'])),
+                    'end_time' => ScheduleCapacity::time(min($window['end'], $range['end'])),
+                ];
+            }
+        }
+
+        usort($overlaps, fn (array $a, array $b) => [$a['tournament_id'], $a['weekday'], $a['field_id'], $a['start_time']] <=> [$b['tournament_id'], $b['weekday'], $b['field_id'], $b['start_time']]);
+
+        return $overlaps;
     }
 
     /**
@@ -206,19 +246,41 @@ class ScheduleService implements ScheduleServiceInterface
             ? ['weeks' => [], 'assigned' => []]
             : ScheduleCapacity::plan($startDate, $windows, $blocks, $duration, array_keys($perMatchday), self::MAX_WEEKS);
 
+        // Las semanas se asignan con los espacios configurados (igual que el generador); de cada jornada se descuentan
+        // después los que ya ocupan partidos de otros torneos de la liga.
+        $others = $plan['weeks'] === [] ? null : $this->fieldAvailability
+            ->forRange($tournament->league_id, $plan['weeks'][0]['monday'], $plan['weeks'][array_key_last($plan['weeks'])]['monday']->addDays(7))
+            ->withoutTournament($tournament->id);
+
         $matchdays = [];
 
         foreach ($perMatchday as $matchday => $required) {
             $week = isset($plan['assigned'][$matchday]) ? $plan['weeks'][$plan['assigned'][$matchday]] : null;
-            $slotsAvailable = $week === null ? 0 : count($week['slots']);
+            $slotsConfigured = $week === null ? 0 : count($week['slots']);
+            $slotsOccupied = 0;
+            $occupiedBy = [];
+
+            foreach ($week['slots'] ?? [] as $slot) {
+                $occupant = $others?->occupant($slot['field_id'], $slot['date'], $slot['start'], $duration);
+
+                if ($occupant !== null) {
+                    $slotsOccupied++;
+                    $occupiedBy[$occupant->id] = FieldAvailability::describe($occupant);
+                }
+            }
+
+            $slotsAvailable = $slotsConfigured - $slotsOccupied;
             $matchdays[] = [
                 'matchday' => $matchday,
                 'week' => $week['week'] ?? null,
                 'start_date' => $week === null ? null : $week['monday']->toDateString(),
                 'end_date' => $week === null ? null : $week['monday']->addDays(6)->toDateString(),
                 'matches_required' => $required,
+                'slots_configured' => $slotsConfigured,
+                'slots_occupied' => $slotsOccupied,
                 'slots_available' => $slotsAvailable,
                 'deficit' => max(0, $required - $slotsAvailable),
+                'occupied_by_others' => array_values($occupiedBy),
             ];
         }
 

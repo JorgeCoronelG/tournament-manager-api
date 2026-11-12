@@ -20,7 +20,8 @@ interface ScheduleGeneratorServiceInterface
     public const SCOPE_UNSCHEDULED = 'unscheduled';
 
     /**
-     * Calcula el horario sin guardarlo.
+     * Calcula el horario sin guardarlo. Cada jornada con partidos sin ubicar trae en `occupied_by_others` los partidos
+     * de otros torneos de la liga que ocupan sus espacios.
      *
      * @return array<string, mixed> {scheduled, unscheduled, locked_kept, played_kept, assigned_kept, matchdays, warnings, matches}
      *
@@ -29,7 +30,9 @@ interface ScheduleGeneratorServiceInterface
     public function preview(Tournament $tournament, string $mode, string $scope, ?int $seed): array;
 
     /**
-     * Calcula y guarda el horario en una sola transacción.
+     * Calcula y guarda el horario en una sola transacción. Antes de guardar se vuelven a leer los partidos de la liga
+     * y se revalida cada asignación: la que ya choca por un cambio concurrente no se guarda (el partido queda sin
+     * horario) y se agrega un aviso con `code` = "slot_taken", `match` y `occupied_by`. El resto se guarda normal.
      *
      * @return array<string, mixed> Igual que preview().
      *

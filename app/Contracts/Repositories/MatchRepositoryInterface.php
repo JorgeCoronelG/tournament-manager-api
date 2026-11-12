@@ -100,12 +100,12 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
 
     /**
      * Partidos programados de la liga (todos los torneos, sin cancelados) con hora de inicio entre $from y $to, con
-     * torneo, equipos y cancha.
+     * torneo, equipos y cancha. Con $lock bloquea las filas (lockForUpdate): solo dentro de una transacción.
      *
      * @param  list<int>  $excludeIds
      * @return Collection<int, GameMatch>
      */
-    public function scheduledInLeague(int $leagueId, CarbonInterface $from, CarbonInterface $to, array $excludeIds = []): Collection;
+    public function scheduledInLeague(int $leagueId, CarbonInterface $from, CarbonInterface $to, array $excludeIds = [], bool $lock = false): Collection;
 
     /**
      * Guarda columnas de horario de un partido (match_datetime, field_id, referee_user_id, schedule_locked,
