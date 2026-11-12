@@ -110,12 +110,12 @@ class PlayoffFlowTest extends TestCase
         $this->getJson($url, $header)->assertOk()->assertJsonPath('blockers.0.type', 'no_calendar');
     }
 
-    public function test_preview_limits_pending_examples_to_ten(): void
+    public function test_preview_lists_every_pending_match(): void
     {
         [$league, $tournament, $header] = $this->tournament(8, false);
 
         $this->getJson($this->base($league, $tournament).'/close-regular-phase/preview', $header)
-            ->assertJsonPath('blockers.0.count', 28)->assertJsonCount(10, 'blockers.0.examples');
+            ->assertJsonPath('blockers.0.count', 28)->assertJsonCount(28, 'blockers.0.examples');
     }
 
     public function test_preview_blocks_on_unresolved_ties_that_cross_the_cut_but_only_warns_inside_it(): void

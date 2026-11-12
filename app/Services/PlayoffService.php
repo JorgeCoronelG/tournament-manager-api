@@ -468,7 +468,7 @@ class PlayoffService implements PlayoffServiceInterface
                 'type' => 'pending_matches',
                 'message' => Message::CLOSE_PENDING_MATCHES,
                 'count' => $pending->count(),
-                'examples' => $pending->take(self::MAX_EXAMPLES)->map(fn (GameMatch $match) => [
+                'examples' => $pending->map(fn (GameMatch $match) => [
                     'match_id' => $match->id,
                     'group' => $match->group?->name,
                     'matchday' => $match->matchday,
