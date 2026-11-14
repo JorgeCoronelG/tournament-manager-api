@@ -104,6 +104,11 @@ class MatchScheduleService implements MatchScheduleServiceInterface
             $attributes['schedule_locked'] = true;
         }
 
+        // Un partido sin fecha y hora no puede estar fijado.
+        if ($datetime === null) {
+            $attributes['schedule_locked'] = false;
+        }
+
         $this->matchRepository->saveSchedule($match, $attributes);
 
         return ['match' => $this->reload($match), 'warnings' => $this->finalizeWarnings($warnings)];
@@ -158,7 +163,7 @@ class MatchScheduleService implements MatchScheduleServiceInterface
                     'field_id' => $new['field'],
                     'referee_user_id' => $new['referee'],
                     'original_match_datetime' => $this->original($old['at'], $target->original_match_datetime, $new['at'])?->format('Y-m-d H:i:s'),
-                    'schedule_locked' => true,
+                    'schedule_locked' => $new['at'] !== null,
                 ] + ($target->tie_id !== null && $new['at'] !== null ? ['scheduled_date' => $new['at']->toDateString()] : []));
             }
         });

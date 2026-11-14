@@ -374,6 +374,51 @@ class MatchScheduleEditTest extends TestCase
         $this->assertTrue($byId[$this->otherReferee->id]['available']);
     }
 
+    public function test_removing_the_schedule_of_a_locked_match_also_unlocks_it_and_it_gets_reassigned(): void
+    {
+        $this->putJson($this->api("tournaments/{$this->tournament->id}/schedule-config"), [
+            'schedule_start_date' => '2026-11-02',
+            'windows' => [
+                ['weekday' => 6, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '12:00'],
+            ],
+            'blocks' => [],
+        ], $this->header)->assertOk();
+
+        $match = $this->matches[0];
+        $this->place($match, '2026-11-07 08:00:00', $this->fieldA, $this->referee);
+        $match->forceFill(['original_match_datetime' => '2026-10-31 08:00:00'])->save();
+
+        $this->schedule($match, ['match_datetime' => null, 'schedule_locked' => true])->assertOk()
+            ->assertJsonPath('match_datetime', null)
+            ->assertJsonPath('field', null)
+            ->assertJsonPath('schedule_locked', false)
+            ->assertJsonPath('referee.id', $this->referee->id);
+
+        $match->refresh();
+        $this->assertNotNull($match->original_match_datetime);
+
+        $this->postJson($this->api("tournaments/{$this->tournament->id}/schedule/generate"), ['scope' => 'unscheduled'], $this->header)->assertOk();
+
+        $this->assertNotNull($match->refresh()->match_datetime);
+    }
+
+    public function test_scheduling_without_schedule_locked_locks_the_match(): void
+    {
+        $this->schedule($this->matches[0], ['match_datetime' => '2026-11-07 08:00:00'])->assertOk()->assertJsonPath('schedule_locked', true);
+    }
+
+    public function test_swap_leaves_the_match_without_schedule_unlocked(): void
+    {
+        [$first] = $this->matches;
+        $second = $this->disjoint($first);
+        $this->place($first, '2026-11-07 08:00:00', $this->fieldA, $this->referee);
+
+        $this->postJson($this->api("matches/{$first->id}/swap-schedule"), ['with_match_id' => $second->id], $this->header)
+            ->assertOk()
+            ->assertJsonPath('match.schedule_locked', false)
+            ->assertJsonPath('with_match.schedule_locked', true);
+    }
+
     public function test_generator_keeps_locked_matches_reassigns_the_rest_and_avoids_other_tournaments(): void
     {
         $this->putJson($this->api("tournaments/{$this->tournament->id}/schedule-config"), [
