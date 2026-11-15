@@ -70,9 +70,19 @@ class PlayoffService implements PlayoffServiceInterface
             'blockers' => $analysis['blockers'],
             'warnings' => $analysis['warnings'],
             // Capacidad de horarios para las fechas propuestas o capturadas; no bloquea el cierre.
+            'playoff_min_start_date' => $this->playoffSchedule->minStartDate($tournament),
             'schedule_warnings' => $analysis['blockers'] === [] ? $this->playoffSchedule->proposalWarnings($tournament, $playoffs) : [],
             'playoffs' => $playoffs,
         ];
+    }
+
+    public function proposalPlayoffs(Tournament $tournament): array
+    {
+        try {
+            return $this->preview($tournament)['playoffs'];
+        } catch (CustomErrorException) {
+            return [];
+        }
     }
 
     public function saveBestManualOrder(Tournament $tournament, PlayoffSource $source, array $teamIds): void

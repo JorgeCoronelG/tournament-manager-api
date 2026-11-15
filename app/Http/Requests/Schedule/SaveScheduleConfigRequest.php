@@ -33,6 +33,10 @@ class SaveScheduleConfigRequest extends FormRequest
             'blocks.*.start_time' => ['nullable', 'date_format:H:i'],
             'blocks.*.end_time' => ['nullable', 'date_format:H:i'],
             'blocks.*.reason' => ['nullable', 'string', 'max:150'],
+            'playoff_dates' => ['nullable', 'array'],
+            'playoff_dates.*.group_id' => ['required', 'integer', 'min:1'],
+            'playoff_dates.*.round_dates' => ['required', 'array'],
+            'playoff_dates.*.round_dates.*' => ['required', 'date_format:Y-m-d'],
         ];
     }
 
@@ -54,6 +58,10 @@ class SaveScheduleConfigRequest extends FormRequest
             'blocks.*.start_time' => 'hora de inicio del bloqueo',
             'blocks.*.end_time' => 'hora de fin del bloqueo',
             'blocks.*.reason' => 'motivo',
+            'playoff_dates' => 'fechas de la liguilla',
+            'playoff_dates.*.group_id' => 'liguilla',
+            'playoff_dates.*.round_dates' => 'fechas de los partidos',
+            'playoff_dates.*.round_dates.*' => 'fecha del partido',
         ];
     }
 
@@ -89,5 +97,28 @@ class SaveScheduleConfigRequest extends FormRequest
             'windows' => $windows,
             'blocks' => $blocks,
         ];
+    }
+
+    /**
+     * Fechas elegidas para las rondas de la liguilla; null si no se enviaron.
+     *
+     * @return list<array{group_id: int, round_dates: list<string>}>|null
+     */
+    public function playoffDates(): ?array
+    {
+        if (! $this->has('playoff_dates') || $this->input('playoff_dates') === null) {
+            return null;
+        }
+
+        $dates = [];
+
+        foreach (array_keys((array) $this->input('playoff_dates')) as $i) {
+            $dates[] = [
+                'group_id' => $this->integer("playoff_dates.{$i}.group_id"),
+                'round_dates' => array_values(array_map('strval', array_filter((array) $this->input("playoff_dates.{$i}.round_dates"), 'is_string'))),
+            ];
+        }
+
+        return $dates;
     }
 }

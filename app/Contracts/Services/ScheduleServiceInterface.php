@@ -65,11 +65,12 @@ interface ScheduleServiceInterface
     /**
      * Espacios configurados de una fecha (con ventanas, bloqueos y duración del torneo), ordenados por hora y cancha.
      *
+     * @param  array{windows: list<array{weekday: int, field_id: int, start_time: string, end_time: string}>, blocks: list<array{date: string, field_id: int|null, start_time: string|null, end_time: string|null}>}|null  $config  Ventanas y bloqueos sin guardar que sustituyen a los guardados (sin fecha de inicio del calendario)
      * @return list<array{date: string, field_id: int, start: int, end: int}>
      *
      * @throws CustomErrorException
      */
-    public function slotsOfDate(Tournament $tournament, string $date): array;
+    public function slotsOfDate(Tournament $tournament, string $date, ?array $config = null): array;
 
     /**
      * Primera fecha con espacios en las próximas semanas, o null.

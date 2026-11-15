@@ -336,7 +336,91 @@ class PlayoffScheduleTest extends TestCase
         $response = $this->getJson($this->api('close-regular-phase/preview'), $this->header)->assertOk()->assertJsonPath('blockers', []);
 
         $messages = array_column((array) $response->json('schedule_warnings'), 'message');
+        $response->assertJsonPath('playoff_min_start_date', null);
         $this->assertCount(2, $messages);
         $this->assertStringStartsWith('No hay ventanas configuradas para el', $messages[0]);
+    }
+
+    public function test_min_start_date_is_the_day_after_the_last_regular_match(): void
+    {
+        $this->closedTournament();
+        $this->getJson($this->api('schedule-config/capacity'), $this->header)->assertOk()->assertJsonPath('playoff_min_start_date', null);
+
+        GameMatch::query()->whereNull('tie_id')->orderBy('id')->firstOrFail()->forceFill(['match_datetime' => '2027-01-31 10:00:00'])->save();
+
+        $this->getJson($this->api('schedule-config/capacity'), $this->header)->assertOk()->assertJsonPath('playoff_min_start_date', '2027-02-01');
+    }
+
+    public function test_capacity_preview_uses_unsaved_windows_and_playoff_dates(): void
+    {
+        $this->closedTournament();
+        $this->configure([['weekday' => 7, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '10:00']]);
+
+        $body = [
+            'schedule_start_date' => null,
+            'windows' => [
+                ['weekday' => 3, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '10:00'],
+                ['weekday' => 4, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '09:00'],
+            ],
+            'blocks' => [],
+            'playoff_dates' => [
+                ['group_id' => $this->principalId, 'round_dates' => ['2027-02-03', '2027-02-06']],
+                ['group_id' => $this->consolationId, 'round_dates' => ['2027-02-03', '2027-02-06']],
+            ],
+        ];
+
+        $response = $this->postJson($this->api('schedule-config/capacity'), $body, $this->header)->assertOk();
+        $rounds = (array) $response->json('playoff_rounds');
+
+        $this->assertSame(['Semifinal', 'Semifinal', 'Final', 'Final'], array_column($rounds, 'round_name'));
+        $this->assertSame(2, $rounds[0]['slots_available']);
+        $this->assertSame(0, $rounds[0]['deficit']);
+        $this->assertSame(0, $rounds[1]['slots_available']);
+        $this->assertSame(['Faltan 2 espacios el 03/02 para Semifinal.', 'No hay ventanas configuradas para el sábado 06/02.', 'No hay ventanas configuradas para el sábado 06/02.'], array_column((array) $response->json('playoff_warnings'), 'message'));
+
+        GameMatch::query()->whereNull('tie_id')->orderBy('id')->firstOrFail()->forceFill(['match_datetime' => '2027-01-31 10:00:00'])->save();
+        $response = $this->postJson($this->api('schedule-config/capacity'), $body, $this->header)->assertOk()->assertJsonPath('playoff_min_start_date', '2027-02-01');
+
+        unset($body['playoff_dates']);
+        $this->postJson($this->api('schedule-config/capacity'), $body, $this->header)->assertOk()->assertJsonPath('playoff_min_start_date', '2027-02-01');
+    }
+
+    public function test_capacity_preview_keeps_the_dates_of_each_liguilla(): void
+    {
+        $this->closedTournament();
+        $windows = [
+            ['weekday' => 3, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '12:00'],
+            ['weekday' => 4, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '12:00'],
+        ];
+
+        $rounds = (array) $this->postJson($this->api('schedule-config/capacity'), [
+            'schedule_start_date' => null, 'windows' => $windows, 'blocks' => [],
+            'playoff_dates' => [
+                ['group_id' => $this->principalId, 'round_dates' => ['2027-02-03', '2027-02-10']],
+                ['group_id' => $this->consolationId, 'round_dates' => ['2027-02-04', '2027-02-11']],
+            ],
+        ], $this->header)->assertOk()->assertJsonPath('playoff_min_start_date', null)->json('playoff_rounds');
+
+        $this->assertSame(
+            [['Principal', 'Semifinal', '2027-02-03'], ['Consolación', 'Semifinal', '2027-02-04'], ['Principal', 'Final', '2027-02-10'], ['Consolación', 'Final', '2027-02-11']],
+            array_map(fn (array $r) => [$r['liguilla'], $r['round_name'], $r['date']], $rounds)
+        );
+    }
+
+    public function test_capacity_preview_without_dates_uses_existing_playoff_matches_and_unsaved_windows(): void
+    {
+        $this->closedTournament();
+        $this->configure([['weekday' => 7, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '10:00']]);
+        $body = ['schedule_start_date' => null, 'windows' => [['weekday' => 6, 'field_id' => $this->fieldA->id, 'start_time' => '08:00', 'end_time' => '12:00']], 'blocks' => []];
+
+        $response = $this->postJson($this->api('schedule-config/capacity'), $body, $this->header)->assertOk();
+
+        $this->assertSame(['Semifinal', 'Semifinal', 'Final', 'Final'], array_column((array) $response->json('playoff_rounds'), 'round_name'));
+        $this->assertSame(4, $response->json('playoff_rounds.0.slots_available'));
+        $this->assertSame([], $response->json('playoff_warnings'));
+
+        $body['windows'][0]['weekday'] = 3;
+        $warnings = $this->postJson($this->api('schedule-config/capacity'), $body, $this->header)->assertOk()->json('playoff_warnings');
+        $this->assertContains('No hay ventanas configuradas para el sábado 07/11.', array_column((array) $warnings, 'message'));
     }
 }

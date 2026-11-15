@@ -77,7 +77,7 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
         return ['cleared' => $cleared];
     }
 
-    public function capacity(Tournament $tournament): array
+    public function capacity(Tournament $tournament, ?array $config = null): array
     {
         $matches = $this->matchRepository->playoffMatches($tournament->id);
 
@@ -101,7 +101,77 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
             $rows[$key]['matches']++;
         }
 
-        return $this->capacityOfRows($tournament, array_values($rows), array_values($matches->map(fn (GameMatch $match) => $match->id)->all()));
+        return $this->capacityOfRows($tournament, array_values($rows), array_values($matches->map(fn (GameMatch $match) => $match->id)->all()), $config);
+    }
+
+    public function minStartDate(Tournament $tournament): ?string
+    {
+        $last = $this->matchRepository->lastRegularDate($tournament->id);
+
+        return $last === null ? null : CarbonImmutable::parse($last)->addDay()->toDateString();
+    }
+
+    public function capacityWithDates(Tournament $tournament, array $config, array $dates, array $playoffs): array
+    {
+        $matches = $this->matchRepository->playoffMatches($tournament->id);
+        $groups = $this->groupRepository->playoffGroups($tournament->id)->keyBy('id');
+        $structure = [];
+
+        if ($matches->isNotEmpty()) {
+            foreach ($matches as $match) {
+                $group = $groups->get($match->group_id);
+
+                if ($group !== null) {
+                    $key = $group->id.'|'.$match->round_index.'|'.$match->leg;
+                    $structure[$key] ??= $this->row($group, (int) $match->round_index, $match->leg, '', 0);
+                    $structure[$key]['matches']++;
+                }
+            }
+        } else {
+            foreach ($playoffs as $playoff) {
+                $groupId = $playoff['group_id'] ?? 0;
+                $group = is_int($groupId) ? $groups->get($groupId) : null;
+
+                if ($group === null || ! is_array($playoff['rounds'] ?? null)) {
+                    continue;
+                }
+
+                /** @var array<int, array<string, mixed>> $playoffRounds */
+                $playoffRounds = $playoff['rounds'];
+
+                foreach ($playoffRounds as $index => $round) {
+                    $legs = ($round['legs'] ?? 1) === 2 ? 2 : 1;
+                    $ties = is_array($round['ties'] ?? null) ? count($round['ties']) : 0;
+
+                    foreach (range(1, $legs) as $leg) {
+                        $structure[] = $this->row($group, $index + 1, $legs === 2 ? $leg : null, '', $ties);
+                    }
+                }
+            }
+        }
+
+        // Igual que el cierre de fase: round_dates va en orden de rondas, una fecha por partido de ida y de vuelta.
+        $byGroup = [];
+
+        foreach ($dates as $item) {
+            $byGroup[$item['group_id']] = $item['round_dates'];
+        }
+
+        $rows = [];
+
+        foreach ($structure as $row) {
+            $legs = $row['group']->legsPerRound();
+            $offset = array_sum(array_slice($legs, 0, $row['round_index'] - 1));
+            $date = $byGroup[$row['group']->id][$offset + ($row['leg'] ?? 1) - 1] ?? null;
+
+            if (is_string($date)) {
+                $row['date'] = $date;
+                $row['sort'][0] = $date;
+                $rows[] = $row;
+            }
+        }
+
+        return $this->capacityOfRows($tournament, $rows, array_values($matches->map(fn (GameMatch $match) => $match->id)->all()), $config);
     }
 
     public function proposalWarnings(Tournament $tournament, array $playoffs): array
@@ -403,11 +473,12 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
      * partidos de la liga que no se reasignan.
      *
      * @param  list<int>  $excludeIds
+     * @param  array{windows: list<array{weekday: int, field_id: int, start_time: string, end_time: string}>, blocks: list<array{date: string, field_id: int|null, start_time: string|null, end_time: string|null}>}|null  $config
      * @return list<Slot>
      */
-    private function freeSlots(Tournament $tournament, string $date, array $excludeIds): array
+    private function freeSlots(Tournament $tournament, string $date, array $excludeIds, ?array $config = null): array
     {
-        $slots = $this->scheduleService->slotsOfDate($tournament, $date);
+        $slots = $this->scheduleService->slotsOfDate($tournament, $date, $config);
 
         if ($slots === []) {
             return [];
@@ -559,16 +630,23 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
      *
      * @param  list<array{group: TournamentGroup, round_index: int, liguilla: string|null, round_name: string, leg: int|null, date: string, matches: int, sort: array<int, int|string>}>  $rows
      * @param  list<int>  $excludeIds  Partidos de liguilla del torneo: son la demanda, no ocupan espacios.
+     * @param  array{windows: list<array{weekday: int, field_id: int, start_time: string, end_time: string}>, blocks: list<array{date: string, field_id: int|null, start_time: string|null, end_time: string|null}>}|null  $config  Ventanas y bloqueos sin guardar; null usa los guardados.
      * @return array{playoff_rounds: list<array<string, mixed>>, playoff_warnings: list<array<string, mixed>>}
      */
-    private function capacityOfRows(Tournament $tournament, array $rows, array $excludeIds): array
+    private function capacityOfRows(Tournament $tournament, array $rows, array $excludeIds, ?array $config = null): array
     {
         usort($rows, fn (array $a, array $b) => $a['sort'] <=> $b['sort']);
 
         $windowDays = [];
 
-        foreach ($this->scheduleRepository->windows($tournament->id) as $window) {
-            $windowDays[(int) $window->weekday] = true;
+        if ($config !== null) {
+            foreach ($config['windows'] as $window) {
+                $windowDays[$window['weekday']] = true;
+            }
+        } else {
+            foreach ($this->scheduleRepository->windows($tournament->id) as $window) {
+                $windowDays[(int) $window->weekday] = true;
+            }
         }
 
         $remaining = [];
@@ -577,7 +655,7 @@ class PlayoffScheduleService implements PlayoffScheduleServiceInterface
 
         foreach ($rows as $row) {
             $date = $row['date'];
-            $remaining[$date] ??= count($this->freeSlots($tournament, $date, $excludeIds));
+            $remaining[$date] ??= count($this->freeSlots($tournament, $date, $excludeIds, $config));
             $available = $remaining[$date];
             $required = $row['matches'];
             $deficit = max(0, $required - $available);

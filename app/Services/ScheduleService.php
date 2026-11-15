@@ -89,8 +89,17 @@ class ScheduleService implements ScheduleServiceInterface
         return $planned + ['names' => $names];
     }
 
-    public function slotsOfDate(Tournament $tournament, string $date): array
+    public function slotsOfDate(Tournament $tournament, string $date, ?array $config = null): array
     {
+        if ($config !== null) {
+            ['windows' => $windows, 'blocks' => $blocks] = $this->normalizeConfig($config);
+            $day = CarbonImmutable::parse($date);
+            $monday = $day->startOfWeek(CarbonImmutable::MONDAY);
+            $slots = ScheduleCapacity::weekSlots($monday, $monday, $windows, $blocks, $this->duration($tournament));
+
+            return array_values(array_filter($slots, fn (array $slot) => $slot['date'] === $day->toDateString()));
+        }
+
         $startDate = $this->startDate($tournament);
 
         if ($startDate === null) {
@@ -174,7 +183,11 @@ class ScheduleService implements ScheduleServiceInterface
         ])->all());
     }
 
-    public function previewCapacity(Tournament $tournament, array $data): array
+    /**
+     * @param  array{windows: list<array{weekday: int, field_id: int, start_time: string, end_time: string}>, blocks: list<array{date: string, field_id: int|null, start_time: string|null, end_time: string|null}>}  $data
+     * @return array{windows: list<array{weekday: int, field_id: int, start: int, end: int}>, blocks: list<array{date: string, field_id: int|null, start: int|null, end: int|null}>}
+     */
+    private function normalizeConfig(array $data): array
     {
         $windows = array_map(fn (array $window) => [
             'weekday' => $window['weekday'],
@@ -188,6 +201,13 @@ class ScheduleService implements ScheduleServiceInterface
             'start' => $block['start_time'] === null ? null : ScheduleCapacity::minutes($block['start_time']),
             'end' => $block['end_time'] === null ? null : ScheduleCapacity::minutes($block['end_time']),
         ], $data['blocks']);
+
+        return ['windows' => $windows, 'blocks' => $blocks];
+    }
+
+    public function previewCapacity(Tournament $tournament, array $data): array
+    {
+        ['windows' => $windows, 'blocks' => $blocks] = $this->normalizeConfig($data);
         $startDate = $data['schedule_start_date'] === null ? null : CarbonImmutable::parse($data['schedule_start_date']);
 
         return $this->computeCapacity($tournament, $startDate, $windows, $blocks)
