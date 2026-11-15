@@ -4,9 +4,12 @@ namespace Database\Seeders;
 
 use App\Contracts\Repositories\ScheduleRepositoryInterface;
 use App\Contracts\Services\MatchServiceInterface;
+use App\Contracts\Services\PlayoffScheduleServiceInterface;
 use App\Contracts\Services\PlayoffServiceInterface;
 use App\Contracts\Services\RegistrationChangeServiceInterface;
+use App\Contracts\Services\ScheduleGeneratorServiceInterface;
 use App\Core\Enum\FieldStatus;
+use App\Core\Enum\LeagueRefereeStatus;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\RegistrationStatus;
@@ -31,9 +34,12 @@ use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use App\Models\User;
 use App\Services\PlayerEligibility;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class DevelopmentSeeder extends Seeder
 {
@@ -44,6 +50,8 @@ class DevelopmentSeeder extends Seeder
     private const FIELDS_PER_LEAGUE = 3;
 
     private const MANAGERS = 15;
+
+    private const DEMO_LEAGUE_PREFIX = 'Liga Demo ';
 
     private const PLAYERS = 100;
 
@@ -56,6 +64,31 @@ class DevelopmentSeeder extends Seeder
 
     /** Inscritos por torneo: los primeros de TEAM_NAMES; el resto queda libre para probar la inscripción. */
     private const TEAMS_PER_TOURNAMENT = 10;
+
+    /**
+     * Ventanas semanales (día ISO, inicio, fin) que se aplican a todas las canchas de la liga demo. Cada torneo de una
+     * misma liga usa un patrón distinto (días distintos), así no chocan entre sí.
+     *
+     * @var list<list<array{0: int, 1: string, 2: string}>>
+     */
+    private const WINDOW_PATTERNS = [
+        [[6, '08:00', '14:00'], [7, '08:00', '12:00']],
+        [[5, '17:00', '22:00'], [3, '17:00', '22:00']],
+        [[2, '17:00', '22:00'], [4, '17:00', '22:00']],
+    ];
+
+    /**
+     * Ligas demo: canchas, equipos propios y escenarios de torneo (el índice es el patrón de ventanas).
+     *
+     * @var array<int, array{fields: int, teams: int, tournaments: list<string>}>
+     */
+    private const DEMO_LEAGUES = [
+        1 => ['fields' => 3, 'teams' => 8, 'tournaments' => ['regular', 'playoffs', 'groups']],
+        2 => ['fields' => 2, 'teams' => 16, 'tournaments' => ['four_groups', 'to_close', 'tied']],
+        3 => ['fields' => 4, 'teams' => 8, 'tournaments' => ['finished', 'two_playoffs', 'withdrawal']],
+        4 => ['fields' => 3, 'teams' => 25, 'tournaments' => ['t25_planning', 't25_to_close']],
+        5 => ['fields' => 2, 'teams' => 25, 'tournaments' => ['t25_tied', 'minimums']],
+    ];
 
     /** Equipos por liga. */
     private const TEAM_NAMES = [
@@ -79,24 +112,15 @@ class DevelopmentSeeder extends Seeder
 
         $this->seedUsersWithRole(RoleEnum::MANAGER, self::MANAGERS, 'DT');
         $this->seedTeams($leagues);
-        $this->seedGroupsTournament($leagues);
-        $this->seedPlayoffStageTournaments($leagues);
-        $this->seedFourGroupsTournament($leagues);
         $this->seedOddTournament($leagues);
-        $this->seedMinimumsTournament($leagues);
-        $this->seedToCloseTournament($leagues);
-        $this->seedTiedTournament($leagues);
-        $this->seed25TeamsTournaments($leagues);
         $this->seedUsersWithRole(RoleEnum::PLAYER, self::PLAYERS, 'JUG');
         $this->seedPlayers();
         $this->seedRosters($leagues);
         $this->seedPlayerScenarios($leagues);
         $this->seedTeamRosters($leagues);
         $this->seedSchedulingScenarios($leagues);
-        $this->seedFinishedTournament($leagues);
-        $this->seedTwoPlayoffsTournament($leagues);
         $this->seedRoleTestUsers($leagues);
-        $this->seedWithdrawalTournament($leagues);
+        $this->seedDemoLeagues();
     }
 
     /**
@@ -124,8 +148,11 @@ class DevelopmentSeeder extends Seeder
      */
     private function seedLeagues(): array
     {
-        if (League::query()->exists()) {
-            return League::query()->orderBy('id')->get()->all();
+        // Las ligas demo (ver seedDemoLeagues) son aparte: no cuentan como ligas base.
+        $base = League::query()->where('name', 'not like', self::DEMO_LEAGUE_PREFIX.'%')->with('admin')->orderBy('id');
+
+        if ($base->exists()) {
+            return $base->get()->all();
         }
 
         $admins = User::factory(2)
@@ -252,89 +279,6 @@ class DevelopmentSeeder extends Seeder
     }
 
     /**
-     * Torneo en planeación de la primera liga con 8 equipos en su grupo «Fase regular», para probar el reparto en
-     * dos grupos, el reparto aleatorio y una liguilla. No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedGroupsTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo de Grupos')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo de Grupos',
-            'start_date' => now()->addMonths(2)->toDateString(),
-        ]);
-
-        foreach ($league->teams()->orderBy('id')->take(8)->get() as $team) {
-            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
-        }
-    }
-
-    /**
-     * Dos torneos de la primera liga con 4 equipos en su grupo «Fase regular»: «Torneo en Fase Regular» (en curso, sin
-     * calendario) con una liguilla a un partido por ronda y sin fechas, y «Torneo en Liguilla», con la fase regular jugada
-     * y cerrada: liguilla [2, 1] con fechas, semifinal 1 definida por penales (ida con victoria clara, vuelta con global
-     * empatado), semifinal 2 con la ida jugada y la vuelta pendiente, y la final con un equipo ya avanzado.
-     * No hace nada si ya existen.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedPlayoffStageTournaments(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null) {
-            return;
-        }
-
-        foreach (['Torneo en Fase Regular', 'Torneo en Liguilla'] as $name) {
-            if ($league->tournaments()->where('name', $name)->exists()) {
-                continue;
-            }
-
-            $closed = $name === 'Torneo en Liguilla';
-            $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-                'league_id' => $league->id,
-                'name' => $name,
-                'start_date' => now()->subMonth()->toDateString(),
-            ]);
-            $regular = $tournament->groups()->firstOrFail();
-
-            foreach ($league->teams()->orderBy('id')->take(4)->get() as $team) {
-                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $regular->id]);
-            }
-
-            if ($closed) {
-                $this->seedPlayedCalendar($tournament);
-            } else {
-                // Calendario de emparejamientos sin partidos jugados ni horarios, para probar capacidad y horarios.
-                app(MatchServiceInterface::class)->generate($tournament, false);
-            }
-
-            $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$regular, 1, 4]], $closed ? [2, 1] : null);
-
-            if ($closed) {
-                // Semifinales el lunes y el jueves del próximo lunes y final el miércoles de la semana siguiente.
-                $monday = now()->next(CarbonInterface::MONDAY)->startOfDay()->toImmutable();
-                app(PlayoffServiceInterface::class)->close($tournament, [[
-                    'group_id' => $playoff->id,
-                    'round_dates' => [$monday->toDateString(), $monday->addDays(3)->toDateString(), $monday->addDays(9)->toDateString()],
-                ]]);
-                $this->seedSemifinalResults($tournament->refresh(), $playoff);
-
-                // Horarios que cubren las semifinales (lunes y jueves) pero no la final (miércoles): déficit de la final.
-                $this->seedScheduleWindows($tournament, $league, $monday->subDays(6)->toDateString(), [[1, 0, '18:00', '21:00'], [1, 1, '18:00', '21:00'], [4, 0, '18:00', '21:00'], [4, 1, '18:00', '21:00']]);
-            }
-        }
-    }
-
-    /**
      * @param  list<array{0: TournamentGroup, 1: int, 2: int}>  $sources  grupo de origen, posición inicial y final
      * @param  list<int>|null  $roundLegs
      */
@@ -373,74 +317,6 @@ class DevelopmentSeeder extends Seeder
         $matches->recordResult($tournament, $leg2, 0, 3, 4, 5);
 
         $matches->recordResult($tournament, $tie(2)->matches->firstOrFail(), 1, 1);
-    }
-
-    /**
-     * «Torneo 4 Grupos» en liguilla de la primera liga: Grupo A a D con 4 equipos cada uno (16 en total, sin vetados y
-     * con delegado; crea los que falten), fase regular jugada y cerrada, «Liguilla Principal» (posiciones 1 y 2 de cada
-     * grupo) y «Liguilla Consolación» (posiciones 3 y 4) con partidos y fechas pero sin horarios, y finales el mismo día.
-     * No lleva el grupo automático «Fase regular». No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedFourGroupsTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo 4 Grupos')->exists()) {
-            return;
-        }
-
-        $teams = $league->teams()->where('status', TeamStatus::ACTIVE)->whereNotNull('manager_user_id')->orderBy('id')->take(16)->get();
-        $managerIds = $league->teams()->whereNotNull('manager_user_id')->pluck('manager_user_id')->unique()->values();
-
-        for ($i = $teams->count() + 1; $i <= 16; $i++) {
-            $teams->push(Team::factory()->create([
-                'league_id' => $league->id,
-                'name' => "Equipo Extra {$i}",
-                'manager_user_id' => $managerIds->isEmpty() ? null : $managerIds[$i % $managerIds->count()],
-            ]));
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo 4 Grupos',
-            'gender' => TournamentGender::MIXED,
-            'min_age' => null,
-            'max_age' => null,
-            'start_date' => now()->addMonths(3)->toDateString(),
-        ]);
-
-        // El grupo automático sobra: este torneo trae los suyos.
-        $tournament->groups()->where('name', TournamentGroup::DEFAULT_NAME)->delete();
-
-        $groups = [];
-
-        foreach (['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D'] as $index => $name) {
-            $group = new TournamentGroup;
-            $group->forceFill(['tournament_id' => $tournament->id, 'name' => $name, 'type' => TournamentGroupType::REGULAR_STAGE])->save();
-            $groups[] = $group;
-
-            foreach ($teams->slice($index * 4, 4) as $team) {
-                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
-            }
-        }
-
-        $this->seedPlayedCalendar($tournament);
-        $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', array_map(fn (TournamentGroup $group) => [$group, 1, 2], $groups), [1, 2, 1]);
-        $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', array_map(fn (TournamentGroup $group) => [$group, 3, 4], $groups), [1, 2, 1]);
-
-        // Las dos liguillas comparten fechas, así que sus finales caen el mismo sábado: cuartos el sábado, semifinales el
-        // domingo de esa semana y el siguiente, y finales el sábado de dos semanas después.
-        $saturday = now()->next(CarbonInterface::SATURDAY)->startOfDay()->toImmutable();
-        $dates = [$saturday->toDateString(), $saturday->addDay()->toDateString(), $saturday->addDays(8)->toDateString(), $saturday->addDays(14)->toDateString()];
-        app(PlayoffServiceInterface::class)->close($tournament, [
-            ['group_id' => $principal->id, 'round_dates' => $dates],
-            ['group_id' => $consolation->id, 'round_dates' => $dates],
-        ]);
-
-        // Horarios que alcanzan para sábado (8 cuartos y 2 finales) pero no para las semifinales del domingo (4 partidos en 2 espacios).
-        $this->seedScheduleWindows($tournament, $league, $saturday->subDays(5)->toDateString(), [[6, 0, '08:00', '12:00'], [6, 1, '08:00', '12:00'], [7, 0, '08:00', '10:00']]);
     }
 
     /**
@@ -593,45 +469,6 @@ class DevelopmentSeeder extends Seeder
     }
 
     /**
-     * «Torneo Finalizado» de la primera liga: 4 equipos con la fase regular jugada, liguilla de semifinales a ida y
-     * vuelta y final con todos los partidos jugados, y el torneo en estado finalizado (los endpoints de horarios
-     * responden 422). No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedFinishedTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo Finalizado')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo Finalizado',
-            'start_date' => now()->subMonths(4)->toDateString(),
-        ]);
-        $regular = $tournament->groups()->firstOrFail();
-
-        foreach ($league->teams()->orderBy('id')->take(4)->get() as $team) {
-            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $regular->id]);
-        }
-
-        $this->seedPlayedCalendar($tournament);
-        $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$regular, 1, 4]], [2, 1]);
-        $start = now()->subMonths(2)->startOfDay();
-
-        app(PlayoffServiceInterface::class)->close($tournament, [[
-            'group_id' => $playoff->id,
-            'round_dates' => [$start->toDateString(), $start->addDays(3)->toDateString(), $start->addDays(9)->toDateString()],
-        ]]);
-
-        $this->playAllPlayoffMatches($tournament->refresh());
-        $tournament->forceFill(['status' => TournamentStatus::FINISHED])->save();
-    }
-
-    /**
      * Juega todos los partidos de liguilla, ronda por ronda: gana el equipo de inscripción más antigua (en la vuelta
      * también, así que el global lo decide ese equipo sin penales).
      */
@@ -656,108 +493,6 @@ class DevelopmentSeeder extends Seeder
             foreach ($pending as $match) {
                 $homeWins = $strength[$match->home_registration_id] < $strength[$match->away_registration_id];
                 $matches->recordResult($tournament, $match, $homeWins ? 2 : 0, $homeWins ? 0 : 2);
-            }
-        }
-    }
-
-    /**
-     * «Torneo 2 Liguillas» en liguilla de la primera liga: 8 equipos con la fase regular jugada, «Liguilla Principal»
-     * (posiciones 1 a 4) y «Liguilla Consolación» (5 a 8), semifinales y final con las mismas fechas, y ventanas
-     * suficientes los sábados para alinear las dos finales. No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedTwoPlayoffsTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo 2 Liguillas')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo 2 Liguillas',
-            'gender' => TournamentGender::MIXED,
-            'min_age' => null,
-            'max_age' => null,
-            'rounds' => 1,
-            'start_date' => now()->subMonths(2)->toDateString(),
-        ]);
-        $group = $tournament->groups()->firstOrFail();
-
-        foreach ($league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(8)->get() as $team) {
-            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
-        }
-
-        $this->seedPlayedCalendar($tournament);
-        $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', [[$group, 1, 4]], [1, 1]);
-        $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', [[$group, 5, 8]], [1, 1]);
-
-        // Semifinales el sábado y finales el sábado siguiente, en ambas liguillas.
-        $saturday = now()->next(CarbonInterface::SATURDAY)->startOfDay()->toImmutable();
-        $dates = [$saturday->toDateString(), $saturday->addDays(7)->toDateString()];
-        app(PlayoffServiceInterface::class)->close($tournament, [
-            ['group_id' => $principal->id, 'round_dates' => $dates],
-            ['group_id' => $consolation->id, 'round_dates' => $dates],
-        ]);
-
-        $this->seedScheduleWindows($tournament, $league, $saturday->subDays(5)->toDateString(), [[6, 0, '08:00', '12:00'], [6, 1, '08:00', '12:00']]);
-    }
-
-    /**
-     * «Torneo con Baja» en curso de la primera liga: 4 equipos a una vuelta, la primera jornada jugada, un partido de la
-     * segunda ganado por default porque un equipo no se presentó y el cuarto equipo dado de baja: uno de sus partidos
-     * pendientes ya se resolvió por default y el otro sigue pendiente, sin poder capturarse hasta resolverlo. No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedWithdrawalTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo con Baja')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo con Baja',
-            'rounds' => 1,
-            'start_date' => now()->subMonth()->toDateString(),
-        ]);
-        $group = $tournament->groups()->firstOrFail();
-
-        $registrations = $league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(4)->get()
-            ->map(fn (Team $team) => Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]));
-        $withdrawn = $registrations->last();
-
-        $matchService = app(MatchServiceInterface::class);
-        $matchService->generate($tournament, false);
-
-        $matches = GameMatch::query()->where('tournament_id', $tournament->id)->orderBy('matchday')->orderBy('id')->get();
-
-        foreach ($matches->where('matchday', 1) as $match) {
-            $matchService->recordResult($tournament, $match, 2, 1);
-        }
-
-        $noShow = $matches->where('matchday', 2)->first(fn (GameMatch $match) => $withdrawn instanceof Registration
-            && $match->home_registration_id !== $withdrawn->id && $match->away_registration_id !== $withdrawn->id);
-
-        if ($noShow instanceof GameMatch) {
-            $matchService->registerWalkover($tournament, $noShow, (int) $noShow->home_registration_id, 'No se presentó a la hora del partido.', $league->admin_user_id);
-        }
-
-        if ($withdrawn instanceof Registration) {
-            app(RegistrationChangeServiceInterface::class)->withdraw($tournament->refresh(), $withdrawn, 'El equipo abandonó el torneo.', (int) $league->admin_user_id);
-
-            // Un partido pendiente del equipo en baja se resuelve por default; los demás quedan pendientes (sin captura de marcador).
-            $pending = GameMatch::query()->where('tournament_id', $tournament->id)->where('status', MatchStatus::SCHEDULED)
-                ->where(fn ($query) => $query->where('home_registration_id', $withdrawn->id)->orWhere('away_registration_id', $withdrawn->id))
-                ->orderBy('matchday')->first();
-
-            if ($pending instanceof GameMatch) {
-                $matchService->registerWalkover($tournament->refresh(), $pending, $withdrawn->id, 'Equipo dado de baja.', (int) $league->admin_user_id);
             }
         }
     }
@@ -871,250 +606,6 @@ class DevelopmentSeeder extends Seeder
         }
 
         app(ScheduleRepositoryInterface::class)->replace($tournament, $startDate, $rows, []);
-    }
-
-    /**
-     * Calendario regular completo del torneo con todos los partidos jugados. Por defecto el equipo de inscripción más
-     * antigua gana 2-0 a los demás, el siguiente a los que le siguen, etc. (sin empates entre equipos). `$score` recibe
-     * el orden de inscripción (0 = más antigua) del local y del visitante y devuelve `[goles local, goles visitante]`.
-     *
-     * @param  (callable(int, int): array{0: int, 1: int})|null  $score
-     */
-    private function seedPlayedCalendar(Tournament $tournament, ?callable $score = null): void
-    {
-        $status = $tournament->status;
-        $tournament->forceFill(['status' => TournamentStatus::IN_PROGRESS])->save();
-        app(MatchServiceInterface::class)->generate($tournament, false);
-        $tournament->forceFill(['status' => $status])->save();
-
-        $strength = $tournament->registrations()->orderBy('id')->pluck('id')->flip();
-        $score ??= fn (int $home, int $away) => $home < $away ? [2, 0] : [0, 2];
-
-        foreach (GameMatch::query()->where('tournament_id', $tournament->id)->get() as $match) {
-            [$homeGoals, $awayGoals] = $score($strength[$match->home_registration_id], $strength[$match->away_registration_id]);
-
-            $match->forceFill(['status' => MatchStatus::PLAYED, 'home_score' => $homeGoals, 'away_score' => $awayGoals])->save();
-        }
-    }
-
-    /**
-     * «Torneo por Cerrar» en curso: un grupo de 8 equipos a una vuelta con todos los partidos jugados y sin empates sin
-     * resolver, y una liguilla de las posiciones 1 a 8 con round_legs [1, 2, 1] sin fechas. No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedToCloseTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo por Cerrar')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo por Cerrar',
-            'gender' => TournamentGender::MIXED,
-            'min_age' => null,
-            'max_age' => null,
-            'rounds' => 1,
-            'start_date' => now()->subMonths(2)->toDateString(),
-        ]);
-        $group = $tournament->groups()->firstOrFail();
-
-        foreach ($league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(8)->get() as $team) {
-            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
-        }
-
-        $this->seedPlayedCalendar($tournament);
-        $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 8]], [1, 2, 1]);
-
-        // Fechas propuestas: sábado, domingo, miércoles (sin ventana, para el aviso) y sábado siguiente.
-        $saturday = now()->next(CarbonInterface::SATURDAY)->startOfDay()->toImmutable();
-        $playoff->forceFill([
-            'start_date' => $saturday->toDateString(),
-            'round_dates' => [$saturday->toDateString(), $saturday->addDay()->toDateString(), $saturday->addDays(4)->toDateString(), $saturday->addDays(7)->toDateString()],
-        ])->save();
-        $this->seedScheduleWindows($tournament, $league, $saturday->subDays(5)->toDateString(), [[6, 0, '08:00', '14:00'], [6, 1, '08:00', '14:00'], [7, 0, '08:00', '12:00'], [7, 1, '08:00', '12:00'], [7, 2, '08:00', '12:00']]);
-    }
-
-    /**
-     * «Torneo con Empate» en curso: 4 equipos con la fase regular jugada, donde el 2.º y el 3.º quedan empatados en
-     * todo (puntos, diferencia, goles y resultado directo) y la liguilla clasifica a los dos primeros: cerrar la fase
-     * se bloquea por el empate. No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedTiedTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo con Empate')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo con Empate',
-            'gender' => TournamentGender::MIXED,
-            'min_age' => null,
-            'max_age' => null,
-            'rounds' => 1,
-            'start_date' => now()->subMonths(2)->toDateString(),
-        ]);
-        $group = $tournament->groups()->firstOrFail();
-
-        foreach ($league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(4)->get() as $team) {
-            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
-        }
-
-        // El primero gana 1-0 a todos; el 2.º y el 3.º ganan 1-0 al 4.º y empatan 0-0 entre sí.
-        $this->seedPlayedCalendar($tournament, function (int $home, int $away): array {
-            $stronger = min($home, $away);
-
-            if ($stronger === 0 || ($stronger !== 3 && max($home, $away) === 3)) {
-                return $home < $away ? [1, 0] : [0, 1];
-            }
-
-            return [0, 0];
-        });
-        $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 2]], null);
-    }
-
-    /**
-     * «Torneo Mínimos» en curso: un grupo de 4 equipos, una vuelta y 6 partidos mínimos para liguilla (cada equipo
-     * jugará 3), sin calendario: generarlo se rechaza por los partidos mínimos. No hace nada si ya existe.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seedMinimumsTournament(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null || $league->tournaments()->where('name', 'Torneo Mínimos')->exists()) {
-            return;
-        }
-
-        $tournament = Tournament::factory()->status(TournamentStatus::IN_PROGRESS)->create([
-            'league_id' => $league->id,
-            'name' => 'Torneo Mínimos',
-            'gender' => TournamentGender::MIXED,
-            'min_age' => null,
-            'max_age' => null,
-            'rounds' => 1,
-            'min_matches_for_playoffs' => 6,
-            'start_date' => now()->subWeek()->toDateString(),
-        ]);
-        $group = $tournament->groups()->firstOrFail();
-
-        foreach ($league->teams()->where('status', TeamStatus::ACTIVE)->orderBy('id')->take(4)->get() as $team) {
-            Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
-        }
-    }
-
-    /**
-     * Tres torneos de la primera liga con 5 grupos de 5 equipos (25) y una liguilla de las posiciones 1 a 3 de cada grupo
-     * (15) más el mejor 4.º entre los grupos (16), round_legs [1, 1, 1, 1] y sin fechas: «Torneo 25 Equipos» en planeación,
-     * «Torneo 25 por Cerrar» en curso con todo jugado y un mejor 4.º claro (el del último grupo gana su partido con más
-     * goles), y «Torneo 25 con Empate» en curso con todo jugado y los cinco 4.º empatados (el empate cruza el corte).
-     * No hace nada con los que ya existen.
-     *
-     * @param  list<League>  $leagues
-     */
-    private function seed25TeamsTournaments(array $leagues): void
-    {
-        $league = $leagues[0] ?? null;
-
-        if ($league === null) {
-            return;
-        }
-
-        $scenarios = [
-            ['Torneo 25 Equipos', TournamentStatus::PLANNING, null],
-            ['Torneo 25 por Cerrar', TournamentStatus::IN_PROGRESS, function (int $home, int $away): array {
-                $lower = min($home, $away);
-                $margin = ($lower % 5 === 3 && max($home, $away) % 5 === 4) ? intdiv($lower, 5) + 2 : 2;
-
-                return $home < $away ? [$margin, 0] : [0, $margin];
-            }],
-            ['Torneo 25 con Empate', TournamentStatus::IN_PROGRESS, fn (int $home, int $away): array => $home < $away ? [2, 0] : [0, 2]],
-        ];
-
-        foreach ($scenarios as [$name, $status, $score]) {
-            if ($league->tournaments()->where('name', $name)->exists()) {
-                continue;
-            }
-
-            $teams = $this->leagueTeams($league, 25);
-            $tournament = Tournament::factory()->status($status)->create([
-                'league_id' => $league->id,
-                'name' => $name,
-                'gender' => TournamentGender::MIXED,
-                'min_age' => null,
-                'max_age' => null,
-                'rounds' => 1,
-                'start_date' => now()->addMonths($status === TournamentStatus::PLANNING ? 3 : -2)->toDateString(),
-            ]);
-            $tournament->groups()->where('name', TournamentGroup::DEFAULT_NAME)->delete();
-
-            $groups = [];
-
-            foreach (['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D', 'Grupo E'] as $index => $groupName) {
-                $group = new TournamentGroup;
-                $group->forceFill(['tournament_id' => $tournament->id, 'name' => $groupName, 'type' => TournamentGroupType::REGULAR_STAGE])->save();
-                $groups[] = $group;
-
-                foreach ($teams->slice($index * 5, 5) as $team) {
-                    Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
-                }
-            }
-
-            $playoff = $this->seedPlayoff($tournament, 'Liguilla', array_map(fn (TournamentGroup $group) => [$group, 1, 3], $groups), [1, 1, 1, 1]);
-            $best = new PlayoffSource;
-            $best->forceFill([
-                'playoff_group_id' => $playoff->id,
-                'kind' => PlayoffSource::KIND_BEST_OF_POSITION,
-                'source_group_id' => null,
-                'position_start' => 4,
-                'position_end' => 4,
-                'best_count' => 1,
-            ])->save();
-
-            if ($score !== null) {
-                $this->seedPlayedCalendar($tournament, $score);
-            }
-        }
-    }
-
-    /**
-     * Los primeros $count equipos activos de la liga (con delegado primero); crea «Equipo Extra n» si faltan.
-     *
-     * @return Collection<int, Team>
-     */
-    private function leagueTeams(League $league, int $count): Collection
-    {
-        $teams = $league->teams()->where('status', TeamStatus::ACTIVE)->whereNotNull('manager_user_id')->orderBy('id')->take($count)->get()->values();
-        $managerIds = $league->teams()->whereNotNull('manager_user_id')->pluck('manager_user_id')->unique()->values();
-        $extra = 1;
-
-        while ($teams->count() < $count) {
-            $name = 'Equipo Extra '.($teams->count() + $extra);
-            $team = $league->teams()->where('name', $name)->first() ?? Team::factory()->create([
-                'league_id' => $league->id,
-                'name' => $name,
-                'manager_user_id' => $managerIds->isEmpty() ? null : $managerIds[$teams->count() % $managerIds->count()],
-            ]);
-
-            if ($teams->contains('id', $team->id)) {
-                $extra++;
-
-                continue;
-            }
-
-            $teams->push($team);
-        }
-
-        return $teams;
     }
 
     /**
@@ -1496,6 +987,463 @@ class DevelopmentSeeder extends Seeder
                 'requested_at' => now()->subDays(5),
                 'responded_at' => $status === RosterStatus::PENDING ? null : now()->subDays(4),
             ])->save();
+        }
+    }
+
+    /**
+     * Ligas demo («Liga Demo 1», «Liga Demo 2», …): cada una con su admin, de 2 a 4 canchas, árbitros activos (una cancha
+     * más que canchas, para cubrir partidos simultáneos) y equipos propios, y con 2 o 3 de los torneos de ejemplo
+     * completos. Nada se comparte con otras ligas, y los torneos de una misma liga usan días de la semana distintos
+     * (WINDOW_PATTERNS) para no chocar en canchas, árbitros ni equipos. Los torneos en planeación quedan sin calendario,
+     * sin horarios y sin árbitros a propósito. Una liga que ya existe se omite, así que es seguro correrlo varias veces.
+     */
+    private function seedDemoLeagues(): void
+    {
+        $managerIds = User::query()
+            ->whereHas('roles', fn ($q) => $q->where('roles.id', RoleEnum::MANAGER->value))
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        foreach (self::DEMO_LEAGUES as $number => $spec) {
+            $name = self::DEMO_LEAGUE_PREFIX.$number;
+
+            if (League::query()->where('name', $name)->exists()) {
+                continue;
+            }
+
+            DB::transaction(function () use ($number, $name, $spec, $managerIds): void {
+                $admin = User::factory()->create(['user_code' => sprintf('LIGAD%02d', $number), 'phone' => $this->phone()]);
+                $admin->roles()->sync([RoleEnum::LEAGUE_ADMIN->value]);
+                $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name]);
+
+                for ($field = 1; $field <= $spec['fields']; $field++) {
+                    Field::factory()->create(['league_id' => $league->id, 'name' => "Cancha {$field}"]);
+                }
+
+                for ($i = 1; $i <= $spec['fields'] + 1; $i++) {
+                    $referee = User::factory()->create(['user_code' => sprintf('ARBD%d%02d', $number, $i), 'phone' => $this->phone()]);
+                    $referee->roles()->sync([RoleEnum::REFEREE->value]);
+                    LeagueReferee::factory()->create(['league_id' => $league->id, 'user_id' => $referee->id]);
+                }
+
+                $teams = collect();
+
+                for ($i = 0; $i < $spec['teams']; $i++) {
+                    $teams->push(Team::factory()->create([
+                        'league_id' => $league->id,
+                        'name' => self::TEAM_NAMES[$i] ?? 'Equipo Extra '.($i + 1),
+                        'manager_user_id' => $managerIds === [] ? null : $managerIds[($number * 7 + $i) % count($managerIds)],
+                    ]));
+                }
+
+                foreach ($spec['tournaments'] as $slot => $scenario) {
+                    $this->seedDemoTournament($league, $scenario, $slot, $teams);
+                }
+            });
+        }
+    }
+
+    /**
+     * Crea un torneo de ejemplo en la liga demo. `$slot` (0 a 2) elige el patrón de ventanas semanales del torneo.
+     *
+     * @param  Collection<int, Team>  $teams
+     */
+    private function seedDemoTournament(League $league, string $scenario, int $slot, Collection $teams): void
+    {
+        $make = fn (string $name, TournamentStatus $status, array $extra = []): Tournament => Tournament::factory()->status($status)->create([
+            'league_id' => $league->id,
+            'name' => $name,
+            'gender' => TournamentGender::MIXED,
+            'min_age' => null,
+            'max_age' => null,
+            'rounds' => 1,
+            'start_date' => now()->toDateString(),
+        ] + $extra);
+        $register = function (Tournament $tournament, int $count, ?TournamentGroup $group = null) use ($teams): void {
+            foreach ($teams->take($count) as $team) {
+                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group?->id]);
+            }
+        };
+        $single = function (string $name, int $count, array $extra = []) use ($make, $register): array {
+            $tournament = $make($name, TournamentStatus::IN_PROGRESS, $extra);
+            $group = $tournament->groups()->firstOrFail();
+            $register($tournament, $count, $group);
+
+            return [$tournament, $group];
+        };
+        $played = fn (int $matchdays): int => $matchdays;
+
+        switch ($scenario) {
+            case 'groups':
+                $tournament = $make('Torneo de Grupos', TournamentStatus::PLANNING, ['rounds' => 1, 'start_date' => now()->addMonths(2)->toDateString()]);
+                $register($tournament, 8);
+
+                break;
+
+            case 'regular':
+                // Calendario completo y horarios en el futuro, sin partidos jugados.
+                [$tournament, $group] = $single('Torneo en Fase Regular', 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, fn (): int => -1);
+                $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 4]], null);
+
+                break;
+
+            case 'playoffs':
+                // Fase regular jugada y cerrada; liguilla [2, 1]: semifinal 1 definida por penales, semifinal 2 a medias.
+                [$tournament, $group] = $single('Torneo en Liguilla', 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $this->playRegularMatches($tournament);
+                $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 4]], [2, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot, [$playoff], 3, false);
+                $this->seedSemifinalResults($tournament->refresh(), $playoff);
+
+                break;
+
+            case 'four_groups':
+                $tournament = $make('Torneo 4 Grupos', TournamentStatus::IN_PROGRESS);
+                $groups = $this->seedGroups($tournament, $teams, ['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D'], 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $this->playRegularMatches($tournament);
+                $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', array_map(fn (TournamentGroup $group) => [$group, 1, 2], $groups), [1, 2, 1]);
+                $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', array_map(fn (TournamentGroup $group) => [$group, 3, 4], $groups), [1, 2, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot, [$principal, $consolation], 4, false);
+
+                break;
+
+            case 'to_close':
+                [$tournament, $group] = $single('Torneo por Cerrar', 8);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $this->playRegularMatches($tournament);
+                $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 8]], [1, 2, 1]);
+                $dates = $this->playoffDates($tournament, $slot, 4, false);
+                $playoff->forceFill(['start_date' => $dates[0], 'round_dates' => $dates])->save();
+
+                break;
+
+            case 'tied':
+                // El primero gana 1-0 a todos; el 2.º y el 3.º ganan 1-0 al 4.º y empatan 0-0 entre sí.
+                [$tournament, $group] = $single('Torneo con Empate', 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $this->playRegularMatches($tournament, function (int $home, int $away): array {
+                    $stronger = min($home, $away);
+
+                    if ($stronger === 0 || ($stronger !== 3 && max($home, $away) === 3)) {
+                        return $home < $away ? [1, 0] : [0, 1];
+                    }
+
+                    return [0, 0];
+                });
+                $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 2]], null);
+
+                break;
+
+            case 'finished':
+                [$tournament, $group] = $single('Torneo Finalizado', 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, fn (int $matchdays): int => $matchdays + 5);
+                $this->playRegularMatches($tournament);
+                $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 4]], [2, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot, [$playoff], 3, true);
+                $this->playAllPlayoffMatches($tournament->refresh());
+                $tournament->forceFill(['status' => TournamentStatus::FINISHED])->save();
+
+                break;
+
+            case 'two_playoffs':
+                [$tournament, $group] = $single('Torneo 2 Liguillas', 8);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $this->playRegularMatches($tournament);
+                $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', [[$group, 1, 4]], [1, 1]);
+                $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', [[$group, 5, 8]], [1, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot, [$principal, $consolation], 2, false);
+
+                break;
+
+            case 'withdrawal':
+                // La primera jornada (la semana pasada) jugada, un partido por default y el último equipo dado de baja.
+                [$tournament, $group] = $single('Torneo con Baja', 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, fn (): int => 1);
+                $this->seedWithdrawal($tournament, $league, $group);
+
+                break;
+
+            case 'minimums':
+                // Sin calendario (generarlo se rechaza por los partidos mínimos), pero con horarios guardados.
+                [$tournament] = $single('Torneo Mínimos', 4, ['min_matches_for_playoffs' => 6]);
+                $this->seedScheduleWindows($tournament, $league, now()->next(CarbonInterface::MONDAY)->toDateString(), $this->windowRows($slot, $league));
+
+                break;
+
+            default:
+                // t25_planning, t25_to_close, t25_tied: 5 grupos de 5 equipos y liguilla de las posiciones 1 a 3 + mejor 4.º.
+                $planning = $scenario === 't25_planning';
+                $name = ['t25_planning' => 'Torneo 25 Equipos', 't25_to_close' => 'Torneo 25 por Cerrar', 't25_tied' => 'Torneo 25 con Empate'][$scenario];
+                $tournament = $make($name, $planning ? TournamentStatus::PLANNING : TournamentStatus::IN_PROGRESS, $planning ? ['start_date' => now()->addMonths(3)->toDateString()] : []);
+                $groups = $this->seedGroups($tournament, $teams, ['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D', 'Grupo E'], 5);
+                $playoff = $this->seedPlayoff($tournament, 'Liguilla', array_map(fn (TournamentGroup $group) => [$group, 1, 3], $groups), [1, 1, 1, 1]);
+                $best = new PlayoffSource;
+                $best->forceFill([
+                    'playoff_group_id' => $playoff->id,
+                    'kind' => PlayoffSource::KIND_BEST_OF_POSITION,
+                    'source_group_id' => null,
+                    'position_start' => 4,
+                    'position_end' => 4,
+                    'best_count' => 1,
+                ])->save();
+
+                if ($planning) {
+                    break;
+                }
+
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+
+                // «Por cerrar»: un mejor 4.º claro (el del último grupo gana su partido con más goles); «con empate»: todos los 4.º empatan.
+                $this->playRegularMatches($tournament, $scenario === 't25_to_close' ? function (int $home, int $away): array {
+                    $lower = min($home, $away);
+                    $margin = ($lower % 5 === 3 && max($home, $away) % 5 === 4) ? intdiv($lower, 5) + 2 : 2;
+
+                    return $home < $away ? [$margin, 0] : [0, $margin];
+                } : null);
+        }
+
+    }
+
+    /**
+     * Quita el grupo automático y crea los grupos indicados con `$size` equipos cada uno (los primeros de `$teams`).
+     *
+     * @param  Collection<int, Team>  $teams
+     * @param  list<string>  $names
+     * @return list<TournamentGroup>
+     */
+    private function seedGroups(Tournament $tournament, Collection $teams, array $names, int $size): array
+    {
+        $tournament->groups()->where('name', TournamentGroup::DEFAULT_NAME)->delete();
+        $groups = [];
+
+        foreach ($names as $index => $name) {
+            $group = new TournamentGroup;
+            $group->forceFill(['tournament_id' => $tournament->id, 'name' => $name, 'type' => TournamentGroupType::REGULAR_STAGE])->save();
+            $groups[] = $group;
+
+            foreach ($teams->slice($index * $size, $size) as $team) {
+                Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id, 'group_id' => $group->id]);
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Filas de ventanas del patrón `$slot` en todas las canchas activas de la liga.
+     *
+     * @return list<array{0: int, 1: int, 2: string, 3: string}>
+     */
+    private function windowRows(int $slot, League $league): array
+    {
+        $count = $league->fields()->where('status', FieldStatus::ACTIVE)->count();
+        $rows = [];
+
+        foreach (self::WINDOW_PATTERNS[$slot] as [$weekday, $start, $end]) {
+            for ($field = 0; $field < $count; $field++) {
+                $rows[] = [$weekday, $field, $start, $end];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Genera el calendario de emparejamientos, guarda las ventanas del torneo, asigna fecha, hora y cancha con el
+     * generador del sistema (que respeta lo ocupado por los torneos anteriores de la liga) y reparte árbitros.
+     * `$weeksBack` recibe el número de jornadas y devuelve cuántas semanas antes del lunes de esta semana empieza el
+     * calendario (negativo = en el futuro). Falla si algún partido queda sin horario.
+     *
+     * @param  callable(int): int  $weeksBack
+     */
+    private function seedScheduledCalendar(Tournament $tournament, League $league, int $slot, callable $weeksBack): void
+    {
+        app(MatchServiceInterface::class)->generate($tournament, false);
+
+        $matchdays = (int) GameMatch::query()->where('tournament_id', $tournament->id)->max('matchday');
+        $monday = now()->startOfWeek(CarbonInterface::MONDAY)->toImmutable()->subWeeks($weeksBack($matchdays));
+
+        $this->seedScheduleWindows($tournament, $league, $monday->toDateString(), $this->windowRows($slot, $league));
+        $tournament->forceFill(['start_date' => $monday->lt(now()) ? $monday->toDateString() : now()->toDateString()])->save();
+
+        $result = app(ScheduleGeneratorServiceInterface::class)->generate(
+            $tournament->refresh(),
+            ScheduleGeneratorServiceInterface::MODE_BALANCED,
+            ScheduleGeneratorServiceInterface::SCOPE_ALL,
+            null,
+        );
+
+        if ($result['unscheduled'] !== 0) {
+            throw new RuntimeException("«{$tournament->name}» quedó con {$result['unscheduled']} partidos sin horario: amplía sus ventanas.");
+        }
+
+        $this->assignReferees($league, $tournament);
+    }
+
+    /**
+     * Marca como jugados todos los partidos del torneo (por defecto gana el de inscripción más antigua, 2-0).
+     *
+     * @param  (callable(int, int): array{0: int, 1: int})|null  $score  Orden de inscripción del local y del visitante → goles.
+     */
+    private function playRegularMatches(Tournament $tournament, ?callable $score = null): void
+    {
+        $strength = $tournament->registrations()->orderBy('id')->pluck('id')->flip();
+        $score ??= fn (int $home, int $away) => $home < $away ? [2, 0] : [0, 2];
+
+        foreach (GameMatch::query()->where('tournament_id', $tournament->id)->get() as $match) {
+            [$homeGoals, $awayGoals] = $score($strength[$match->home_registration_id], $strength[$match->away_registration_id]);
+
+            $match->forceFill(['status' => MatchStatus::PLAYED, 'home_score' => $homeGoals, 'away_score' => $awayGoals])->save();
+        }
+    }
+
+    /**
+     * Fechas semanales de las rondas de liguilla, en el día principal del patrón `$slot`, después del último partido
+     * de fase regular (y, si no es `$past`, a partir de mañana).
+     *
+     * @return list<string>
+     */
+    private function playoffDates(Tournament $tournament, int $slot, int $count, bool $past): array
+    {
+        $last = CarbonImmutable::parse((string) GameMatch::query()->where('tournament_id', $tournament->id)->max('match_datetime'))->startOfDay();
+        $from = $last->addDay();
+        $tomorrow = now()->addDay()->startOfDay()->toImmutable();
+
+        if (! $past && $from->lt($tomorrow)) {
+            $from = $tomorrow;
+        }
+
+        while ($from->dayOfWeekIso !== self::WINDOW_PATTERNS[$slot][0][0]) {
+            $from = $from->addDay();
+        }
+
+        return array_map(fn (int $week): string => $from->addWeeks($week)->toDateString(), range(0, $count - 1));
+    }
+
+    /**
+     * Cierra la fase regular con las fechas por ronda, asigna hora y cancha a la liguilla con PlayoffScheduleService y
+     * reparte árbitros.
+     *
+     * @param  list<TournamentGroup>  $playoffs
+     */
+    private function closeAndSchedulePlayoffs(Tournament $tournament, League $league, int $slot, array $playoffs, int $dates, bool $past): void
+    {
+        $roundDates = $this->playoffDates($tournament, $slot, $dates, $past);
+
+        app(PlayoffServiceInterface::class)->close($tournament, array_map(
+            fn (TournamentGroup $playoff): array => ['group_id' => $playoff->id, 'round_dates' => $roundDates],
+            $playoffs,
+        ));
+
+        $result = app(PlayoffScheduleServiceInterface::class)->generate($tournament->refresh(), 'all', false);
+
+        if ($result['unscheduled'] !== 0) {
+            throw new RuntimeException("La liguilla de «{$tournament->name}» quedó con {$result['unscheduled']} partidos sin horario: amplía sus ventanas.");
+        }
+
+        $this->assignReferees($league, $tournament);
+    }
+
+    /**
+     * Árbitro para cada partido del torneo con horario y sin árbitro: el activo de la liga con menos partidos que no
+     * tenga otro partido de la liga que se traslape (de cualquier torneo).
+     */
+    private function assignReferees(League $league, Tournament $tournament): void
+    {
+        $referees = LeagueReferee::query()
+            ->where('league_id', $league->id)
+            ->where('status', LeagueRefereeStatus::ACTIVE)
+            ->orderBy('user_id')
+            ->pluck('user_id')
+            ->all();
+        $durations = Tournament::query()->where('league_id', $league->id)->pluck('match_duration_minutes', 'id');
+        $load = array_fill_keys($referees, 0);
+        $busy = [];
+
+        $assigned = GameMatch::query()->whereIn('tournament_id', $durations->keys())->whereNotNull('referee_user_id')->whereNotNull('match_datetime')->get();
+
+        foreach ($assigned as $match) {
+            $start = $match->match_datetime->getTimestamp();
+            $busy[$match->referee_user_id][] = [$start, $start + $durations[$match->tournament_id] * 60];
+            $load[$match->referee_user_id] = ($load[$match->referee_user_id] ?? 0) + 1;
+        }
+
+        $pending = GameMatch::query()->where('tournament_id', $tournament->id)->whereNotNull('match_datetime')->whereNull('referee_user_id')
+            ->orderBy('match_datetime')->orderBy('id')->get();
+
+        foreach ($pending as $match) {
+            $start = $match->match_datetime->getTimestamp();
+            $end = $start + $durations[$match->tournament_id] * 60;
+            $candidates = $referees;
+            usort($candidates, fn (int $a, int $b): int => [$load[$a], $a] <=> [$load[$b], $b]);
+
+            $referee = null;
+
+            foreach ($candidates as $candidate) {
+                $overlaps = false;
+
+                foreach ($busy[$candidate] ?? [] as [$from, $to]) {
+                    if ($start < $to && $from < $end) {
+                        $overlaps = true;
+
+                        break;
+                    }
+                }
+
+                if (! $overlaps) {
+                    $referee = $candidate;
+
+                    break;
+                }
+            }
+
+            if ($referee === null) {
+                throw new RuntimeException("No hay árbitro libre para un partido de «{$tournament->name}» en {$league->name}.");
+            }
+
+            $match->forceFill(['referee_user_id' => $referee])->save();
+            $busy[$referee][] = [$start, $end];
+            $load[$referee]++;
+        }
+    }
+
+    /**
+     * Jornada 1 jugada, un partido de la 2 ganado por default porque un equipo no se presentó y el último equipo dado
+     * de baja: uno de sus partidos pendientes se resuelve por default y los demás siguen pendientes (con horario y árbitro).
+     */
+    private function seedWithdrawal(Tournament $tournament, League $league, TournamentGroup $group): void
+    {
+        $matchService = app(MatchServiceInterface::class);
+        $withdrawn = $tournament->registrations()->orderBy('id')->get()->last();
+        $matches = GameMatch::query()->where('tournament_id', $tournament->id)->orderBy('matchday')->orderBy('id')->get();
+
+        foreach ($matches->where('matchday', 1) as $match) {
+            $matchService->recordResult($tournament, $match, 2, 1);
+        }
+
+        $noShow = $matches->where('matchday', 2)->first(fn (GameMatch $match) => $withdrawn instanceof Registration
+            && $match->home_registration_id !== $withdrawn->id && $match->away_registration_id !== $withdrawn->id);
+
+        if ($noShow instanceof GameMatch) {
+            $matchService->registerWalkover($tournament, $noShow, (int) $noShow->home_registration_id, 'No se presentó a la hora del partido.', $league->admin_user_id);
+        }
+
+        if (! $withdrawn instanceof Registration) {
+            return;
+        }
+
+        app(RegistrationChangeServiceInterface::class)->withdraw($tournament->refresh(), $withdrawn, 'El equipo abandonó el torneo.', (int) $league->admin_user_id);
+
+        $pending = GameMatch::query()->where('tournament_id', $tournament->id)->where('status', MatchStatus::SCHEDULED)
+            ->where(fn ($query) => $query->where('home_registration_id', $withdrawn->id)->orWhere('away_registration_id', $withdrawn->id))
+            ->orderBy('matchday')->first();
+
+        if ($pending instanceof GameMatch) {
+            $matchService->registerWalkover($tournament->refresh(), $pending, $withdrawn->id, 'Equipo dado de baja.', (int) $league->admin_user_id);
         }
     }
 }
