@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 class Team extends Model
 {
@@ -74,6 +73,6 @@ class Team extends Model
      */
     public function logoUrl(): ?string
     {
-        return $this->logo_path === null ? null : Storage::disk('public')->url($this->logo_path);
+        return $this->logo_path === null ? null : url('/media/'.$this->logo_path);
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,3 +17,14 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Escudos de equipos por Laravel (no por /storage, que el servidor entrega directo) para que lleven los headers CORS.
+Route::get('/media/{path}', function (string $path) {
+    $disk = Storage::disk('public');
+
+    if (! str_starts_with($path, 'teams/logos/') || str_contains($path, '..') || ! $disk->exists($path)) {
+        abort(404);
+    }
+
+    return $disk->response($path, null, ['Cache-Control' => 'public, max-age=86400', 'Vary' => 'Origin']);
+})->where('path', '.*');

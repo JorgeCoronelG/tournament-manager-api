@@ -42,7 +42,7 @@ class TeamLogoTest extends TestCase
         $this->assertCount(1, $files);
         $this->assertMatchesRegularExpression('#^teams/logos/[0-9a-f-]{36}\.webp$#', $files[0]);
         $this->assertSame($files[0], $team->fresh()->logo_path);
-        $this->assertSame(Storage::disk('public')->url($files[0]), $response->json('logo_url'));
+        $this->assertSame(url('/media/'.$files[0]), $response->json('logo_url'));
 
         $info = getimagesizefromstring(Storage::disk('public')->get($files[0]));
         $this->assertSame(IMAGETYPE_WEBP, $info[2]);
