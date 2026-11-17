@@ -176,6 +176,51 @@ class MatchResultAndStandingsTest extends TestCase
         $assertUnplayed($this->getJson($url, $header)->json('groups.0'), $inA);
     }
 
+    public function test_ties_are_pending_only_when_the_group_finished_its_regular_stage(): void
+    {
+        [$league, $tournament, $header, $teams] = $this->runningTournament();
+        $url = $this->base($league, $tournament).'/standings';
+        $group = $tournament->groups()->firstOrFail();
+        $ids = array_map(fn ($t) => $t->id, $teams);
+
+        // Sin resultados todo el grupo está sin jugar: no está completo.
+        $this->getJson($url, $header)->assertJsonPath('groups.0.complete', false)->assertJsonPath('groups.0.ties_pending', false);
+
+        // Una jornada jugada con empate: hay `ties`, pero aún faltan partidos.
+        $this->play($tournament, $teams[0], $teams[1], 1, 1);
+        $this->getJson($url, $header)->assertJsonPath('groups.0.complete', false)->assertJsonPath('groups.0.ties_pending', false);
+
+        // Todo jugado y empatado en todos los criterios: queda pendiente de definir.
+        $this->play($tournament, $teams[0], $teams[2], 1, 1);
+        $this->play($tournament, $teams[1], $teams[2], 1, 1);
+        $this->getJson($url, $header)->assertJsonPath('groups.0.complete', true)->assertJsonPath('groups.0.ties', [$ids])->assertJsonPath('groups.0.ties_pending', true);
+
+        // Con orden manual guardado el empate ya no está pendiente.
+        $this->putJson("{$url}/manual-order", ['group_id' => $group->id, 'registration_ids' => $ids], $header)->assertOk()
+            ->assertJsonPath('groups.0.complete', true)->assertJsonPath('groups.0.ties_pending', false);
+    }
+
+    public function test_complete_counts_walkovers_and_is_calculated_per_group(): void
+    {
+        [$league, $tournament, $header] = $this->tournamentWithAdminHeader();
+        $a = $tournament->groups()->firstOrFail();
+        $b = $this->makeGroup($tournament, 'Grupo B');
+        $this->teamsIn($tournament, $a, 3);
+        $this->teamsIn($tournament, $b, 3);
+        $tournament->forceFill(['status' => TournamentStatus::IN_PROGRESS])->save();
+        $this->postJson($this->base($league, $tournament).'/matches/generate', ['shuffle' => false], $header)->assertOk();
+
+        foreach (GameMatch::query()->where('group_id', $a->id)->get() as $match) {
+            $match->forceFill(['status' => MatchStatus::PLAYED, 'home_score' => 1, 'away_score' => 0])->save();
+        }
+
+        $groups = $this->getJson($this->base($league, $tournament).'/standings', $header)->assertOk()->json('groups');
+
+        $this->assertTrue($groups[0]['complete']);
+        $this->assertFalse($groups[1]['complete']);
+        $this->assertFalse($groups[1]['ties_pending']);
+    }
+
     public function test_standings_availability_and_group_filter(): void
     {
         [$league, $tournament, $header] = $this->runningTournament();

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Services\PlayoffServiceInterface;
 use App\Contracts\Services\StandingServiceInterface;
 use App\Core\BaseApiController;
 use App\Http\Requests\Standings\ManualOrderRequest;
@@ -13,13 +14,16 @@ use Illuminate\Http\Response;
 
 class StandingController extends BaseApiController
 {
-    public function __construct(protected StandingServiceInterface $standingService) {}
+    public function __construct(
+        protected StandingServiceInterface $standingService,
+        protected PlayoffServiceInterface $playoffService,
+    ) {}
 
     public function index(Request $request, League $league, Tournament $tournament): JsonResponse
     {
         $groupId = $request->filled('group_id') ? $request->integer('group_id') : null;
 
-        return $this->successResponse(['groups' => $this->standingService->standings($tournament, $groupId)], Response::HTTP_OK);
+        return $this->successResponse($this->playoffService->withQualification($tournament, $this->standingService->standings($tournament, $groupId)), Response::HTTP_OK);
     }
 
     public function saveManualOrder(ManualOrderRequest $request, League $league, Tournament $tournament): JsonResponse
@@ -27,7 +31,7 @@ class StandingController extends BaseApiController
         $groupId = $request->integer('group_id');
         $this->standingService->saveManualOrder($tournament, $groupId, $request->registrationIds());
 
-        return $this->successResponse(['groups' => $this->standingService->standings($tournament, $groupId)], Response::HTTP_OK);
+        return $this->successResponse($this->playoffService->withQualification($tournament, $this->standingService->standings($tournament, $groupId)), Response::HTTP_OK);
     }
 
     public function clearManualOrder(Request $request, League $league, Tournament $tournament): Response

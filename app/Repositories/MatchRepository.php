@@ -170,6 +170,13 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->get();
     }
 
+    public function isRegularStageComplete(int $groupId): bool
+    {
+        $matches = fn () => $this->entity->newQuery()->where('group_id', $groupId)->where('phase', MatchPhase::REGULAR_STAGE);
+
+        return $matches()->exists() && ! $matches()->where('status', MatchStatus::SCHEDULED)->exists();
+    }
+
     public function manualOrder(int $groupId): array
     {
         return StandingManualOrder::query()->where('group_id', $groupId)->pluck('position', 'registration_id')->map(fn (mixed $position) => is_numeric($position) ? (int) $position : 0)->all();

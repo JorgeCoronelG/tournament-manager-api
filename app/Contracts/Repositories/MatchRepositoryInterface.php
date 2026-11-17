@@ -68,6 +68,12 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
     public function registrationsOfGroup(int $groupId): Collection;
 
     /**
+     * Si el grupo ya terminó su fase regular: tiene partidos y ninguno sigue pendiente (programado sin resultado, con
+     * equipos dados de baja incluidos). Es el mismo criterio con el que el cierre de fase detecta partidos pendientes.
+     */
+    public function isRegularStageComplete(int $groupId): bool;
+
+    /**
      * Orden manual guardado del grupo: registration_id => posición.
      *
      * @return array<int, int>

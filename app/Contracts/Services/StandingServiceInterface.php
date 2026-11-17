@@ -13,7 +13,12 @@ interface StandingServiceInterface
     /**
      * Tabla de cada grupo regular (o solo la del grupo indicado). Con el torneo en curso, en liguilla o terminado.
      *
-     * @return list<array{group_id: int, group_name: string, criteria: list<string>, rows: list<array<string, mixed>>, ties: list<list<int>>}>
+     * `complete`: todos los partidos de la fase regular del grupo tienen resultado (mismo criterio que el cierre de fase).
+     * `ties_pending`: `complete` y quedan empates (`ties`) sin orden manual; antes de terminar el grupo el empate aún puede resolverse solo.
+     *
+     * `has_manual_order`: el grupo tiene un orden manual guardado.
+     *
+     * @return list<array{group_id: int, group_name: string, criteria: list<string>, rows: list<array<string, mixed>>, ties: list<list<int>>, complete: bool, ties_pending: bool, has_manual_order: bool}>
      *
      * @throws CustomErrorException
      */

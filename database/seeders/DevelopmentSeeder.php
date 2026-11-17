@@ -88,6 +88,7 @@ class DevelopmentSeeder extends Seeder
         3 => ['fields' => 4, 'teams' => 8, 'tournaments' => ['finished', 'two_playoffs', 'withdrawal']],
         4 => ['fields' => 3, 'teams' => 25, 'tournaments' => ['t25_planning', 't25_to_close']],
         5 => ['fields' => 2, 'teams' => 25, 'tournaments' => ['t25_tied', 'minimums']],
+        6 => ['fields' => 3, 'teams' => 16, 'tournaments' => ['tied_ten', 'tied_groups']],
     ];
 
     /** Equipos por liga. */
@@ -1174,6 +1175,28 @@ class DevelopmentSeeder extends Seeder
 
                 break;
 
+            case 'tied_ten':
+                // Niveles por inscripción: empate entre el 1.º y el 2.º (no cruza la línea) y triple entre el 4.º, 5.º y 6.º (cruza Principal y Consolación).
+                [$tournament, $group] = $single('Torneo 10 Equipos con Empates', 10);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $this->playRegularMatches($tournament, $this->scoreByLevel(fn (int $order): int => [0, 0, 1, 2, 2, 2, 3, 4, 5, 6][$order]));
+                $this->seedPlayoff($tournament, 'Liguilla Principal', [[$group, 1, 4]], [1, 1]);
+                $this->seedPlayoff($tournament, 'Liguilla Consolación', [[$group, 5, 8]], [1, 1]);
+
+                break;
+
+            case 'tied_groups':
+                // Grupo A: empate 1.º-2.º; B: 2.º-3.º; C: triple 2.º-4.º; D: sin empates.
+                $tournament = $make('Torneo Grupos con Empates', TournamentStatus::IN_PROGRESS);
+                $groups = $this->seedGroups($tournament, $teams, ['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D'], 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot, $played);
+                $levels = [[0, 0, 1, 2], [0, 1, 1, 2], [0, 1, 1, 1], [0, 1, 2, 3]];
+                $this->playRegularMatches($tournament, $this->scoreByLevel(fn (int $order): int => $levels[intdiv($order, 4)][$order % 4]));
+                $this->seedPlayoff($tournament, 'Liguilla Principal', array_map(fn (TournamentGroup $group) => [$group, 1, 2], $groups), [1, 1, 1]);
+                $this->seedPlayoff($tournament, 'Liguilla Consolación', array_map(fn (TournamentGroup $group) => [$group, 3, 4], $groups), [1, 1, 1]);
+
+                break;
+
             default:
                 // t25_planning, t25_to_close, t25_tied: 5 grupos de 5 equipos y liguilla de las posiciones 1 a 3 + mejor 4.º.
                 $planning = $scenario === 't25_planning';
@@ -1206,6 +1229,22 @@ class DevelopmentSeeder extends Seeder
                 } : null);
         }
 
+    }
+
+    /**
+     * Marcadores para provocar empates exactos: gana 1-0 el de nivel menor y el mismo nivel empata 0-0, así que los
+     * equipos del mismo nivel quedan iguales en todo (empate sin resolver) y el resto en posiciones distintas.
+     *
+     * @param  callable(int): int  $level  Orden de inscripción (0 = más antigua) → nivel.
+     * @return callable(int, int): array{0: int, 1: int}
+     */
+    private function scoreByLevel(callable $level): callable
+    {
+        return function (int $home, int $away) use ($level): array {
+            [$homeLevel, $awayLevel] = [$level($home), $level($away)];
+
+            return $homeLevel === $awayLevel ? [0, 0] : ($homeLevel < $awayLevel ? [1, 0] : [0, 1]);
+        };
     }
 
     /**

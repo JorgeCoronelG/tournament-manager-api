@@ -76,6 +76,149 @@ class PlayoffService implements PlayoffServiceInterface
         ];
     }
 
+    public function withQualification(Tournament $tournament, array $groups): array
+    {
+        $playoffs = $this->groupRepository->listByTournament($tournament->id)
+            ->where('type', TournamentGroupType::PLAYOFF)
+            ->filter(fn (TournamentGroup $group) => $group->sources->isNotEmpty())
+            ->sortBy(fn (TournamentGroup $group) => $this->priorityOf($group))
+            ->values();
+
+        if ($playoffs->isEmpty()) {
+            return ['groups' => $this->withPlayoffColumn($groups, [], []), 'playoffs' => []];
+        }
+
+        // Misma lógica que la vista previa del cierre: orden de la tabla, bajas, mejores de una posición y desempates manuales.
+        $analysis = $this->analyse($tournament);
+        $marked = $analysis['marked'];
+        $legend = [];
+        $byRegistration = [];
+
+        foreach ($playoffs as $index => $playoff) {
+            $item = ['id' => $playoff->id, 'name' => $playoff->name, 'priority' => $index + 1];
+            $legend[] = $item + ['positions' => $this->positionsText($playoff)];
+
+            foreach ($marked[$playoff->id] ?? [] as $registrationId) {
+                $byRegistration[$registrationId] ??= $item;
+            }
+        }
+
+        return [
+            'groups' => $this->withPlayoffColumn($groups, $byRegistration, $analysis['pending']),
+            'playoffs' => $legend,
+        ];
+    }
+
+    /**
+     * Inscripciones con la clasificación indefinida: un empate sin orden manual, en un grupo que ya terminó, cuyas
+     * posiciones caen en liguillas distintas o unas dentro y otras fuera (una fuente de mejores de una posición cuenta
+     * como una zona más), y los candidatos de un corte de mejores que cae dentro de un empate.
+     *
+     * @param  Collection<int, TournamentGroup>  $playoffs
+     * @param  array<int, array<string, mixed>>  $standings  Tablas sin bajas por id de grupo.
+     * @param  list<array{registration_id: int, group_id: int}>  $undecidedBest
+     * @return list<int>
+     */
+    private function pendingQualification(Collection $playoffs, array $standings, array $undecidedBest): array
+    {
+        $pending = [];
+
+        foreach ($standings as $groupId => $table) {
+            /** @var list<list<int>> $ties */
+            $ties = $table['ties'];
+            /** @var list<array<string, mixed>> $rows */
+            $rows = $table['rows'];
+
+            if ($table['complete'] !== true || $ties === []) {
+                continue;
+            }
+
+            $zones = [];
+
+            foreach ($playoffs as $playoff) {
+                foreach ($playoff->sources as $source) {
+                    if ($source->isBestOfPosition()) {
+                        $zones[(int) $source->position_start] ??= 'best:'.$source->id;
+                    } elseif ((int) $source->source_group_id === (int) $groupId) {
+                        foreach (range((int) $source->position_start, (int) $source->position_end) as $position) {
+                            $zones[$position] = 'playoff:'.$playoff->id;
+                        }
+                    }
+                }
+            }
+
+            foreach ($ties as $tie) {
+                $start = $this->int($rows[(int) array_search($tie[0], array_column($rows, 'registration_id'), true)]['position']);
+                $covered = array_unique(array_map(fn (int $offset) => $zones[$start + $offset] ?? 'out', array_keys($tie)));
+
+                if (count($covered) > 1) {
+                    array_push($pending, ...$tie);
+                }
+            }
+        }
+
+        foreach ($undecidedBest as $candidate) {
+            if (($standings[$candidate['group_id']]['complete'] ?? false) === true) {
+                $pending[] = $candidate['registration_id'];
+            }
+        }
+
+        return array_values(array_unique($pending));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $groups
+     * @param  array<int, array{id: int, name: string, priority: int}>  $byRegistration
+     * @param  list<int>  $pending  Inscripciones con la clasificación indefinida: sin liguilla y `playoff_pending` en true.
+     * @return list<array<string, mixed>>
+     */
+    private function withPlayoffColumn(array $groups, array $byRegistration, array $pending): array
+    {
+        $result = [];
+
+        foreach ($groups as $group) {
+            /** @var list<array<string, mixed>> $rows */
+            $rows = $group['rows'];
+            $group['rows'] = array_map(function (array $row) use ($byRegistration, $pending): array {
+                $id = $this->int($row['registration_id']);
+                $undefined = in_array($id, $pending, true);
+
+                return $row + ['playoff' => $undefined ? null : ($byRegistration[$id] ?? null), 'playoff_pending' => $undefined];
+            }, $rows);
+            $result[] = $group;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Menor es más importante: por la mejor posición de origen de sus fuentes y, a igualdad, por antigüedad.
+     */
+    private function priorityOf(TournamentGroup $group): int
+    {
+        $best = $group->sources->map(fn (PlayoffSource $source) => (int) $source->position_start)->filter(fn (int $position) => $position > 0)->min() ?? 999;
+
+        return $best * 1_000_000 + $group->id;
+    }
+
+    /**
+     * Texto corto del origen: «1-2», «3» o «Mejor 4.º»; varias fuentes separadas por coma.
+     */
+    private function positionsText(TournamentGroup $playoff): string
+    {
+        $parts = [];
+
+        foreach ($playoff->sources->sortBy('id') as $source) {
+            $start = (int) $source->position_start;
+            $end = (int) $source->position_end;
+            $parts[] = $source->isBestOfPosition()
+                ? ((int) $source->best_count > 1 ? "{$source->best_count} mejores {$start}.º" : "Mejor {$start}.º")
+                : ($start === $end ? (string) $start : "{$start}-{$end}");
+        }
+
+        return implode(', ', array_values(array_unique($parts)));
+    }
+
     public function proposalPlayoffs(Tournament $tournament): array
     {
         try {
@@ -367,7 +510,7 @@ class PlayoffService implements PlayoffServiceInterface
      * Comparativa de una fuente de mejores: tabla de candidatos, clasificados y bloqueo si un empate cruza el corte.
      *
      * @param  array<int|string, array{group_name: string, rows: list<array<string, mixed>>}>  $standings
-     * @return array{table: array<string, mixed>, qualified: list<array<string, mixed>>, blockers: list<array<string, mixed>>}
+     * @return array{table: array<string, mixed>, qualified: list<array<string, mixed>>, blockers: list<array<string, mixed>>, undecided: list<array{registration_id: int, group_id: int}>}
      */
     private function bestOf(TournamentGroup $playoff, PlayoffSource $source, array $standings, int &$order): array
     {
@@ -413,10 +556,13 @@ class PlayoffService implements PlayoffServiceInterface
             'teams' => array_map(fn (int $id) => $this->text(collect($candidates)->firstWhere('registration_id', $id)['team_name'] ?? ''), $ids),
         ], $ranked['blocking']);
 
+        $undecidedRows = array_values(array_filter($candidates, fn (array $row) => in_array($row['registration_id'], $undecided, true)));
+
         return [
             'table' => ['source_id' => $source->id, 'position' => $position, 'best_count' => $count, 'table' => $table],
             'qualified' => $qualified,
             'blockers' => $blockers,
+            'undecided' => array_map(fn (array $row) => ['registration_id' => $this->int($row['registration_id']), 'group_id' => $this->int($row['group_id'])], $undecidedRows),
         ];
     }
 
@@ -437,7 +583,7 @@ class PlayoffService implements PlayoffServiceInterface
     /**
      * Bloqueos y avisos del cierre, y por liguilla los clasificados sembrados con sus cruces de primera ronda.
      *
-     * @return array{blockers: list<array<string, mixed>>, warnings: list<array<string, mixed>>, plans: array<int, array<string, mixed>>, best_of: array<int, list<array<string, mixed>>>, playoffs: Collection<int, TournamentGroup>}
+     * @return array{blockers: list<array<string, mixed>>, warnings: list<array<string, mixed>>, plans: array<int, array<string, mixed>>, best_of: array<int, list<array<string, mixed>>>, playoffs: Collection<int, TournamentGroup>, marked: array<int, list<int>>, pending: list<int>}
      */
     private function analyse(Tournament $tournament): array
     {
@@ -489,6 +635,10 @@ class PlayoffService implements PlayoffServiceInterface
         }
 
         $seenTies = [];
+        /** @var array<int, list<int>> $marked Inscripciones que clasifican por liguilla (para la tabla de posiciones). */
+        $marked = [];
+        /** @var list<array{registration_id: int, group_id: int}> $undecidedBest */
+        $undecidedBest = [];
         /** @var array<int, array{team: string, playoffs: list<string>}> $qualifiedIn */
         $qualifiedIn = [];
 
@@ -541,11 +691,24 @@ class PlayoffService implements PlayoffServiceInterface
                 }
             }
 
+            $marked[$playoff->id] = array_map(fn (array $row) => $this->int($row['registration_id']), $qualified);
+
             foreach ($playoff->sources->sortBy('id')->filter(fn (PlayoffSource $source) => $source->isBestOfPosition()) as $source) {
                 $best = $this->bestOf($playoff, $source, $standings->all(), $order);
+
+                /** @var list<array{registration_id: int, qualified: bool}> $candidates */
+                $candidates = $best['table']['table'];
+
+                foreach ($candidates as $candidate) {
+                    if ($candidate['qualified']) {
+                        $marked[$playoff->id][] = $this->int($candidate['registration_id']);
+                    }
+                }
+
                 $bestOf[$playoff->id][] = $best['table'];
                 array_push($qualified, ...$best['qualified']);
                 array_push($blockers, ...$best['blockers']);
+                array_push($undecidedBest, ...$best['undecided']);
             }
 
             foreach ($qualified as $row) {
@@ -582,6 +745,12 @@ class PlayoffService implements PlayoffServiceInterface
             ];
         }
 
+        $pending = $this->pendingQualification($playoffs, $standings->all(), $undecidedBest);
+
+        foreach ($marked as $playoffId => $registrationIds) {
+            $marked[$playoffId] = array_values(array_diff($registrationIds, $pending));
+        }
+
         // Red de seguridad: un equipo no puede clasificar en dos liguillas (datos guardados con fuentes traslapadas).
         foreach ($qualifiedIn as $registrationId => $item) {
             if (count($item['playoffs']) > 1) {
@@ -595,7 +764,7 @@ class PlayoffService implements PlayoffServiceInterface
             }
         }
 
-        return ['blockers' => $blockers, 'warnings' => $warnings, 'plans' => $plans, 'best_of' => $bestOf, 'playoffs' => $playoffs];
+        return ['blockers' => $blockers, 'warnings' => $warnings, 'plans' => $plans, 'best_of' => $bestOf, 'playoffs' => $playoffs, 'marked' => $marked, 'pending' => $pending];
     }
 
     /**

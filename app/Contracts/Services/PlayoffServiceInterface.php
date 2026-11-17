@@ -23,6 +23,16 @@ interface PlayoffServiceInterface
     public function preview(Tournament $tournament): array;
 
     /**
+     * Agrega a cada fila de las tablas de posiciones `playoff` (`{id, name, priority}` de la liguilla a la que clasifica
+     * o null) y devuelve la leyenda `playoffs` (`{id, name, priority, positions}`, la principal primero). Usa el mismo
+     * análisis que la vista previa del cierre. Sin liguillas con fuentes, `playoff` es null y `playoffs` va vacío.
+     *
+     * @param  list<array<string, mixed>>  $groups  Resultado de StandingServiceInterface::standings().
+     * @return array{groups: list<array<string, mixed>>, playoffs: list<array<string, mixed>>}
+     */
+    public function withQualification(Tournament $tournament, array $groups): array;
+
+    /**
      * Propuesta de liguillas de preview(), o lista vacía si el torneo no se puede cerrar.
      *
      * @return list<array<string, mixed>>

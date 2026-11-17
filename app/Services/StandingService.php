@@ -90,7 +90,7 @@ class StandingService implements StandingServiceInterface
     }
 
     /**
-     * @return array{group_id: int, group_name: string, criteria: list<string>, rows: list<array<string, mixed>>, ties: list<list<int>>}
+     * @return array{group_id: int, group_name: string, criteria: list<string>, rows: list<array<string, mixed>>, ties: list<list<int>>, complete: bool, ties_pending: bool, has_manual_order: bool}
      */
     private function groupStandings(Tournament $tournament, TournamentGroup $group, bool $useManualOrder): array
     {
@@ -106,11 +106,13 @@ class StandingService implements StandingServiceInterface
         /** @var list<string> $criteria */
         $criteria = array_values(array_filter((array) $tournament->tiebreakers, 'is_string'));
 
+        $manualOrder = $this->matchRepository->manualOrder($group->id);
+
         $table = Standings::build(
             array_values($registrations->keys()->map(fn ($id) => (int) $id)->all()),
             $matches,
             $criteria === [] ? Tiebreaker::defaults() : $criteria,
-            $useManualOrder ? $this->matchRepository->manualOrder($group->id) : []
+            $useManualOrder ? $manualOrder : []
         );
 
         $rows = array_map(function (array $row) use ($registrations) {
@@ -127,12 +129,19 @@ class StandingService implements StandingServiceInterface
             ] + array_diff_key($row, ['position' => 1, 'registration_id' => 1]);
         }, $table['rows']);
 
+        $complete = $this->matchRepository->isRegularStageComplete($group->id);
+
         return [
             'group_id' => $group->id,
             'group_name' => $group->name,
             'criteria' => $criteria === [] ? Tiebreaker::defaults() : $criteria,
             'rows' => $rows,
             'ties' => $table['ties'],
+            // `ties` ya excluye los empates con orden manual guardado: solo importan cuando no queda nada por jugar.
+            'complete' => $complete,
+            'ties_pending' => $complete && $table['ties'] !== [],
+            // Lo guardado, no `$useManualOrder`: sigue siendo correcto cuando se llama con false para calcular los empates.
+            'has_manual_order' => $manualOrder !== [],
         ];
     }
 }
