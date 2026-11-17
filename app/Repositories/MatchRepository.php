@@ -271,7 +271,7 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->when($fieldId !== null, fn ($query) => $query->where('field_id', $fieldId))
             ->when($refereeId !== null, fn ($query) => $query->where('referee_user_id', $refereeId))
             ->when(! empty($filters['unassigned_referee']), fn ($query) => $query->whereNull('referee_user_id'))
-            ->with(['tournament', 'group', 'field', 'referee', 'home.team', 'away.team'])
+            ->with(['tournament', 'group', 'field', 'referee', 'home.team', 'away.team', 'tie.matches'])
             ->orderBy('match_datetime')
             ->orderBy('field_id')
             ->orderBy('id')

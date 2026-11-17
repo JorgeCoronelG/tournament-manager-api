@@ -6,6 +6,7 @@ use App\Contracts\Repositories\MatchRepositoryInterface;
 use App\Contracts\Repositories\ScheduleRepositoryInterface;
 use App\Contracts\Services\AgendaServiceInterface;
 use App\Core\Enum\MatchPhase;
+use App\Core\Enum\MatchStatus;
 use App\Core\Enum\Message;
 use App\Core\Enum\RegistrationStatus;
 use App\Exceptions\CustomErrorException;
@@ -101,6 +102,7 @@ class AgendaService implements AgendaServiceInterface
     private function item(GameMatch $match): array
     {
         $at = $match->match_datetime;
+        [$globalHome, $globalAway] = $this->global($match);
         $duration = max(1, (int) $match->tournament?->match_duration_minutes);
 
         return [
@@ -118,7 +120,39 @@ class AgendaService implements AgendaServiceInterface
             'home_withdrawn' => $match->home?->status === RegistrationStatus::WITHDRAWN,
             'away_withdrawn' => $match->away?->status === RegistrationStatus::WITHDRAWN,
             'status' => $match->status->value,
+            'home_score' => $match->home_score,
+            'away_score' => $match->away_score,
+            'home_penalties' => $match->home_penalties,
+            'away_penalties' => $match->away_penalties,
+            'leg' => $match->leg,
+            'global_home' => $globalHome,
+            'global_away' => $globalAway,
             'schedule_locked' => $match->schedule_locked,
+        ];
+    }
+
+    /**
+     * Global de una vuelta jugada (ida + vuelta) desde el punto de vista de sus equipos local y visitante.
+     *
+     * @return array{0: int|null, 1: int|null}
+     */
+    private function global(GameMatch $match): array
+    {
+        if ($match->leg !== 2 || $match->status !== MatchStatus::PLAYED) {
+            return [null, null];
+        }
+
+        $first = $match->tie?->matches->firstWhere('leg', 1);
+
+        if (! $first instanceof GameMatch || $first->status !== MatchStatus::PLAYED) {
+            return [null, null];
+        }
+
+        $goals = fn (GameMatch $leg, ?int $registration): int => (int) ($leg->home_registration_id === $registration ? $leg->home_score : $leg->away_score);
+
+        return [
+            (int) $match->home_score + $goals($first, $match->home_registration_id),
+            (int) $match->away_score + $goals($first, $match->away_registration_id),
         ];
     }
 
