@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Core\Enum\LeagueStatus;
 use App\Core\Traits\AdvancedFilter;
 use App\Core\Traits\Sortable;
 use Database\Factories\LeagueFactory;
@@ -27,12 +28,32 @@ class League extends Model
     public array $allowedSorts = ['name', 'created_at'];
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'active',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'status' => LeagueStatus::class,
+    ];
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
         'admin_user_id',
         'name',
+        'status',
     ];
+
+    public function isActive(): bool
+    {
+        return $this->status === LeagueStatus::ACTIVE;
+    }
 
     /**
      * @return BelongsTo<User, $this>

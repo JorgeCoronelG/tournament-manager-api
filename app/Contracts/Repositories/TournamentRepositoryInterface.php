@@ -52,6 +52,11 @@ interface TournamentRepositoryInterface extends BaseRepositoryInterface
     public function countByLeagueExceptStatus(int $leagueId, TournamentStatus $status): int;
 
     /**
+     * @param  list<TournamentStatus>  $statuses
+     */
+    public function countByLeagueAndStatuses(int $leagueId, array $statuses): int;
+
+    /**
      * Crea el torneo en la liga indicada, siempre en planeación.
      *
      * @param  array<string, mixed>  $data

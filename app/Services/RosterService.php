@@ -78,7 +78,12 @@ class RosterService extends BaseService implements RosterServiceInterface
 
     public function reject(Roster $roster, User $actor): Roster
     {
-        return DB::transaction(fn () => $this->rosterRepository->reject($this->lockPendingOf($roster, $actor)));
+        return DB::transaction(function () use ($roster, $actor) {
+            $roster = $this->lockPendingOf($roster, $actor);
+            $this->assertLeagueActive($this->tournamentOf($roster));
+
+            return $this->rosterRepository->reject($roster);
+        });
     }
 
     public function removePlayer(Roster $roster, User $actor, string $reason): Roster
@@ -179,6 +184,8 @@ class RosterService extends BaseService implements RosterServiceInterface
      */
     private function assertRostersOpen(Tournament $tournament): void
     {
+        $this->assertLeagueActive($tournament);
+
         $open = in_array($tournament->status, [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS], true)
             && ! $tournament->playoffsStarted();
 
@@ -241,6 +248,13 @@ class RosterService extends BaseService implements RosterServiceInterface
         }
 
         return $roster;
+    }
+
+    private function assertLeagueActive(Tournament $tournament): void
+    {
+        if (! League::query()->findOrFail($tournament->league_id)->isActive()) {
+            throw new CustomErrorException(Message::LEAGUE_INACTIVE, Response::HTTP_FORBIDDEN);
+        }
     }
 
     private function assertLeagueAdmin(Tournament $tournament, User $actor): void

@@ -23,6 +23,8 @@ class LeagueResource extends JsonResource
         return [
             'id' => $this->resource->id,
             'name' => $this->resource->name,
+            'status' => $this->resource->status->value,
+            'is_active' => $this->resource->isActive(),
             'admin' => [
                 'id' => $admin->id,
                 'first_name' => $admin->first_name,

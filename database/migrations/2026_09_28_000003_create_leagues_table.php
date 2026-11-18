@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('admin_user_id')->constrained('users');
             $table->string('name', 150);
+            $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
             $table->softDeletes();
         });

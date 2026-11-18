@@ -10,6 +10,7 @@ use App\Contracts\Services\RegistrationChangeServiceInterface;
 use App\Contracts\Services\ScheduleGeneratorServiceInterface;
 use App\Core\Enum\FieldStatus;
 use App\Core\Enum\LeagueRefereeStatus;
+use App\Core\Enum\LeagueStatus;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\RegistrationStatus;
@@ -123,6 +124,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedSchedulingScenarios($leagues);
         $this->seedRoleTestUsers($leagues);
         $this->seedDemoLeagues();
+        $this->seedInactiveLeague();
     }
 
     /**
@@ -999,6 +1001,23 @@ class DevelopmentSeeder extends Seeder
      * (WINDOW_PATTERNS) para no chocar en canchas, árbitros ni equipos. Los torneos en planeación quedan sin calendario,
      * sin horarios y sin árbitros a propósito. Una liga que ya existe se omite, así que es seguro correrlo varias veces.
      */
+    /**
+     * Liga pequeña desactivada (con su administrador) para probar la tabla, el filtro y el bloqueo de acceso.
+     */
+    private function seedInactiveLeague(): void
+    {
+        $name = 'Liga Inactiva';
+
+        if (League::query()->where('name', $name)->exists()) {
+            return;
+        }
+
+        $admin = User::factory()->create(['user_code' => 'LIGAINA', 'phone' => $this->phone(), 'email' => 'liga.inactiva@example.com']);
+        $admin->roles()->sync([RoleEnum::LEAGUE_ADMIN->value]);
+
+        League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name, 'status' => LeagueStatus::INACTIVE]);
+    }
+
     private function seedDemoLeagues(): void
     {
         $managerIds = User::query()

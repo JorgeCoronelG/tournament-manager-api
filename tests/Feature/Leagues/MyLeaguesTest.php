@@ -43,7 +43,7 @@ class MyLeaguesTest extends TestCase
             ->assertJsonStructure(['data', 'links', 'meta'])
             ->assertJsonCount(2, 'data');
 
-        $this->assertSame([['id' => $a->id, 'name' => 'A Liga'], ['id' => $b->id, 'name' => 'B Liga']], $response->json('data'));
+        $this->assertSame([['id' => $a->id, 'name' => 'A Liga', 'status' => 'active'], ['id' => $b->id, 'name' => 'B Liga', 'status' => 'active']], $response->json('data'));
     }
 
     public function test_league_admin_with_a_single_league(): void

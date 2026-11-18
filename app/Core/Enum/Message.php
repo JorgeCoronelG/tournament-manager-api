@@ -13,6 +13,10 @@ class Message
 
     public const TOO_MANY_CODE_ATTEMPTS = 'Demasiados intentos fallidos. Solicite un nuevo código.';
 
+    public const LEAGUE_INACTIVE = 'La liga está desactivada.';
+
+    public const LEAGUE_DEACTIVATE_HAS_ACTIVE_TOURNAMENTS = 'No se puede desactivar una liga con torneos activos.';
+
     public const INVALID_QUERY_PARAMETER = 'Parámetro de consulta inválido.';
 
     public const INVALID_ID_PARAMETER_WITH_ID_BODY = 'El id es diferente al id del parámetro de ruta.';

@@ -8,6 +8,7 @@ use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Contracts\Services\LeagueServiceInterface;
 use App\Core\BaseService;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\LeagueStatus;
 use App\Core\Enum\Message;
 use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\TournamentStatus;
@@ -84,11 +85,30 @@ class LeagueService extends BaseService implements LeagueServiceInterface
     {
         $isSuperadmin = $user->roles->contains('id', RoleEnum::SUPERADMIN->value);
 
-        return $this->leagueRepository->paginateAccessible($query, $isSuperadmin ? null : $user->id, $search);
+        // El encargado no ve las ligas inactivas; el superadmin las ve todas para poder reactivarlas.
+        return $this->leagueRepository->paginateAccessible($query, $isSuperadmin ? null : $user->id, $search, $isSuperadmin ? null : LeagueStatus::ACTIVE);
     }
 
-    public function paginate(ListQuery $query, ?int $adminUserId, ?string $search): LengthAwarePaginator
+    public function paginate(ListQuery $query, ?int $adminUserId, ?string $search, ?LeagueStatus $status = null): LengthAwarePaginator
     {
-        return $this->leagueRepository->paginateManaged($query, $adminUserId, $search);
+        return $this->leagueRepository->paginateManaged($query, $adminUserId, $search, $status);
+    }
+
+    public function updateStatus(int $id, bool $isActive): League
+    {
+        /** @var League $league */
+        $league = $this->leagueRepository->findById($id);
+        $target = $isActive ? LeagueStatus::ACTIVE : LeagueStatus::INACTIVE;
+
+        if ($league->status !== $target) {
+            if (! $isActive && $this->tournamentRepository->countByLeagueAndStatuses($league->id, [TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS]) > 0) {
+                throw new CustomErrorException(Message::LEAGUE_DEACTIVATE_HAS_ACTIVE_TOURNAMENTS, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            /** @var League $league */
+            $league = $this->leagueRepository->update($id, ['status' => $target]);
+        }
+
+        return $league->load('admin');
     }
 }

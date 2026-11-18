@@ -92,6 +92,14 @@ class TournamentRepository extends BaseRepository implements TournamentRepositor
             ->count();
     }
 
+    public function countByLeagueAndStatuses(int $leagueId, array $statuses): int
+    {
+        return $this->entity->newQuery()
+            ->where('league_id', $leagueId)
+            ->whereIn('status', $statuses)
+            ->count();
+    }
+
     public function createInLeague(int $leagueId, array $data): Tournament
     {
         $tournament = $this->entity->newInstance($data);

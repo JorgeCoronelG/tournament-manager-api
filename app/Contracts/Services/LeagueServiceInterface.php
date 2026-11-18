@@ -4,6 +4,7 @@ namespace App\Contracts\Services;
 
 use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseServiceInterface;
+use App\Core\Enum\LeagueStatus;
 use App\Models\League;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -21,5 +22,10 @@ interface LeagueServiceInterface extends BaseServiceInterface
     /**
      * @return LengthAwarePaginator<int, League>
      */
-    public function paginate(ListQuery $query, ?int $adminUserId, ?string $search): LengthAwarePaginator;
+    public function paginate(ListQuery $query, ?int $adminUserId, ?string $search, ?LeagueStatus $status = null): LengthAwarePaginator;
+
+    /**
+     * Activa o desactiva la liga sin tocar sus datos. Desactivar exige que no tenga torneos en curso ni en liguilla.
+     */
+    public function updateStatus(int $id, bool $isActive): League;
 }

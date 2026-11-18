@@ -203,5 +203,6 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value])->
     Route::post('/leagues', [LeagueController::class, 'store']);
     Route::get('/leagues/{id}', [LeagueController::class, 'show']);
     Route::put('/leagues/{id}', [LeagueController::class, 'update']);
+    Route::patch('/leagues/{id}/status', [LeagueController::class, 'updateStatus']);
     Route::delete('/leagues/{id}', [LeagueController::class, 'destroy']);
 });

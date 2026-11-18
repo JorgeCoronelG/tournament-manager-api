@@ -19,6 +19,8 @@ class MyLeagueResource extends JsonResource
         return [
             'id' => $this->resource->id,
             'name' => $this->resource->name,
+            // El superadmin recibe también las ligas inactivas: el front las distingue por este campo para no ofrecerlas.
+            'status' => $this->resource->status->value,
         ];
     }
 }
