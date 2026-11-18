@@ -34,6 +34,21 @@ interface TournamentRepositoryInterface extends BaseRepositoryInterface
     /**
      * Torneos no eliminados de la liga cuyo estado es distinto del indicado.
      */
+    /**
+     * Torneos finalizados de la liga, del más reciente al más antiguo, con `teams_count` (inscripciones activas),
+     * `playoffs_count` (grupos de liguilla) y `end_date` (fecha del último partido no cancelado; null si no hay).
+     *
+     * @return LengthAwarePaginator<int, Tournament>
+     */
+    public function paginateHistory(int $leagueId, ?string $search, ?int $year, int $perPage): LengthAwarePaginator;
+
+    /**
+     * Años distintos (de la fecha de inicio) de los torneos finalizados de la liga, de mayor a menor.
+     *
+     * @return list<int>
+     */
+    public function historyYears(int $leagueId): array;
+
     public function countByLeagueExceptStatus(int $leagueId, TournamentStatus $status): int;
 
     /**

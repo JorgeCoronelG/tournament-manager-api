@@ -317,6 +317,41 @@ class PlayoffService implements PlayoffServiceInterface
         });
     }
 
+    public function results(Tournament $tournament): array
+    {
+        $playoffs = $this->groupRepository->listByTournament($tournament->id)->where('type', TournamentGroupType::PLAYOFF)->sortBy(fn (TournamentGroup $group) => $this->priorityOf($group))->values();
+        $ties = $this->playoffRepository->tiesOfGroups(array_values(array_map(fn (TournamentGroup $group) => $group->id, $playoffs->all())))->groupBy('group_id');
+        $results = [];
+
+        foreach ($playoffs as $playoff) {
+            $final = ($ties->get($playoff->id) ?? collect())->firstWhere('round_index', count($playoff->roundsDetail()));
+            $winner = $final instanceof PlayoffTie ? $final->winner : null;
+            $loser = $final instanceof PlayoffTie && $winner !== null
+                ? ($final->registration_a_id === $winner->id ? $final->registrationB : $final->registrationA)
+                : null;
+
+            $results[] = [
+                'id' => $playoff->id,
+                'name' => $playoff->name,
+                'positions' => $this->positionsText($playoff),
+                'champion' => $this->teamBrief($winner),
+                'runner_up' => $this->teamBrief($loser),
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * @return array{id: int, name: string, logo_url: string|null}|null
+     */
+    private function teamBrief(?Registration $registration): ?array
+    {
+        $team = $registration?->team;
+
+        return $team === null ? null : ['id' => $team->id, 'name' => $team->name, 'logo_url' => $team->logoUrl()];
+    }
+
     public function bracket(Tournament $tournament): array
     {
         if (! in_array($tournament->status, [TournamentStatus::PLAYOFFS, TournamentStatus::FINISHED], true)) {

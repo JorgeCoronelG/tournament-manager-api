@@ -271,6 +271,8 @@ class Message
 
     public const TOURNAMENT_NOT_STARTED = 'El torneo no ha iniciado.';
 
+    public const TOURNAMENT_NOT_FINISHED = 'El torneo aún no ha finalizado.';
+
     public const MATCH_RESULT_ONLY_REGULAR_STAGE = 'Solo se puede capturar el resultado de partidos de fase regular.';
 
     public const STANDINGS_GROUP_INVALID = 'El grupo debe ser de fase regular y pertenecer a este torneo.';

@@ -18,6 +18,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'RoleServiceInterface' => 'RoleService',
         'UserServiceInterface' => 'UserService',
         'TournamentServiceInterface' => 'TournamentService',
+        'TournamentSummaryServiceInterface' => 'TournamentSummaryService',
         'FieldServiceInterface' => 'FieldService',
         'LeagueRefereeServiceInterface' => 'LeagueRefereeService',
         'TeamServiceInterface' => 'TeamService',

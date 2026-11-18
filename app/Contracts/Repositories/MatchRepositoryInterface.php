@@ -71,6 +71,14 @@ interface MatchRepositoryInterface extends BaseRepositoryInterface
      * Si el grupo ya terminó su fase regular: tiene partidos y ninguno sigue pendiente (programado sin resultado, con
      * equipos dados de baja incluidos). Es el mismo criterio con el que el cierre de fase detecta partidos pendientes.
      */
+    /**
+     * Partidos jugados del torneo (fase regular y liguillas, con los ganados por default) y la suma de sus goles
+     * (sin penales).
+     *
+     * @return array{matches: int, goals: int}
+     */
+    public function playedTotals(int $tournamentId): array;
+
     public function isRegularStageComplete(int $groupId): bool;
 
     /**

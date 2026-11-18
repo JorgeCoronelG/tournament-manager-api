@@ -85,8 +85,12 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
 
         Route::scopeBindings()->group(function (): void {
             Route::get('/tournaments', [TournamentController::class, 'index']);
+            // Antes de /tournaments/{tournament}: "history" no es un id.
+            Route::get('/tournaments/history', [TournamentController::class, 'history']);
+            Route::get('/tournaments/history/years', [TournamentController::class, 'historyYears']);
             Route::post('/tournaments', [TournamentController::class, 'store']);
             Route::get('/tournaments/{tournament}', [TournamentController::class, 'show']);
+            Route::get('/tournaments/{tournament}/summary', [TournamentController::class, 'summary']);
             Route::put('/tournaments/{tournament}', [TournamentController::class, 'update']);
             Route::patch('/tournaments/{tournament}/status', [TournamentController::class, 'updateStatus']);
             Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);

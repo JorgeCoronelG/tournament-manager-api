@@ -53,6 +53,16 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
         return $this->tournamentRepository->paginateByLeague($league->id, $query, $search, $gender, $statuses, $excludeStatuses);
     }
 
+    public function paginateHistory(League $league, ?string $search, ?int $year, int $perPage): LengthAwarePaginator
+    {
+        return $this->tournamentRepository->paginateHistory($league->id, $search, $year, $perPage);
+    }
+
+    public function historyYears(League $league): array
+    {
+        return $this->tournamentRepository->historyYears($league->id);
+    }
+
     public function createInLeague(League $league, TournamentData $data): Tournament
     {
         return DB::transaction(function () use ($league, $data) {

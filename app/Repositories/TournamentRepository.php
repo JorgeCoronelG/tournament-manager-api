@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\RegistrationStatus;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
@@ -12,6 +13,7 @@ use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @extends BaseRepository<Tournament>
@@ -42,6 +44,44 @@ class TournamentRepository extends BaseRepository implements TournamentRepositor
             ->orderByDesc('id')
             ->paginate($query->perPage)
             ->withQueryString();
+    }
+
+    public function paginateHistory(int $leagueId, ?string $search, ?int $year, int $perPage): LengthAwarePaginator
+    {
+        $endDate = DB::table('matches')
+            ->selectRaw('MAX(COALESCE(DATE(match_datetime), scheduled_date))')
+            ->whereColumn('matches.tournament_id', 'tournaments.id')
+            ->where('matches.status', '!=', 'cancelled')
+            ->whereNull('matches.deleted_at');
+
+        return $this->entity->newQuery()
+            ->where('league_id', $leagueId)
+            ->where('status', TournamentStatus::FINISHED)
+            ->when($search !== null, fn (Builder $builder) => $builder->where('name', 'LIKE', "%{$search}%"))
+            ->when($year !== null, fn (Builder $builder) => $builder->whereYear('start_date', $year))
+            ->addSelect(['tournaments.*', 'end_date' => $endDate])
+            ->withCount([
+                'registrations as teams_count' => fn (Builder $builder) => $builder->where('status', RegistrationStatus::ACTIVE),
+                'groups as playoffs_count' => fn (Builder $builder) => $builder->where('type', TournamentGroupType::PLAYOFF),
+            ])
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    public function historyYears(int $leagueId): array
+    {
+        $years = [];
+
+        foreach ($this->entity->newQuery()->where('league_id', $leagueId)->where('status', TournamentStatus::FINISHED)->get(['id', 'start_date']) as $tournament) {
+            $years[(int) $tournament->start_date->format('Y')] = true;
+        }
+
+        $years = array_keys($years);
+        rsort($years);
+
+        return $years;
     }
 
     public function countByLeagueExceptStatus(int $leagueId, TournamentStatus $status): int
