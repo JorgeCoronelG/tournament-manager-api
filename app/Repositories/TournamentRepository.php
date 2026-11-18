@@ -6,12 +6,15 @@ use App\Contracts\Repositories\TournamentRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\RegistrationStatus;
+use App\Core\Enum\TeamStatus;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentGroupType;
 use App\Core\Enum\TournamentStatus;
+use App\Models\League;
 use App\Models\Tournament;
 use App\Models\TournamentGroup;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -90,6 +93,23 @@ class TournamentRepository extends BaseRepository implements TournamentRepositor
             ->where('league_id', $leagueId)
             ->where('status', '!=', $status)
             ->count();
+    }
+
+    public function lockLeague(int $leagueId): League
+    {
+        return League::query()->lockForUpdate()->findOrFail($leagueId);
+    }
+
+    public function usageByLeague(int $leagueId): Collection
+    {
+        return $this->entity->newQuery()
+            ->where('league_id', $leagueId)
+            ->whereIn('status', [TournamentStatus::PLANNING, TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS])
+            ->withCount(['registrations as active_registrations' => fn (Builder $builder) => $builder
+                ->where('status', RegistrationStatus::ACTIVE)
+                ->whereDoesntHave('team', fn (Builder $team) => $team->where('status', TeamStatus::BANNED))])
+            ->orderBy('id')
+            ->get();
     }
 
     public function countByLeagueAndStatuses(int $leagueId, array $statuses): int

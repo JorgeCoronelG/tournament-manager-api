@@ -71,6 +71,7 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
             }
 
             $this->assertTeamsCanRegister($locked, $teamIds);
+            $this->assertWithinTeamLimit($locked, count($teamIds));
 
             return new Collection(array_map(
                 fn (int $teamId) => $this->registrationRepository->register($locked->id, $teamId)->load(['team.manager', 'group']),
@@ -95,6 +96,27 @@ class RegistrationService extends BaseService implements RegistrationServiceInte
         }
 
         $this->registrationRepository->remove($registration, $userId, $reason);
+    }
+
+    /**
+     * Con el torneo bloqueado, las inscripciones activas (sin bajas ni equipos vetados) más las nuevas no pueden pasar
+     * del máximo de la liga; null = sin límite. Un equipo de la liga sin inscripción no cuenta.
+     *
+     * @throws CustomErrorException
+     */
+    private function assertWithinTeamLimit(Tournament $tournament, int $new): void
+    {
+        $limit = $tournament->loadMissing('league')->league?->max_teams_per_tournament;
+
+        if ($limit === null) {
+            return;
+        }
+
+        $current = $this->registrationRepository->countActiveByTournament($tournament->id) - $this->registrationRepository->countBannedTeamsByTournament($tournament->id);
+
+        if ($current + $new > $limit) {
+            throw new CustomErrorException(Message::getMessageLeagueLimitTeams($limit), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
     }
 
     /**

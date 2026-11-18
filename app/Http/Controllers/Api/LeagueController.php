@@ -11,6 +11,7 @@ use App\Exceptions\CustomErrorException;
 use App\Http\Requests\Leagues\SaveLeagueRequest;
 use App\Http\Requests\Leagues\UpdateLeagueStatusRequest;
 use App\Http\Resources\Leagues\LeagueResource;
+use App\Models\League;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -39,6 +40,11 @@ class LeagueController extends BaseApiController
         $league = $this->leagueService->create($request->toData());
 
         return $this->showOne(new LeagueResource($league), Response::HTTP_CREATED);
+    }
+
+    public function limits(League $league): JsonResponse
+    {
+        return $this->successResponse($this->leagueService->limits($league), Response::HTTP_OK);
     }
 
     public function show(int $id): JsonResponse

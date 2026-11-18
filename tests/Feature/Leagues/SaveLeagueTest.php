@@ -27,7 +27,26 @@ class SaveLeagueTest extends TestCase
      */
     private function store(array $body): TestResponse
     {
-        return $this->postJson('/api/leagues', $body, $this->authHeader($this->token));
+        return $this->postJson('/api/leagues', self::withLimits($body), $this->authHeader($this->token));
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function update(int $id, array $body): TestResponse
+    {
+        return $this->putJson("/api/leagues/{$id}", self::withLimits($body), $this->authHeader($this->token));
+    }
+
+    /**
+     * El límite de torneos activos es obligatorio (null = sin límite): se completa salvo que la prueba los envíe.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private static function withLimits(array $body): array
+    {
+        return $body + ['max_active_tournaments' => null];
     }
 
     public function test_creates_a_league(): void
@@ -134,7 +153,7 @@ class SaveLeagueTest extends TestCase
         $new = $this->createLeagueAdmin();
         $league = League::factory()->create(['admin_user_id' => $old->id, 'name' => 'Liga Vieja']);
 
-        $this->putJson("/api/leagues/{$league->id}", ['name' => 'Liga Nueva', 'admin_user_id' => $new->id], $this->authHeader($this->token))
+        $this->update($league->id, ['name' => 'Liga Nueva', 'admin_user_id' => $new->id])
             ->assertOk()
             ->assertJsonPath('name', 'Liga Nueva')
             ->assertJsonPath('admin.id', $new->id);
@@ -145,7 +164,7 @@ class SaveLeagueTest extends TestCase
         $admin = $this->createLeagueAdmin();
         $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Norte']);
 
-        $this->putJson("/api/leagues/{$league->id}", ['name' => 'LIGA NORTE', 'admin_user_id' => $admin->id], $this->authHeader($this->token))
+        $this->update($league->id, ['name' => 'LIGA NORTE', 'admin_user_id' => $admin->id])
             ->assertOk();
     }
 
@@ -155,7 +174,7 @@ class SaveLeagueTest extends TestCase
         League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Norte']);
         $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Sur']);
 
-        $this->putJson("/api/leagues/{$league->id}", ['name' => 'Liga Norte', 'admin_user_id' => $admin->id], $this->authHeader($this->token))
+        $this->update($league->id, ['name' => 'Liga Norte', 'admin_user_id' => $admin->id])
             ->assertStatus(422)
             ->assertJsonStructure(['error' => ['name']]);
     }
@@ -165,7 +184,7 @@ class SaveLeagueTest extends TestCase
         $admin = $this->createLeagueAdmin();
         $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => 'Liga Sur']);
 
-        $this->putJson("/api/leagues/{$league->id}", ['name' => 'Liga Sur', 'admin_user_id' => 9999], $this->authHeader($this->token))
+        $this->update($league->id, ['name' => 'Liga Sur', 'admin_user_id' => 9999])
             ->assertStatus(422)
             ->assertJsonStructure(['error' => ['admin_user_id']]);
     }
@@ -175,10 +194,10 @@ class SaveLeagueTest extends TestCase
         $admin = $this->createLeagueAdmin();
         $body = ['name' => 'X', 'admin_user_id' => $admin->id];
 
-        $this->putJson('/api/leagues/9999', $body, $this->authHeader($this->token))->assertStatus(404);
+        $this->update(9999, $body)->assertStatus(404);
 
         $league = League::factory()->create(['admin_user_id' => $admin->id]);
         $league->delete();
-        $this->putJson("/api/leagues/{$league->id}", $body, $this->authHeader($this->token))->assertStatus(404);
+        $this->update($league->id, $body)->assertStatus(404);
     }
 }

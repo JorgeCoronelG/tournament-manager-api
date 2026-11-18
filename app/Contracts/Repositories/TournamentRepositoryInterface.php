@@ -6,8 +6,10 @@ use App\Core\Classes\ListQuery;
 use App\Core\Contracts\BaseRepositoryInterface;
 use App\Core\Enum\TournamentGender;
 use App\Core\Enum\TournamentStatus;
+use App\Models\League;
 use App\Models\Tournament;
 use App\Models\TournamentGroup;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
@@ -50,6 +52,19 @@ interface TournamentRepositoryInterface extends BaseRepositoryInterface
     public function historyYears(int $leagueId): array;
 
     public function countByLeagueExceptStatus(int $leagueId, TournamentStatus $status): int;
+
+    /**
+     * Bloquea la fila de la liga hasta terminar la transacción: serializa quienes comprueban sus límites.
+     */
+    public function lockLeague(int $leagueId): League;
+
+    /**
+     * Torneos en planeación, en curso y en liguilla de la liga (más antiguo primero) con `active_registrations`:
+     * inscripciones activas que cuentan, sin las de equipos vetados.
+     *
+     * @return Collection<int, Tournament>
+     */
+    public function usageByLeague(int $leagueId): Collection;
 
     /**
      * @param  list<TournamentStatus>  $statuses

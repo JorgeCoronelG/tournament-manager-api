@@ -150,7 +150,34 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
             $this->groupService->assertReadyToStart($tournament);
         }
 
-        return $this->tournamentRepository->updateStatus($tournament, $status);
+        if ($status !== TournamentStatus::IN_PROGRESS) {
+            return $this->tournamentRepository->updateStatus($tournament, $status);
+        }
+
+        // Con la liga bloqueada, dos peticiones simultáneas no pueden iniciar torneos por encima del límite.
+        return DB::transaction(function () use ($tournament, $status): Tournament {
+            $this->assertLeagueLimitsAllowStart($tournament);
+
+            return $this->tournamentRepository->updateStatus($tournament, $status);
+        });
+    }
+
+    /**
+     * Iniciar un torneo exige un lugar entre los activos de la liga (en curso o en liguilla) y que sus inscripciones
+     * activas no superen el máximo por torneo. Aplica a cualquier usuario; los límites en null no restringen.
+     */
+    private function assertLeagueLimitsAllowStart(Tournament $tournament): void
+    {
+        $league = $this->tournamentRepository->lockLeague($tournament->league_id);
+
+        if ($league->max_active_tournaments !== null
+            && $this->tournamentRepository->countByLeagueAndStatuses($league->id, [TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS]) >= $league->max_active_tournaments) {
+            throw new CustomErrorException(Message::getMessageLeagueLimitActiveTournaments($league->max_active_tournaments), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if ($league->max_teams_per_tournament !== null && $this->participatingTeams($tournament) > $league->max_teams_per_tournament) {
+            throw new CustomErrorException(Message::getMessageLeagueLimitTeams($league->max_teams_per_tournament), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
     }
 
     /**

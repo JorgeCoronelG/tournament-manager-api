@@ -25,6 +25,8 @@ class LeagueResource extends JsonResource
             'name' => $this->resource->name,
             'status' => $this->resource->status->value,
             'is_active' => $this->resource->isActive(),
+            'max_active_tournaments' => $this->resource->max_active_tournaments,
+            'max_teams_per_tournament' => $this->resource->max_teams_per_tournament,
             'admin' => [
                 'id' => $admin->id,
                 'first_name' => $admin->first_name,

@@ -19,6 +19,7 @@ use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -43,9 +44,20 @@ class LeagueService extends BaseService implements LeagueServiceInterface
         $league = $this->leagueRepository->create([
             'name' => $data->name,
             'admin_user_id' => $data->admin_user_id,
-        ]);
+        ] + $this->limitAttributes($data));
 
         return $league->load('admin');
+    }
+
+    /**
+     * Límites del body (null = sin límite). `max_teams_per_tournament` (reservado para los planes futuros) solo cambia si viene.
+     *
+     * @return array<string, mixed>
+     */
+    private function limitAttributes(LeagueData $data): array
+    {
+        return ['max_active_tournaments' => $data->max_active_tournaments]
+            + ($data->max_teams_per_tournament instanceof Optional ? [] : ['max_teams_per_tournament' => $data->max_teams_per_tournament]);
     }
 
     /**
@@ -57,7 +69,7 @@ class LeagueService extends BaseService implements LeagueServiceInterface
         $league = $this->leagueRepository->update($id, [
             'name' => $data->name,
             'admin_user_id' => $data->admin_user_id,
-        ]);
+        ] + $this->limitAttributes($data));
 
         return $league->load('admin');
     }
@@ -79,6 +91,31 @@ class LeagueService extends BaseService implements LeagueServiceInterface
             $this->fieldRepository->deleteByLeague($league->id);
             $this->leagueRepository->delete($league->id);
         });
+    }
+
+    public function limits(League $league): array
+    {
+        $tournaments = $this->tournamentRepository->usageByLeague($league->id);
+        $rows = [];
+
+        foreach ($tournaments as $tournament) {
+            $registrations = $tournament->getAttributeValue('active_registrations');
+            $rows[] = [
+                'id' => $tournament->id,
+                'name' => $tournament->name,
+                'status' => $tournament->status->value,
+                'active_registrations' => is_numeric($registrations) ? (int) $registrations : 0,
+            ];
+        }
+
+        return [
+            'max_active_tournaments' => $league->max_active_tournaments,
+            'max_teams_per_tournament' => $league->max_teams_per_tournament,
+            'usage' => [
+                'active_tournaments' => $tournaments->whereIn('status', [TournamentStatus::IN_PROGRESS, TournamentStatus::PLAYOFFS])->count(),
+                'tournaments' => $rows,
+            ],
+        ];
     }
 
     public function paginateAccessible(ListQuery $query, User $user, ?string $search): LengthAwarePaginator

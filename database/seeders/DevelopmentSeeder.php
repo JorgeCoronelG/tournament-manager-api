@@ -81,7 +81,7 @@ class DevelopmentSeeder extends Seeder
     /**
      * Ligas demo: canchas, equipos propios y escenarios de torneo (el índice es el patrón de ventanas).
      *
-     * @var array<int, array{fields: int, teams: int, tournaments: list<string>}>
+     * @var array<int, array{fields: int, teams: int, tournaments: list<string>, limits?: array{max_active_tournaments: int|null}}>
      */
     private const DEMO_LEAGUES = [
         1 => ['fields' => 3, 'teams' => 8, 'tournaments' => ['regular', 'playoffs', 'groups']],
@@ -91,6 +91,8 @@ class DevelopmentSeeder extends Seeder
         5 => ['fields' => 2, 'teams' => 25, 'tournaments' => ['t25_tied', 'minimums']],
         6 => ['fields' => 3, 'teams' => 16, 'tournaments' => ['tied_ten', 'tied_groups']],
         7 => ['fields' => 3, 'teams' => 16, 'tournaments' => ['finished_one', 'finished_two', 'finished_groups', 'finished_none']],
+        // Un solo torneo activo permitido: el torneo en curso ya ocupa el lugar, así que iniciar el de planeación se rechaza.
+        8 => ['fields' => 2, 'teams' => 10, 'tournaments' => ['regular', 'groups'], 'limits' => ['max_active_tournaments' => 1]],
     ];
 
     /** Equipos por liga. */
@@ -108,6 +110,9 @@ class DevelopmentSeeder extends Seeder
     public function run(): void
     {
         $this->seedSuperAdmin();
+
+        // El límite de equipos por torneo está reservado para los planes futuros: en bases ya sembradas se limpia.
+        League::query()->update(['max_teams_per_tournament' => null]);
 
         $leagues = $this->seedLeagues();
         $this->seedTournaments($leagues);
@@ -1036,7 +1041,7 @@ class DevelopmentSeeder extends Seeder
             DB::transaction(function () use ($number, $name, $spec, $managerIds): void {
                 $admin = User::factory()->create(['user_code' => sprintf('LIGAD%02d', $number), 'phone' => $this->phone()]);
                 $admin->roles()->sync([RoleEnum::LEAGUE_ADMIN->value]);
-                $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name]);
+                $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name] + ($spec['limits'] ?? []));
 
                 for ($field = 1; $field <= $spec['fields']; $field++) {
                     Field::factory()->create(['league_id' => $league->id, 'name' => "Cancha {$field}"]);

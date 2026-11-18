@@ -39,6 +39,8 @@ class League extends Model
      */
     protected $casts = [
         'status' => LeagueStatus::class,
+        'max_active_tournaments' => 'integer',
+        'max_teams_per_tournament' => 'integer',
     ];
 
     /**
@@ -48,6 +50,8 @@ class League extends Model
         'admin_user_id',
         'name',
         'status',
+        'max_active_tournaments',
+        'max_teams_per_tournament',
     ];
 
     public function isActive(): bool

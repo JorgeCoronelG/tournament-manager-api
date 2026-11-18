@@ -58,6 +58,7 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
     // /leagues/{league}/... y filtrados por esa liga, nunca por un league_id del body.
     Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
         Route::get('/dashboard/summary', [DashboardController::class, 'leagueSummary']);
+        Route::get('/limits', [LeagueController::class, 'limits']);
 
         Route::get('/referees', [RefereeController::class, 'index']);
         Route::post('/referees', [RefereeController::class, 'store']);

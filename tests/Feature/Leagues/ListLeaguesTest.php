@@ -26,7 +26,7 @@ class ListLeaguesTest extends TestCase
             ->assertJsonPath('data.0.admin.status', 'pending');
 
         $this->assertSame(
-            ['id', 'name', 'status', 'is_active', 'admin', 'created_at'],
+            ['id', 'name', 'status', 'is_active', 'max_active_tournaments', 'max_teams_per_tournament', 'admin', 'created_at'],
             array_keys($response->json('data.0'))
         );
         $this->assertSame(

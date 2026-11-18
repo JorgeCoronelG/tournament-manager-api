@@ -114,6 +114,16 @@ class Message
 
     public const PLAYER_NOT_BANNED = 'El jugador no está vetado en esta liga.';
 
+    public static function getMessageLeagueLimitActiveTournaments(int $limit): string
+    {
+        return "Esta liga permite {$limit} torneo(s) activo(s) a la vez. Finaliza uno o solicita ampliar el límite.";
+    }
+
+    public static function getMessageLeagueLimitTeams(int $limit): string
+    {
+        return "Esta liga permite hasta {$limit} equipos inscritos por torneo.";
+    }
+
     public static function getMessagePlayerGenderLocked(string $tournaments): string
     {
         return "No se puede cambiar la rama porque el jugador está inscrito en: {$tournaments}. Primero da de baja al jugador de esos torneos.";
