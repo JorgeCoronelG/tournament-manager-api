@@ -36,6 +36,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'AgendaServiceInterface' => 'AgendaService',
         'RegistrationChangeServiceInterface' => 'RegistrationChangeService',
         'TeamBanServiceInterface' => 'TeamBanService',
+        'DashboardServiceInterface' => 'DashboardService',
         'LogoProcessorInterface' => 'LogoImageProcessor',
     ];
 

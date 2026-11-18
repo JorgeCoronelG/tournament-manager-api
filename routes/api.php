@@ -3,6 +3,7 @@
 use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AgendaController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
@@ -56,6 +57,8 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
     // Recursos de una liga (torneos, árbitros, canchas, equipos...): siempre anidados bajo
     // /leagues/{league}/... y filtrados por esa liga, nunca por un league_id del body.
     Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
+        Route::get('/dashboard/summary', [DashboardController::class, 'leagueSummary']);
+
         Route::get('/referees', [RefereeController::class, 'index']);
         Route::post('/referees', [RefereeController::class, 'store']);
         Route::get('/referees/lookup', [RefereeController::class, 'lookup'])->middleware('throttle:referee-lookup');
@@ -190,6 +193,8 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
 
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value])->group(function (): void {
     Route::get('/roles', [RoleController::class, 'index']);
+
+    Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
 
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);

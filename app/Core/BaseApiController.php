@@ -45,6 +45,26 @@ class BaseApiController extends Controller
     }
 
     /**
+     * Parámetro de un listado que debe ser un id (entero positivo); vacío se ignora y uno inválido responde 400.
+     *
+     * @throws CustomErrorException
+     */
+    protected function parseId(Request $request, string $key): ?int
+    {
+        if (! $request->filled($key)) {
+            return null;
+        }
+
+        $value = $request->query($key);
+
+        if (! is_string($value) || ! ctype_digit($value) || (int) $value < 1) {
+            throw new CustomErrorException(Message::INVALID_QUERY_PARAMETER, Response::HTTP_BAD_REQUEST);
+        }
+
+        return (int) $value;
+    }
+
+    /**
      * Parámetro de un listado que debe ser un año de cuatro dígitos; vacío se ignora y uno inválido responde 400.
      *
      * @throws CustomErrorException
