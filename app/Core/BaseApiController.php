@@ -5,6 +5,7 @@ namespace App\Core;
 use App\Core\Enum\Message;
 use App\Core\Traits\ApiResponse;
 use App\Exceptions\CustomErrorException;
+use App\Helpers\Validation;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,6 +42,42 @@ class BaseApiController extends Controller
         }
 
         return $value;
+    }
+
+    /**
+     * Parámetro de un listado que debe ser un id (entero positivo); vacío se ignora y uno inválido responde 400.
+     *
+     * @throws CustomErrorException
+     */
+    protected function parseId(Request $request, string $key): ?int
+    {
+        if (! $request->filled($key)) {
+            return null;
+        }
+
+        $value = $request->query($key);
+
+        if (! is_string($value) || ! ctype_digit($value) || (int) $value < 1) {
+            throw new CustomErrorException(Message::INVALID_QUERY_PARAMETER, Response::HTTP_BAD_REQUEST);
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * Parámetro de un listado que debe ser un año de cuatro dígitos; vacío se ignora y uno inválido responde 400.
+     *
+     * @throws CustomErrorException
+     */
+    protected function parseYear(Request $request, string $key = 'year'): ?int
+    {
+        if (! $request->filled($key)) {
+            return null;
+        }
+
+        $value = $request->query($key);
+
+        return Validation::validateYear(is_string($value) ? $value : null);
     }
 
     /**

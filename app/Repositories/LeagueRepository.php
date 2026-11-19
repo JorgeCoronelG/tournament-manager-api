@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Contracts\Repositories\LeagueRepositoryInterface;
 use App\Core\BaseRepository;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\LeagueStatus;
 use App\Models\League;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -19,12 +20,13 @@ class LeagueRepository extends BaseRepository implements LeagueRepositoryInterfa
         parent::__construct($entity);
     }
 
-    public function paginateManaged(ListQuery $query, ?int $adminUserId, ?string $search): LengthAwarePaginator
+    public function paginateManaged(ListQuery $query, ?int $adminUserId, ?string $search, ?LeagueStatus $status = null): LengthAwarePaginator
     {
         return $this->entity->newQuery()
             ->filter($query->filters)
             ->applySort($query->sort)
             ->when($adminUserId !== null, fn (Builder $builder) => $builder->where('admin_user_id', $adminUserId))
+            ->when($status !== null, fn (Builder $builder) => $builder->where('status', $status))
             ->when($search !== null, function (Builder $builder) use ($search) {
                 $builder->where(function (Builder $group) use ($search) {
                     $group->where('name', 'LIKE', "%{$search}%")
@@ -42,11 +44,12 @@ class LeagueRepository extends BaseRepository implements LeagueRepositoryInterfa
             ->withQueryString();
     }
 
-    public function paginateAccessible(ListQuery $query, ?int $adminUserId, ?string $search): LengthAwarePaginator
+    public function paginateAccessible(ListQuery $query, ?int $adminUserId, ?string $search, ?LeagueStatus $status = null): LengthAwarePaginator
     {
         return $this->entity->newQuery()
             ->applySort($query->sort)
             ->when($adminUserId !== null, fn (Builder $builder) => $builder->where('admin_user_id', $adminUserId))
+            ->when($status !== null, fn (Builder $builder) => $builder->where('status', $status))
             ->when($search !== null, fn (Builder $builder) => $builder->where('name', 'LIKE', "%{$search}%"))
             ->paginate($query->perPage)
             ->withQueryString();

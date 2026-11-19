@@ -13,6 +13,10 @@ class Message
 
     public const TOO_MANY_CODE_ATTEMPTS = 'Demasiados intentos fallidos. Solicite un nuevo código.';
 
+    public const LEAGUE_INACTIVE = 'La liga está desactivada.';
+
+    public const LEAGUE_DEACTIVATE_HAS_ACTIVE_TOURNAMENTS = 'No se puede desactivar una liga con torneos activos.';
+
     public const INVALID_QUERY_PARAMETER = 'Parámetro de consulta inválido.';
 
     public const INVALID_ID_PARAMETER_WITH_ID_BODY = 'El id es diferente al id del parámetro de ruta.';
@@ -109,6 +113,16 @@ class Message
     public const PLAYER_ALREADY_BANNED = 'El jugador ya está vetado en esta liga.';
 
     public const PLAYER_NOT_BANNED = 'El jugador no está vetado en esta liga.';
+
+    public static function getMessageLeagueLimitActiveTournaments(int $limit): string
+    {
+        return "Esta liga permite {$limit} torneo(s) activo(s) a la vez. Finaliza uno o solicita ampliar el límite.";
+    }
+
+    public static function getMessageLeagueLimitTeams(int $limit): string
+    {
+        return "Esta liga permite hasta {$limit} equipos inscritos por torneo.";
+    }
 
     public static function getMessagePlayerGenderLocked(string $tournaments): string
     {
@@ -270,6 +284,8 @@ class Message
     public const REGULAR_STAGE_CLOSED = 'La fase regular ya está cerrada.';
 
     public const TOURNAMENT_NOT_STARTED = 'El torneo no ha iniciado.';
+
+    public const TOURNAMENT_NOT_FINISHED = 'El torneo aún no ha finalizado.';
 
     public const MATCH_RESULT_ONLY_REGULAR_STAGE = 'Solo se puede capturar el resultado de partidos de fase regular.';
 

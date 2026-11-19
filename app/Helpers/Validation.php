@@ -72,6 +72,20 @@ class Validation
     }
 
     /**
+     * Valida un año de cuatro dígitos (p. ej. "2026") y lo devuelve como entero.
+     *
+     * @throws CustomErrorException
+     */
+    public static function validateYear(?string $year = null): int
+    {
+        if ($year === null || ! preg_match('/^\d{4}$/', $year)) {
+            throw new CustomErrorException(Message::INVALID_QUERY_PARAMETER, Response::HTTP_BAD_REQUEST);
+        }
+
+        return (int) $year;
+    }
+
+    /**
      * Función para validar una fecha en formato AAAA/MM/DD
      *
      * @throws CustomErrorException

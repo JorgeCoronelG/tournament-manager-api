@@ -170,6 +170,18 @@ class MatchRepository extends BaseRepository implements MatchRepositoryInterface
             ->get();
     }
 
+    public function playedTotals(int $tournamentId): array
+    {
+        $row = $this->entity->newQuery()
+            ->where('tournament_id', $tournamentId)
+            ->where('status', MatchStatus::PLAYED)
+            ->selectRaw('COUNT(*) as matches, COALESCE(SUM(COALESCE(home_score, 0) + COALESCE(away_score, 0)), 0) as goals')
+            ->toBase()
+            ->first();
+
+        return ['matches' => (int) ($row->matches ?? 0), 'goals' => (int) ($row->goals ?? 0)];
+    }
+
     public function isRegularStageComplete(int $groupId): bool
     {
         $matches = fn () => $this->entity->newQuery()->where('group_id', $groupId)->where('phase', MatchPhase::REGULAR_STAGE);

@@ -29,6 +29,10 @@ class SaveLeagueRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:150', $this->uniqueName()],
             'admin_user_id' => ['required', 'integer', $this->validAdmin()],
+            // `present`: el campo debe venir, pero null significa «sin límite».
+            'max_active_tournaments' => ['present', 'nullable', 'integer', 'min:1', 'max:65535'],
+            // Reservado para los planes futuros: hoy no se configura.
+            'max_teams_per_tournament' => ['sometimes', 'nullable', 'integer', 'min:2', 'max:65535'],
         ];
     }
 
@@ -40,6 +44,8 @@ class SaveLeagueRequest extends FormRequest
         return [
             'name' => 'nombre',
             'admin_user_id' => 'encargado',
+            'max_active_tournaments' => 'máximo de torneos activos',
+            'max_teams_per_tournament' => 'máximo de equipos por torneo',
         ];
     }
 

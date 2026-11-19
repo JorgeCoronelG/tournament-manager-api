@@ -3,6 +3,7 @@
 use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AgendaController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
@@ -56,6 +57,9 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
     // Recursos de una liga (torneos, árbitros, canchas, equipos...): siempre anidados bajo
     // /leagues/{league}/... y filtrados por esa liga, nunca por un league_id del body.
     Route::middleware('league.access')->prefix('/leagues/{league}')->group(function (): void {
+        Route::get('/dashboard/summary', [DashboardController::class, 'leagueSummary']);
+        Route::get('/limits', [LeagueController::class, 'limits']);
+
         Route::get('/referees', [RefereeController::class, 'index']);
         Route::post('/referees', [RefereeController::class, 'store']);
         Route::get('/referees/lookup', [RefereeController::class, 'lookup'])->middleware('throttle:referee-lookup');
@@ -85,8 +89,12 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
 
         Route::scopeBindings()->group(function (): void {
             Route::get('/tournaments', [TournamentController::class, 'index']);
+            // Antes de /tournaments/{tournament}: "history" no es un id.
+            Route::get('/tournaments/history', [TournamentController::class, 'history']);
+            Route::get('/tournaments/history/years', [TournamentController::class, 'historyYears']);
             Route::post('/tournaments', [TournamentController::class, 'store']);
             Route::get('/tournaments/{tournament}', [TournamentController::class, 'show']);
+            Route::get('/tournaments/{tournament}/summary', [TournamentController::class, 'summary']);
             Route::put('/tournaments/{tournament}', [TournamentController::class, 'update']);
             Route::patch('/tournaments/{tournament}/status', [TournamentController::class, 'updateStatus']);
             Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);
@@ -187,6 +195,8 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value])->group(function (): void {
     Route::get('/roles', [RoleController::class, 'index']);
 
+    Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::get('/users/{id}', [UserController::class, 'show']);
@@ -199,5 +209,6 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value])->
     Route::post('/leagues', [LeagueController::class, 'store']);
     Route::get('/leagues/{id}', [LeagueController::class, 'show']);
     Route::put('/leagues/{id}', [LeagueController::class, 'update']);
+    Route::patch('/leagues/{id}/status', [LeagueController::class, 'updateStatus']);
     Route::delete('/leagues/{id}', [LeagueController::class, 'destroy']);
 });

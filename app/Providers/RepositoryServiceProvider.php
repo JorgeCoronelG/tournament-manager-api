@@ -28,6 +28,7 @@ class RepositoryServiceProvider extends ServiceProvider
         'MatchRepositoryInterface' => 'MatchRepository',
         'PlayoffRepositoryInterface' => 'PlayoffRepository',
         'ScheduleRepositoryInterface' => 'ScheduleRepository',
+        'DashboardRepositoryInterface' => 'DashboardRepository',
     ];
 
     /**

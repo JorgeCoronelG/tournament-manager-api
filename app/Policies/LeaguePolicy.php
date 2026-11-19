@@ -9,11 +9,12 @@ use App\Models\User;
 class LeaguePolicy
 {
     /**
-     * Superadmin accede a cualquier liga; un encargado, solo a las suyas.
+     * Superadmin accede a cualquier liga (incluso inactiva, para consultarla y reactivarla); un encargado,
+     * solo a las suyas y mientras estén activas.
      */
     public function access(User $user, League $league): bool
     {
         return $user->roles->contains('id', RoleEnum::SUPERADMIN->value)
-            || $league->admin_user_id === $user->id;
+            || ($league->admin_user_id === $user->id && $league->isActive());
     }
 }

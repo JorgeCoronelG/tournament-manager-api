@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\Services\TournamentServiceInterface;
+use App\Contracts\Services\TournamentSummaryServiceInterface;
 use App\Core\BaseApiController;
 use App\Core\Classes\ListQuery;
 use App\Core\Enum\Message;
@@ -11,6 +12,7 @@ use App\Core\Enum\TournamentStatus;
 use App\Exceptions\CustomErrorException;
 use App\Http\Requests\Tournaments\SaveTournamentRequest;
 use App\Http\Requests\Tournaments\UpdateTournamentStatusRequest;
+use App\Http\Resources\Tournaments\TournamentHistoryResource;
 use App\Http\Resources\Tournaments\TournamentResource;
 use App\Models\League;
 use App\Models\Tournament;
@@ -20,7 +22,10 @@ use Illuminate\Http\Response;
 
 class TournamentController extends BaseApiController
 {
-    public function __construct(protected TournamentServiceInterface $tournamentService) {}
+    public function __construct(
+        protected TournamentServiceInterface $tournamentService,
+        protected TournamentSummaryServiceInterface $summaryService,
+    ) {}
 
     public function index(Request $request, League $league): JsonResponse
     {
@@ -37,6 +42,29 @@ class TournamentController extends BaseApiController
         );
 
         return $this->showAll(TournamentResource::collection($tournaments));
+    }
+
+    public function history(Request $request, League $league): JsonResponse
+    {
+        $listQuery = ListQuery::fromRequest($request);
+        $tournaments = $this->tournamentService->paginateHistory(
+            $league,
+            $this->parseSearch($request),
+            $this->parseYear($request),
+            $listQuery->perPage
+        );
+
+        return $this->showAll(TournamentHistoryResource::collection($tournaments));
+    }
+
+    public function historyYears(League $league): JsonResponse
+    {
+        return response()->json(['data' => $this->tournamentService->historyYears($league)]);
+    }
+
+    public function summary(League $league, Tournament $tournament): JsonResponse
+    {
+        return $this->successResponse($this->summaryService->summary($tournament), Response::HTTP_OK);
     }
 
     public function store(SaveTournamentRequest $request, League $league): JsonResponse

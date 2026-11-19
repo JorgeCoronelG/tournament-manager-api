@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Core\Enum\Message;
+use App\Exceptions\CustomErrorException;
 use App\Models\League;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -37,6 +39,10 @@ class LeagueAccess
         }
 
         if (! $user->can('access', $league)) {
+            if ($league->admin_user_id === $user->id && ! $league->isActive()) {
+                throw new CustomErrorException(Message::LEAGUE_INACTIVE, Response::HTTP_FORBIDDEN);
+            }
+
             throw new AuthorizationException;
         }
 

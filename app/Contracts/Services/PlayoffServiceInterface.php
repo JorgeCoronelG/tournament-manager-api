@@ -65,6 +65,15 @@ interface PlayoffServiceInterface
     public function close(Tournament $tournament, array $entries): Tournament;
 
     /**
+     * Resultado de cada liguilla ya decidida, en el orden de prioridad de la leyenda de posiciones: id, nombre, texto de
+     * posiciones de origen, campeón (ganador de la final, por global o penales) y subcampeón (quien la perdió); ambos
+     * `{id, name, logo_url}` del equipo o null si la final no está decidida.
+     *
+     * @return list<array{id: int, name: string, positions: string, champion: array<string, mixed>|null, runner_up: array<string, mixed>|null}>
+     */
+    public function results(Tournament $tournament): array;
+
+    /**
      * Llaves de cada liguilla y campeón. Con el torneo en liguilla o terminado.
      *
      * @return array{playoffs: list<array<string, mixed>>}

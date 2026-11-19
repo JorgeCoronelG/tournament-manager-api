@@ -353,6 +353,62 @@ class PlayoffFlowTest extends TestCase
         $this->patchJson($this->resultUrl($league, $tournament, $final), ['home_goals' => 0, 'away_goals' => 1], $header)->assertStatus(422)->assertJsonPath('error', Message::MATCH_TOURNAMENT_FINISHED);
     }
 
+    public function test_summary_of_a_finished_tournament_with_champion_and_runner_up(): void
+    {
+        [$league, $tournament, $header, $playoffId, $teams] = $this->closed([1, 1]);
+        $base = $this->base($league, $tournament);
+        $url = "{$base}/summary";
+
+        $this->getJson($url, $header)->assertStatus(422)->assertJsonPath('error', Message::TOURNAMENT_NOT_FINISHED);
+
+        $this->patchJson($this->resultUrl($league, $tournament, $this->tie($playoffId, 1, 1)->matches->firstOrFail()), ['home_goals' => 2, 'away_goals' => 0], $header)->assertOk();
+        $this->patchJson($this->resultUrl($league, $tournament, $this->tie($playoffId, 1, 2)->matches->firstOrFail()), ['home_goals' => 0, 'away_goals' => 1], $header)->assertOk();
+        $this->patchJson($this->resultUrl($league, $tournament, $this->tie($playoffId, 2, 1)->matches->firstOrFail()), ['home_goals' => 3, 'away_goals' => 1], $header)->assertOk();
+        $this->patchJson("{$base}/status", ['status' => 'finished'], $header)->assertOk();
+
+        $played = GameMatch::query()->where('tournament_id', $tournament->id)->where('status', MatchStatus::PLAYED)->get();
+
+        $this->getJson($url, $header)->assertOk()
+            ->assertJsonPath('teams_count', 4)
+            ->assertJsonPath('playoffs_count', 1)
+            ->assertJsonPath('matches_played', $played->count())
+            ->assertJsonPath('goals_scored', $played->sum(fn (GameMatch $m) => $m->home_score + $m->away_score))
+            ->assertJsonPath('champion', null)
+            ->assertJsonPath('playoffs.0.id', $playoffId)
+            ->assertJsonPath('playoffs.0.name', 'Liguilla')
+            ->assertJsonPath('playoffs.0.positions', '1-4')
+            ->assertJsonPath('playoffs.0.champion.id', $teams[0]->team_id)
+            ->assertJsonPath('playoffs.0.runner_up.id', $teams[2]->team_id)
+            ->assertJsonStructure(['playoffs' => [['champion' => ['id', 'name', 'logo_url'], 'runner_up' => ['id', 'name', 'logo_url']]]]);
+        $this->assertSame(9, $played->count());
+    }
+
+    public function test_summary_of_a_finished_tournament_without_playoffs_uses_the_standings_leader(): void
+    {
+        [$league, $tournament, $header, , $teams] = $this->tournament(4, true, null, false);
+        $tournament->forceFill(['status' => TournamentStatus::FINISHED])->save();
+
+        $this->getJson($this->base($league, $tournament).'/summary', $header)->assertOk()
+            ->assertJsonPath('playoffs_count', 0)
+            ->assertJsonPath('playoffs', [])
+            ->assertJsonPath('matches_played', 6)
+            ->assertJsonPath('champion.source', 'standings')
+            ->assertJsonCount(1, 'champion.teams')
+            ->assertJsonPath('champion.teams.0.id', $teams[0]->team_id)
+            ->assertJsonPath('champion.teams.0.group_id', $teams[0]->group_id);
+    }
+
+    public function test_summary_without_playoffs_has_no_champion_when_the_first_place_is_tied(): void
+    {
+        [$league, $tournament, $header] = $this->tournament(2, false, null, false);
+        foreach (GameMatch::query()->where('tournament_id', $tournament->id)->get() as $match) {
+            $match->forceFill(['status' => MatchStatus::PLAYED, 'home_score' => 1, 'away_score' => 1])->save();
+        }
+        $tournament->forceFill(['status' => TournamentStatus::FINISHED])->save();
+
+        $this->getJson($this->base($league, $tournament).'/summary', $header)->assertOk()->assertJsonPath('champion', null)->assertJsonPath('playoffs', []);
+    }
+
     public function test_clearing_and_editing_results_with_and_without_results_in_the_next_round(): void
     {
         [$league, $tournament, $header, $playoffId, $teams] = $this->closed([1, 1]);
@@ -455,6 +511,7 @@ class PlayoffFlowTest extends TestCase
             'preview' => ['GET', '/close-regular-phase/preview'],
             'close' => ['POST', '/close-regular-phase'],
             'playoffs' => ['GET', '/playoffs'],
+            'summary' => ['GET', '/summary'],
         ];
     }
 

@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\Services\LeagueServiceInterface;
 use App\Core\BaseApiController;
 use App\Core\Classes\ListQuery;
+use App\Core\Enum\LeagueStatus;
 use App\Core\Enum\Message;
 use App\Exceptions\CustomErrorException;
 use App\Http\Requests\Leagues\SaveLeagueRequest;
+use App\Http\Requests\Leagues\UpdateLeagueStatusRequest;
 use App\Http\Resources\Leagues\LeagueResource;
+use App\Models\League;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -25,7 +28,8 @@ class LeagueController extends BaseApiController
         $leagues = $this->leagueService->paginate(
             $listQuery,
             $this->parseAdminUserId($request),
-            $this->parseSearch($request)
+            $this->parseSearch($request),
+            $this->parseStatus($request)
         );
 
         return $this->showAll(LeagueResource::collection($leagues));
@@ -36,6 +40,11 @@ class LeagueController extends BaseApiController
         $league = $this->leagueService->create($request->toData());
 
         return $this->showOne(new LeagueResource($league), Response::HTTP_CREATED);
+    }
+
+    public function limits(League $league): JsonResponse
+    {
+        return $this->successResponse($this->leagueService->limits($league), Response::HTTP_OK);
     }
 
     public function show(int $id): JsonResponse
@@ -53,11 +62,36 @@ class LeagueController extends BaseApiController
         return $this->showOne(new LeagueResource($league));
     }
 
+    public function updateStatus(UpdateLeagueStatusRequest $request, int $id): JsonResponse
+    {
+        $league = $this->leagueService->updateStatus($id, $request->boolean('is_active'));
+
+        return $this->showOne(new LeagueResource($league));
+    }
+
     public function destroy(int $id): Response
     {
         $this->leagueService->delete($id);
 
         return $this->noContentResponse();
+    }
+
+    /**
+     * @throws CustomErrorException
+     */
+    private function parseStatus(Request $request): ?LeagueStatus
+    {
+        if (! $request->filled('status')) {
+            return null;
+        }
+
+        $status = LeagueStatus::tryFrom((string) $request->string('status'));
+
+        if ($status === null) {
+            throw new CustomErrorException(Message::INVALID_QUERY_PARAMETER, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $status;
     }
 
     /**

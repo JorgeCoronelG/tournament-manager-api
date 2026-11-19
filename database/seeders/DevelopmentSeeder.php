@@ -10,6 +10,7 @@ use App\Contracts\Services\RegistrationChangeServiceInterface;
 use App\Contracts\Services\ScheduleGeneratorServiceInterface;
 use App\Core\Enum\FieldStatus;
 use App\Core\Enum\LeagueRefereeStatus;
+use App\Core\Enum\LeagueStatus;
 use App\Core\Enum\MatchStatus;
 use App\Core\Enum\PlayerGender;
 use App\Core\Enum\RegistrationStatus;
@@ -80,7 +81,7 @@ class DevelopmentSeeder extends Seeder
     /**
      * Ligas demo: canchas, equipos propios y escenarios de torneo (el índice es el patrón de ventanas).
      *
-     * @var array<int, array{fields: int, teams: int, tournaments: list<string>}>
+     * @var array<int, array{fields: int, teams: int, tournaments: list<string>, limits?: array{max_active_tournaments: int|null}}>
      */
     private const DEMO_LEAGUES = [
         1 => ['fields' => 3, 'teams' => 8, 'tournaments' => ['regular', 'playoffs', 'groups']],
@@ -89,6 +90,9 @@ class DevelopmentSeeder extends Seeder
         4 => ['fields' => 3, 'teams' => 25, 'tournaments' => ['t25_planning', 't25_to_close']],
         5 => ['fields' => 2, 'teams' => 25, 'tournaments' => ['t25_tied', 'minimums']],
         6 => ['fields' => 3, 'teams' => 16, 'tournaments' => ['tied_ten', 'tied_groups']],
+        7 => ['fields' => 3, 'teams' => 16, 'tournaments' => ['finished_one', 'finished_two', 'finished_groups', 'finished_none']],
+        // Un solo torneo activo permitido: el torneo en curso ya ocupa el lugar, así que iniciar el de planeación se rechaza.
+        8 => ['fields' => 2, 'teams' => 10, 'tournaments' => ['regular', 'groups'], 'limits' => ['max_active_tournaments' => 1]],
     ];
 
     /** Equipos por liga. */
@@ -107,6 +111,9 @@ class DevelopmentSeeder extends Seeder
     {
         $this->seedSuperAdmin();
 
+        // El límite de equipos por torneo está reservado para los planes futuros: en bases ya sembradas se limpia.
+        League::query()->update(['max_teams_per_tournament' => null]);
+
         $leagues = $this->seedLeagues();
         $this->seedTournaments($leagues);
         $this->seedReferees($leagues);
@@ -122,6 +129,7 @@ class DevelopmentSeeder extends Seeder
         $this->seedSchedulingScenarios($leagues);
         $this->seedRoleTestUsers($leagues);
         $this->seedDemoLeagues();
+        $this->seedInactiveLeague();
     }
 
     /**
@@ -998,6 +1006,23 @@ class DevelopmentSeeder extends Seeder
      * (WINDOW_PATTERNS) para no chocar en canchas, árbitros ni equipos. Los torneos en planeación quedan sin calendario,
      * sin horarios y sin árbitros a propósito. Una liga que ya existe se omite, así que es seguro correrlo varias veces.
      */
+    /**
+     * Liga pequeña desactivada (con su administrador) para probar la tabla, el filtro y el bloqueo de acceso.
+     */
+    private function seedInactiveLeague(): void
+    {
+        $name = 'Liga Inactiva';
+
+        if (League::query()->where('name', $name)->exists()) {
+            return;
+        }
+
+        $admin = User::factory()->create(['user_code' => 'LIGAINA', 'phone' => $this->phone(), 'email' => 'liga.inactiva@example.com']);
+        $admin->roles()->sync([RoleEnum::LEAGUE_ADMIN->value]);
+
+        League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name, 'status' => LeagueStatus::INACTIVE]);
+    }
+
     private function seedDemoLeagues(): void
     {
         $managerIds = User::query()
@@ -1016,7 +1041,7 @@ class DevelopmentSeeder extends Seeder
             DB::transaction(function () use ($number, $name, $spec, $managerIds): void {
                 $admin = User::factory()->create(['user_code' => sprintf('LIGAD%02d', $number), 'phone' => $this->phone()]);
                 $admin->roles()->sync([RoleEnum::LEAGUE_ADMIN->value]);
-                $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name]);
+                $league = League::factory()->create(['admin_user_id' => $admin->id, 'name' => $name] + ($spec['limits'] ?? []));
 
                 for ($field = 1; $field <= $spec['fields']; $field++) {
                     Field::factory()->create(['league_id' => $league->id, 'name' => "Cancha {$field}"]);
@@ -1150,6 +1175,48 @@ class DevelopmentSeeder extends Seeder
 
                 break;
 
+            case 'finished_one':
+                [$tournament, $group] = $single('Clausura 2026', 8);
+                $this->seedScheduledCalendar($tournament, $league, $slot % 3, fn (int $matchdays): int => $matchdays + 5);
+                $this->playRegularMatches($tournament);
+                $playoff = $this->seedPlayoff($tournament, 'Liguilla', [[$group, 1, 4]], [2, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot % 3, [$playoff], 3, true);
+                $this->finishTournament($tournament, '2026-01-12');
+
+                break;
+
+            case 'finished_two':
+                [$tournament, $group] = $single('Apertura 2026', 8);
+                $this->seedScheduledCalendar($tournament, $league, $slot % 3, fn (int $matchdays): int => $matchdays + 5);
+                $this->playRegularMatches($tournament);
+                $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', [[$group, 1, 4]], [1, 1]);
+                $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', [[$group, 5, 8]], [1, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot % 3, [$principal, $consolation], 2, true);
+                $this->finishTournament($tournament, '2026-07-06');
+
+                break;
+
+            case 'finished_groups':
+                $tournament = $make('Clausura 2025', TournamentStatus::IN_PROGRESS);
+                $groups = $this->seedGroups($tournament, $teams, ['Grupo A', 'Grupo B', 'Grupo C', 'Grupo D'], 4);
+                $this->seedScheduledCalendar($tournament, $league, $slot % 3, fn (int $matchdays): int => $matchdays + 5);
+                $this->playRegularMatches($tournament);
+                $principal = $this->seedPlayoff($tournament, 'Liguilla Principal', array_map(fn (TournamentGroup $group) => [$group, 1, 2], $groups), [1, 2, 1]);
+                $consolation = $this->seedPlayoff($tournament, 'Liguilla Consolación', array_map(fn (TournamentGroup $group) => [$group, 3, 4], $groups), [1, 2, 1]);
+                $this->closeAndSchedulePlayoffs($tournament, $league, $slot % 3, [$principal, $consolation], 4, true);
+                $this->finishTournament($tournament, '2025-01-13');
+
+                break;
+
+            case 'finished_none':
+                // Sin liguillas el torneo pasa a finalizado directo desde la fase regular.
+                [$tournament] = $single('Copa Verano 2024', 6);
+                $this->seedScheduledCalendar($tournament, $league, $slot % 3, fn (int $matchdays): int => $matchdays + 5);
+                $this->playRegularMatches($tournament);
+                $this->finishTournament($tournament, '2024-06-03');
+
+                break;
+
             case 'two_playoffs':
                 [$tournament, $group] = $single('Torneo 2 Liguillas', 8);
                 $this->seedScheduledCalendar($tournament, $league, $slot, $played);
@@ -1229,6 +1296,49 @@ class DevelopmentSeeder extends Seeder
                 } : null);
         }
 
+    }
+
+    /**
+     * Juega toda la liguilla (si la hay), marca el torneo como finalizado y lo mueve en el tiempo (ver `moveToDate`).
+     */
+    private function finishTournament(Tournament $tournament, string $startDate): void
+    {
+        $this->playAllPlayoffMatches($tournament->refresh());
+        $tournament->forceFill(['status' => TournamentStatus::FINISHED])->save();
+        $this->moveToDate($tournament, $startDate);
+    }
+
+    /**
+     * Desplaza el torneo en semanas completas (los partidos conservan su día de la semana) para que su primer partido
+     * caiga en la semana de `$startDate`: fechas y horas de los partidos, fechas de rondas y de inicio de las liguillas.
+     * El `start_date` del torneo queda en `$startDate`; de ahí sale el año del historial.
+     */
+    private function moveToDate(Tournament $tournament, string $startDate): void
+    {
+        $first = GameMatch::query()->where('tournament_id', $tournament->id)->whereNotNull('match_datetime')->min('match_datetime');
+        $weeks = $first === null ? 0 : (int) round(CarbonImmutable::parse((string) $first)->startOfDay()->diffInDays(CarbonImmutable::parse($startDate), false) / 7);
+
+        if ($weeks !== 0) {
+            foreach (GameMatch::query()->where('tournament_id', $tournament->id)->get() as $match) {
+                $match->forceFill([
+                    'match_datetime' => $match->match_datetime?->copy()->addWeeks($weeks),
+                    'original_match_datetime' => $match->original_match_datetime?->copy()->addWeeks($weeks),
+                    'scheduled_date' => $match->scheduled_date?->copy()->addWeeks($weeks),
+                ])->save();
+            }
+
+            foreach ($tournament->groups()->where('type', TournamentGroupType::PLAYOFF)->get() as $playoff) {
+                $playoff->forceFill([
+                    'start_date' => $playoff->start_date?->copy()->addWeeks($weeks),
+                    'round_dates' => $playoff->round_dates === null ? null : array_map(
+                        fn (string $date): string => CarbonImmutable::parse($date)->addWeeks($weeks)->toDateString(),
+                        $playoff->round_dates,
+                    ),
+                ])->save();
+            }
+        }
+
+        $tournament->forceFill(['start_date' => $startDate])->save();
     }
 
     /**

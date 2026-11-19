@@ -35,6 +35,18 @@ interface TournamentServiceInterface extends BaseServiceInterface
         array $excludeStatuses = []
     ): LengthAwarePaginator;
 
+    /**
+     * Historial: torneos finalizados de la liga (más reciente primero) con `teams_count`, `playoffs_count` y `end_date`.
+     *
+     * @return LengthAwarePaginator<int, Tournament>
+     */
+    public function paginateHistory(League $league, ?string $search, ?int $year, int $perPage): LengthAwarePaginator;
+
+    /**
+     * @return list<int> años con al menos un torneo finalizado, de mayor a menor
+     */
+    public function historyYears(League $league): array;
+
     public function createInLeague(League $league, TournamentData $data): Tournament;
 
     /**

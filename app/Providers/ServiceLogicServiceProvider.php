@@ -18,6 +18,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'RoleServiceInterface' => 'RoleService',
         'UserServiceInterface' => 'UserService',
         'TournamentServiceInterface' => 'TournamentService',
+        'TournamentSummaryServiceInterface' => 'TournamentSummaryService',
         'FieldServiceInterface' => 'FieldService',
         'LeagueRefereeServiceInterface' => 'LeagueRefereeService',
         'TeamServiceInterface' => 'TeamService',
@@ -35,6 +36,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'AgendaServiceInterface' => 'AgendaService',
         'RegistrationChangeServiceInterface' => 'RegistrationChangeService',
         'TeamBanServiceInterface' => 'TeamBanService',
+        'DashboardServiceInterface' => 'DashboardService',
         'LogoProcessorInterface' => 'LogoImageProcessor',
     ];
 
