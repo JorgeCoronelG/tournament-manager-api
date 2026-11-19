@@ -1,4 +1,4 @@
-FROM composer:2.9.5 AS composer
+FROM composer:2.11.1 AS composer
 
 # Versión fija a propósito (mismo PHP en local y en el servidor). Súbela cuando salga un parche de seguridad.
 FROM php:8.5.12-cli

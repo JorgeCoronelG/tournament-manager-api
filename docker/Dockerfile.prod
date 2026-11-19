@@ -1,7 +1,7 @@
 # Esta etapa solo descarga dependencias. La imagen composer:2 cambia de versión de PHP por su cuenta
 # (ya trae 8.6) y Composer rechazaría paquetes que declaran soporte hasta 8.5. El PHP real de producción
 # es el de la etapa final (8.5.12), así que aquí se ignoran los requisitos de plataforma.
-FROM composer:2.9.5 AS vendor
+FROM composer:2.11.1 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --ignore-platform-reqs
