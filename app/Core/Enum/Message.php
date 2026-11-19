@@ -19,8 +19,6 @@ class Message
 
     public const INVALID_QUERY_PARAMETER = 'Parámetro de consulta inválido.';
 
-    public const INVALID_ID_PARAMETER_WITH_ID_BODY = 'El id es diferente al id del parámetro de ruta.';
-
     // Mensajes de excepciones
     public const AUTHENTICATION_EXCEPTION = 'No autenticado.';
 
@@ -243,7 +241,7 @@ class Message
 
     public const CLOSE_ONLY_IN_PROGRESS = 'Solo se puede cerrar la fase regular de un torneo en curso.';
 
-    public const CLOSE_NO_PLAYOFFS = 'Este torneo no tiene liguilla; usa Terminar torneo.';
+    public const CLOSE_NO_PLAYOFFS = 'Este torneo no tiene liguilla; usa Finalizar torneo.';
 
     public const CLOSE_PENDING_MATCHES = 'Faltan partidos de la fase regular por jugar.';
 

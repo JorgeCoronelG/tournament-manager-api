@@ -9,12 +9,13 @@ class MediaLogoTest extends TestCase
 {
     public function test_serves_logo_with_cors_and_cache_headers(): void
     {
+        config(['cors.allowed_origins' => ['http://localhost:4200']]);
         Storage::fake('public');
         Storage::disk('public')->put('teams/logos/a.webp', 'img');
 
         $this->get('/media/teams/logos/a.webp', ['Origin' => 'http://localhost:4200'])
             ->assertOk()
-            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertHeader('Access-Control-Allow-Origin', 'http://localhost:4200')
             ->assertHeader('Vary', 'Origin')
             ->assertHeader('Cache-Control', 'max-age=86400, public');
     }

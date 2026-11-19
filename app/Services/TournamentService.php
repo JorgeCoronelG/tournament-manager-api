@@ -135,7 +135,6 @@ class TournamentService extends BaseService implements TournamentServiceInterfac
     {
         $this->assertTransitionAllowed($tournament, $status);
 
-        // TODO: al existir partidos, validar aquí el resto de precondiciones para iniciar.
         if ($status === TournamentStatus::IN_PROGRESS
             && $this->participatingTeams($tournament) < self::MIN_TEAMS_TO_START) {
             throw new CustomErrorException(Message::TOURNAMENT_START_NEEDS_TEAMS, Response::HTTP_UNPROCESSABLE_ENTITY);

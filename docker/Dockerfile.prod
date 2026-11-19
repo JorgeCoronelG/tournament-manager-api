@@ -1,0 +1,27 @@
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+COPY . .
+RUN composer dump-autoload --no-dev --optimize
+
+# Misma versión de PHP que el Dockerfile de desarrollo.
+FROM php:8.5.12-fpm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx supervisor libzip-dev libpng-dev libjpeg-dev libwebp-dev \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install pdo_mysql zip bcmath pcntl gd opcache \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/prod/nginx.conf /etc/nginx/sites-available/default
+COPY docker/prod/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/prod/php.ini /usr/local/etc/php/conf.d/zz-prod.ini
+
+WORKDIR /var/www/html
+COPY --from=vendor /app .
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
