@@ -1,11 +1,12 @@
 name: Publish image
 
 # Construye la imagen de producción de la API y la sube a GHCR:
-#   - cada push a main   -> :main y :sha-<commit>
+#   - cada push a main    -> :main y :sha-<commit>
+#   - cada push a staging -> :staging y :sha-<commit>
 #   - cada tag v*        -> :<version>, :<major>.<minor> y :latest
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     tags: ["v*"]
 
 permissions:
