@@ -9,7 +9,7 @@ COPY . .
 RUN composer dump-autoload --no-dev --optimize
 
 # Misma versión de PHP que el Dockerfile de desarrollo.
-FROM php:8.5.12-fpm
+FROM php:8.6.0RC5-fpm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nginx supervisor libzip-dev libpng-dev libjpeg-dev libwebp-dev \

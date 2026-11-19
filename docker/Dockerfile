@@ -1,7 +1,7 @@
 FROM composer:2.9.5 AS composer
 
 # Versión fija a propósito (mismo PHP en local y en el servidor). Súbela cuando salga un parche de seguridad.
-FROM php:8.5.12-cli
+FROM php:8.6.0RC5-cli
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip libzip-dev libsqlite3-dev \
