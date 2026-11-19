@@ -11,7 +11,7 @@ FROM php:8.5.12-fpm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nginx supervisor libzip-dev libpng-dev libjpeg-dev libwebp-dev \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
-    && docker-php-ext-install pdo_mysql zip bcmath pcntl gd opcache \
+    && docker-php-ext-install pdo_mysql zip bcmath pcntl gd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/prod/nginx.conf /etc/nginx/sites-available/default
