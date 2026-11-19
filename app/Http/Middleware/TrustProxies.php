@@ -10,9 +10,13 @@ class TrustProxies extends Middleware
     /**
      * The trusted proxies for this application.
      *
+     * En producción la API solo es alcanzable a través del proxy (Caddy) dentro
+     * de la red de Docker, así que se confía en el proxy para leer
+     * X-Forwarded-Proto/Host y que Laravel detecte HTTPS.
+     *
      * @var array<int, string>|string|null
      */
-    protected $proxies;
+    protected $proxies = '*';
 
     /**
      * The headers that should be used to detect proxies.
