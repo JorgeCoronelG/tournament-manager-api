@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\PlayerRosterRequestController;
 use App\Http\Controllers\Api\PlayoffController;
 use App\Http\Controllers\Api\RefereeController;
+use App\Http\Controllers\Api\RefereeMatchController;
 use App\Http\Controllers\Api\RegistrationChangeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
@@ -73,6 +74,14 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::PLAYER->value])->pref
     Route::get('/roster-requests', [PlayerRosterRequestController::class, 'index']);
     Route::post('/roster-requests/{roster}/accept', [PlayerRosterRequestController::class, 'accept'])->whereNumber('roster');
     Route::post('/roster-requests/{roster}/reject', [PlayerRosterRequestController::class, 'reject'])->whereNumber('roster');
+});
+
+// App móvil, rol Árbitro: sus partidos, la plantilla para validar sin internet y el envío de lo registrado en la
+// cancha. El servicio comprueba que el partido sea suyo (403).
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::REFEREE->value])->prefix('/referee')->group(function (): void {
+    Route::get('/matches', [RefereeMatchController::class, 'index']);
+    Route::get('/matches/{match}/rosters', [RefereeMatchController::class, 'rosters'])->whereNumber('match');
+    Route::post('/matches/{match}/sync', [RefereeMatchController::class, 'sync'])->whereNumber('match')->middleware('throttle:referee-sync');
 });
 
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','.RoleEnum::LEAGUE_ADMIN->value])->group(function (): void {
