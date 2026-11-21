@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Contracts\Repositories\FeedRepositoryInterface;
 use App\Contracts\Services\FeedServiceInterface;
 use App\Contracts\Services\StandingServiceInterface;
-use App\Core\Enum\Message;
 use App\Core\Enum\MatchStatus;
+use App\Core\Enum\Message;
 use App\Exceptions\CustomErrorException;
 use App\Models\GameMatch;
 use App\Models\Tournament;
@@ -73,45 +73,35 @@ class FeedService implements FeedServiceInterface
 
         $match->load(['tournament.league', 'field', 'home.team', 'away.team']);
 
-        $name = fn (?string $first, ?string $last): string => trim(($first ?? '').' '.($last ?? ''));
+        $events = array_values($this->feedRepository->eventsOf($match)
+            ->map(fn (array $event) => ['id' => (string) $event['id']] + $event)
+            ->all());
 
-        $events = $this->feedRepository->eventsOf($match)->map(fn (object $event) => [
-            'id' => (string) $event->id,
-            'type' => $event->type,
-            'minute' => $event->minute === null ? null : (int) $event->minute,
-            'registration_id' => (int) $event->registration_id,
-            'player' => $event->player_id === null ? null : [
-                'player_id' => (int) $event->player_id,
-                'name' => $name($event->first_name, $event->last_name),
-                'jersey_number' => $event->jersey_number,
-            ],
-            'related_player' => $event->related_player_id === null ? null : [
-                'player_id' => (int) $event->related_player_id,
-                'name' => $name($event->related_first_name, $event->related_last_name),
-                'jersey_number' => $event->related_jersey_number,
-            ],
-        ])->values()->all();
-
-        $registered = $this->feedRepository->lineupsOf($match)->groupBy('registration_id');
+        $registered = $this->feedRepository->lineupsOf($match);
         $lineups = [];
 
         foreach ([$match->home, $match->away] as $side) {
-            if ($side === null || ! $registered->has($side->id)) {
+            if ($side === null) {
+                continue;
+            }
+
+            $players = $registered->where('registration_id', $side->id);
+
+            if ($players->isEmpty()) {
                 continue;
             }
 
             $lineups[] = [
                 'registration_id' => $side->id,
                 'team_name' => $side->team->name ?? '',
-                'players' => $registered->get($side->id)
-                    ?->map(fn (object $row) => [
-                        'player_id' => (int) $row->player_id,
-                        'name' => $name($row->first_name, $row->last_name),
-                        'jersey_number' => $row->jersey_number === null ? null : (int) $row->jersey_number,
+                'players' => array_values($players
+                    ->map(fn (array $row) => [
+                        'player_id' => $row['player_id'],
+                        'name' => $row['name'],
+                        'jersey_number' => $row['jersey_number'],
                     ])
                     ->sortBy('jersey_number')
-                    ->values()
-                    ->all() ?? [],
+                    ->all()),
             ];
         }
 
@@ -140,19 +130,11 @@ class FeedService implements FeedServiceInterface
                 'goals_against' => $row['goals_against'],
                 'goal_difference' => $row['goal_difference'],
                 'points' => $row['points'],
-                'form' => $form[$row['registration_id']] ?? [],
+                'form' => is_int($row['registration_id']) ? ($form[$row['registration_id']] ?? []) : [],
             ], $group['rows']),
         ], $this->standingService->standings($tournament, null));
 
-        $totals = $this->feedRepository->playerTotals($tournament->id)->map(fn (object $row) => [
-            'player_id' => (int) $row->player_id,
-            'name' => trim($row->first_name.' '.$row->last_name),
-            'team_name' => (string) $row->team_name,
-            'registration_id' => (int) $row->registration_id,
-            'goals' => (int) $row->goals,
-            'yellow_cards' => (int) $row->yellow_cards,
-            'red_cards' => (int) $row->red_cards,
-        ]);
+        $totals = $this->feedRepository->playerTotals($tournament->id);
 
         $scorers = $totals->filter(fn (array $row) => $row['goals'] > 0)
             ->sort(fn (array $a, array $b) => [$b['goals'], $a['name']] <=> [$a['goals'], $b['name']])
@@ -197,7 +179,7 @@ class FeedService implements FeedServiceInterface
             }
         }
 
-        return array_map(fn (array $list) => array_values(array_slice($list, -self::FORM_LENGTH)), $form);
+        return array_map(fn (array $list) => array_slice($list, -self::FORM_LENGTH), $form);
     }
 
     /**

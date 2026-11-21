@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 class FeedRepository implements FeedRepositoryInterface
 {
@@ -34,18 +35,18 @@ class FeedRepository implements FeedRepositoryInterface
             ->whereNull('deleted_at')->pluck('league_id');
         $asAdmin = DB::table('leagues')->where('admin_user_id', $user->id)->pluck('id');
 
-        $ids = $asPlayer->merge($asManager)->merge($asReferee)->merge($asAdmin)->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $ids = self::ints($asPlayer->merge($asManager)->merge($asReferee)->merge($asAdmin)->all());
 
-        return $ids === [] ? [] : array_values(array_map('intval', League::query()
+        return $ids === [] ? [] : self::ints(League::query()
             ->whereIn('id', $ids)
             ->where('status', LeagueStatus::ACTIVE)
             ->pluck('id')
-            ->all()));
+            ->all());
     }
 
     public function activeLeagueIds(): array
     {
-        return array_values(array_map('intval', League::query()->where('status', LeagueStatus::ACTIVE)->pluck('id')->all()));
+        return self::ints(League::query()->where('status', LeagueStatus::ACTIVE)->pluck('id')->all());
     }
 
     public function visibleTournaments(array $leagueIds, CarbonInterface $finishedSince): Collection
@@ -81,7 +82,10 @@ class FeedRepository implements FeedRepositoryInterface
             ->whereHas('team', fn (Builder $team) => $team->where('manager_user_id', $user->id))
             ->pluck('id');
 
-        return $asPlayer->merge($asManager)->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+        $ids = self::ints($asPlayer->merge($asManager)->all());
+        sort($ids);
+
+        return $ids;
     }
 
     public function matches(
@@ -135,12 +139,29 @@ class FeedRepository implements FeedRepositoryInterface
                 'e.id', 'e.type', 'e.minute', 'e.registration_id', 'e.player_id', 'e.related_player_id',
                 'u.first_name', 'u.last_name', 'ru.first_name as related_first_name', 'ru.last_name as related_last_name',
             ])
-            ->map(function (object $event) use ($match): object {
-                $event->jersey_number = $this->jersey((int) $event->registration_id, $event->player_id, $match->tournament_id);
-                $event->related_jersey_number = $this->jersey((int) $event->registration_id, $event->related_player_id, $match->tournament_id);
+            ->map(function (stdClass $event) use ($match): array {
+                $registrationId = self::int($event->registration_id);
+                $playerId = self::nullableInt($event->player_id);
+                $relatedId = self::nullableInt($event->related_player_id);
 
-                return $event;
-            });
+                return [
+                    'id' => self::int($event->id),
+                    'type' => self::string($event->type),
+                    'minute' => self::nullableInt($event->minute),
+                    'registration_id' => $registrationId,
+                    'player' => $playerId === null ? null : [
+                        'player_id' => $playerId,
+                        'name' => self::name($event->first_name, $event->last_name),
+                        'jersey_number' => $this->jersey($registrationId, $playerId, $match->tournament_id),
+                    ],
+                    'related_player' => $relatedId === null ? null : [
+                        'player_id' => $relatedId,
+                        'name' => self::name($event->related_first_name, $event->related_last_name),
+                        'jersey_number' => $this->jersey($registrationId, $relatedId, $match->tournament_id),
+                    ],
+                ];
+            })
+            ->values();
     }
 
     public function lineupsOf(GameMatch $match): BaseCollection
@@ -161,7 +182,14 @@ class FeedRepository implements FeedRepositoryInterface
             ->get([
                 's.registration_id', 's.player_id', 'u.first_name', 'u.last_name',
                 DB::raw('MAX(r.jersey_number) as jersey_number'),
-            ]);
+            ])
+            ->map(fn (stdClass $row): array => [
+                'registration_id' => self::int($row->registration_id),
+                'player_id' => self::int($row->player_id),
+                'name' => self::name($row->first_name, $row->last_name),
+                'jersey_number' => self::nullableInt($row->jersey_number),
+            ])
+            ->values();
     }
 
     public function playedRegularMatches(int $tournamentId): Collection
@@ -196,18 +224,24 @@ class FeedRepository implements FeedRepositoryInterface
                 DB::raw("SUM(CASE WHEN e.type = 'goal' THEN 1 ELSE 0 END) as goals"),
                 DB::raw("SUM(CASE WHEN e.type = 'yellow_card' THEN 1 ELSE 0 END) as yellow_cards"),
                 DB::raw("SUM(CASE WHEN e.type = 'red_card' THEN 1 ELSE 0 END) as red_cards"),
-            ]);
+            ])
+            ->map(fn (stdClass $row): array => [
+                'player_id' => self::int($row->player_id),
+                'name' => self::name($row->first_name, $row->last_name),
+                'team_name' => self::string($row->team_name),
+                'registration_id' => self::int($row->registration_id),
+                'goals' => self::int($row->goals),
+                'yellow_cards' => self::int($row->yellow_cards),
+                'red_cards' => self::int($row->red_cards),
+            ])
+            ->values();
     }
 
     /** @var array<string, int|null> */
     private array $jerseys = [];
 
-    private function jersey(int $registrationId, mixed $playerId, int $tournamentId): ?int
+    private function jersey(int $registrationId, int $playerId, int $tournamentId): ?int
     {
-        if ($playerId === null) {
-            return null;
-        }
-
         $key = $registrationId.'-'.$playerId;
 
         if (! array_key_exists($key, $this->jerseys)) {
@@ -218,9 +252,40 @@ class FeedRepository implements FeedRepositoryInterface
                 ->whereIn('status', [RosterStatus::ACTIVE->value, RosterStatus::REMOVED->value])
                 ->orderByDesc('id')
                 ->value('jersey_number');
-            $this->jerseys[$key] = $jersey === null ? null : (int) $jersey;
+            $this->jerseys[$key] = self::nullableInt($jersey);
         }
 
         return $this->jerseys[$key];
+    }
+
+    /**
+     * Ids sin repetir de una consulta (pluck devuelve mixed).
+     *
+     * @param  array<array-key, mixed>  $values
+     * @return list<int>
+     */
+    private static function ints(array $values): array
+    {
+        return array_values(array_unique(array_map(self::int(...), array_values($values))));
+    }
+
+    private static function int(mixed $value): int
+    {
+        return is_numeric($value) ? (int) $value : 0;
+    }
+
+    private static function nullableInt(mixed $value): ?int
+    {
+        return $value === null ? null : self::int($value);
+    }
+
+    private static function string(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    private static function name(mixed $first, mixed $last): string
+    {
+        return trim(self::string($first).' '.self::string($last));
     }
 }

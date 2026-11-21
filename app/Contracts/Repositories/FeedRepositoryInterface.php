@@ -3,6 +3,7 @@
 namespace App\Contracts\Repositories;
 
 use App\Models\GameMatch;
+use App\Models\Tournament;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -32,7 +33,7 @@ interface FeedRepositoryInterface
      * Torneos visibles de esas ligas: en curso, en liguilla o terminados con algún partido desde `$finishedSince`.
      *
      * @param  list<int>  $leagueIds
-     * @return Collection<int, \App\Models\Tournament>
+     * @return Collection<int, Tournament>
      */
     public function visibleTournaments(array $leagueIds, CarbonInterface $finishedSince): Collection;
 
@@ -66,14 +67,14 @@ interface FeedRepositoryInterface
     /**
      * Eventos no anulados del partido con el nombre y el dorsal del jugador, en orden de minuto.
      *
-     * @return BaseCollection<int, object>
+     * @return BaseCollection<int, array{id: int, type: string, minute: int|null, registration_id: int, player: array{player_id: int, name: string, jersey_number: int|null}|null, related_player: array{player_id: int, name: string, jersey_number: int|null}|null}>
      */
     public function eventsOf(GameMatch $match): BaseCollection;
 
     /**
      * Jugadores que el árbitro registró (escaneo válido) en el partido, con nombre y dorsal.
      *
-     * @return BaseCollection<int, object>
+     * @return BaseCollection<int, array{registration_id: int, player_id: int, name: string, jersey_number: int|null}>
      */
     public function lineupsOf(GameMatch $match): BaseCollection;
 
@@ -87,7 +88,7 @@ interface FeedRepositoryInterface
     /**
      * Totales por jugador de los partidos jugados del torneo: goles, amarillas y rojas (sin anulados ni autogoles).
      *
-     * @return BaseCollection<int, object>
+     * @return BaseCollection<int, array{player_id: int, name: string, team_name: string, registration_id: int, goals: int, yellow_cards: int, red_cards: int}>
      */
     public function playerTotals(int $tournamentId): BaseCollection;
 }
