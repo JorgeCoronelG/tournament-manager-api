@@ -90,6 +90,8 @@ class Message
 
     public const PLAYER_NOT_FOUND = 'No existe el registro.';
 
+    public const PLAYER_PROFILE_EXISTS = 'Tu cuenta ya tiene perfil de jugador.';
+
     public const REGISTRATION_TOURNAMENT_NOT_PLANNING = 'Solo se pueden inscribir equipos en un torneo en planeación.';
 
     public const REGISTRATION_REMOVE_ONLY_PLANNING = 'Solo se puede quitar la inscripción de un torneo en planeación.';

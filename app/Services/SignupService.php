@@ -8,13 +8,17 @@ use App\Contracts\Services\SignupServiceInterface;
 use App\Contracts\Services\UserServiceInterface;
 use App\Core\Enum\LoginClient;
 use App\Core\Enum\Role as RoleEnum;
+use App\Core\Enum\Message;
+use App\Data\Auth\BecomePlayerData;
 use App\Data\Auth\SignupData;
+use App\Exceptions\CustomErrorException;
 use App\Models\Player;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
@@ -84,6 +88,51 @@ class SignupService implements SignupServiceInterface
         $token = $this->authRepository->createToken($user, LoginClient::MOBILE->value);
 
         return ['user' => $user, 'token' => $token];
+    }
+
+    /**
+     * @throws Throwable
+     */
+    public function becomePlayer(User $user, BecomePlayerData $data): User
+    {
+        if (Player::query()->withTrashed()->where('user_id', $user->id)->exists()) {
+            throw new CustomErrorException(Message::PLAYER_PROFILE_EXISTS, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $disk = Storage::disk('public');
+        $path = self::PHOTO_DIRECTORY.'/'.Str::uuid().'.webp';
+        $disk->put($path, $this->photoProcessor->process($data->photo));
+        $oldPhoto = $user->getRawOriginal('photo_url');
+
+        try {
+            DB::transaction(function () use ($user, $data, $path): void {
+                if ($data->phone !== null) {
+                    $user->phone = $data->phone;
+                }
+                $user->photo_url = $path;
+                $user->save();
+
+                $user->roles()->syncWithoutDetaching([RoleEnum::PLAYER->value]);
+
+                $player = new Player([
+                    'birth_date' => $data->birth_date,
+                    'gender' => $data->gender,
+                ]);
+                $player->forceFill(['user_id' => $user->id, 'qr_code' => $this->generateQrCode()]);
+                $player->save();
+            });
+        } catch (Throwable $e) {
+            $disk->delete($path);
+
+            throw $e;
+        }
+
+        // La foto anterior (si era nuestra) ya no la usa nadie.
+        if (is_string($oldPhoto) && str_starts_with($oldPhoto, self::PHOTO_DIRECTORY.'/')) {
+            $disk->delete($oldPhoto);
+        }
+
+        return $user->refresh()->load(['roles', 'player']);
     }
 
     /**

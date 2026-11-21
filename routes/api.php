@@ -59,6 +59,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:change-password');
 
+    // App móvil: delegado o árbitro que también quiere jugar (teléfono, fecha, rama y selfie).
+    Route::post('/user/player-profile', [SignupController::class, 'becomePlayer'])
+        ->middleware(['permission:'.RoleEnum::MANAGER->value.','.RoleEnum::REFEREE->value, 'throttle:register']);
+
     // App móvil: token de notificaciones push del celular (al entrar y al cerrar sesión).
     Route::post('/push-tokens', [PushTokenController::class, 'store']);
     Route::delete('/push-tokens', [PushTokenController::class, 'destroy']);
