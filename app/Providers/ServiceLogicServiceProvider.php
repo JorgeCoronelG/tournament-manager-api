@@ -41,6 +41,7 @@ class ServiceLogicServiceProvider extends ServiceProvider
         'PhotoProcessorInterface' => 'PhotoImageProcessor',
         'SignupServiceInterface' => 'SignupService',
         'FeedServiceInterface' => 'FeedService',
+        'PlayerProfileServiceInterface' => 'PlayerProfileService',
     ];
 
     /**
