@@ -4,6 +4,7 @@ use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AgendaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
@@ -60,6 +61,14 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // App móvil: token de notificaciones push del celular (al entrar y al cerrar sesión).
     Route::post('/push-tokens', [PushTokenController::class, 'store']);
     Route::delete('/push-tokens', [PushTokenController::class, 'destroy']);
+
+    // App móvil, todos los roles: Inicio y Tabla. El servicio solo deja ver torneos de las ligas del usuario (404).
+    Route::prefix('/feed')->group(function (): void {
+        Route::get('/', [FeedController::class, 'home']);
+        Route::get('/results', [FeedController::class, 'results']);
+        Route::get('/matches/{match}', [FeedController::class, 'match'])->whereNumber('match');
+        Route::get('/tournaments/{tournament}/stats', [FeedController::class, 'stats'])->whereNumber('tournament');
+    });
 });
 
 // App móvil, rol Delegado: plantilla por solicitudes. El servicio comprueba que el equipo sea suyo (403).
