@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Core\Enum\Message;
 use App\Core\Enum\Role as RoleEnum;
+use App\Models\Player;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,9 +26,23 @@ class MeTest extends TestCase
                 'first_name' => $user->first_name,
                 'last_name' => $user->last_name,
                 'email' => $user->email,
+                'phone' => $user->phone,
+                'user_code' => $user->user_code,
                 'photo_url' => $user->photo_url,
+                'birth_date' => null,
                 'roles' => [],
             ]);
+    }
+
+    public function test_includes_the_birth_date_of_a_player(): void
+    {
+        $user = User::factory()->create();
+        Player::factory()->create(['user_id' => $user->id, 'birth_date' => '1997-12-15']);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $this->getJson('/api/user', ['Authorization' => 'Bearer '.$token])
+            ->assertOk()
+            ->assertJsonPath('birth_date', '1997-12-15');
     }
 
     public function test_returns_the_roles_of_the_user_with_their_stable_code(): void

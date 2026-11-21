@@ -23,7 +23,11 @@ class UserResource extends JsonResource
             'first_name' => $this->resource->first_name,
             'last_name' => $this->resource->last_name,
             'email' => $this->resource->email,
+            'phone' => $this->resource->phone,
+            'user_code' => $this->resource->user_code,
             'photo_url' => $this->resource->photo_url,
+            // Solo los jugadores tienen fecha de nacimiento (players.birth_date); el perfil de la app la muestra.
+            'birth_date' => $this->resource->player?->birth_date?->toDateString(),
             'roles' => $this->roles(),
         ];
     }
