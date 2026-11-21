@@ -46,14 +46,14 @@ class PlayerProfileService implements PlayerProfileServiceInterface
             ->where('player_id', $player->id)
             ->whereNull('lifted_at')
             ->pluck('league_id')
-            ->map(fn (mixed $id) => (int) $id)
+            ->map(fn (mixed $id) => is_numeric($id) ? (int) $id : 0)
             ->all());
         $suspendedTournaments = array_flip(DB::table('sanctions')
             ->where('player_id', $player->id)
             ->where('is_completed', false)
             ->whereNull('deleted_at')
             ->pluck('tournament_id')
-            ->map(fn (mixed $id) => (int) $id)
+            ->map(fn (mixed $id) => is_numeric($id) ? (int) $id : 0)
             ->all());
 
         $teams = [];
@@ -132,6 +132,6 @@ class PlayerProfileService implements PlayerProfileServiceInterface
 
     private function teamName(?Registration $registration): string
     {
-        return $registration?->team?->name ?? '';
+        return $registration?->team->name ?? '';
     }
 }
