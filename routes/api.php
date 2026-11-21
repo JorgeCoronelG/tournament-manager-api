@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\PlayerRosterRequestController;
 use App\Http\Controllers\Api\PlayoffController;
+use App\Http\Controllers\Api\PushTokenController;
 use App\Http\Controllers\Api\RefereeController;
 use App\Http\Controllers\Api\RegistrationChangeController;
 use App\Http\Controllers\Api\RegistrationController;
@@ -55,6 +56,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/user', [AuthController::class, 'me']);
 
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:change-password');
+
+    // App móvil: token de notificaciones push del celular (al entrar y al cerrar sesión).
+    Route::post('/push-tokens', [PushTokenController::class, 'store']);
+    Route::delete('/push-tokens', [PushTokenController::class, 'destroy']);
 });
 
 // App móvil, rol Delegado: plantilla por solicitudes. El servicio comprueba que el equipo sea suyo (403).

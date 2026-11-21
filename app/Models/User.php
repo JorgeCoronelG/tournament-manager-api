@@ -143,6 +143,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Celulares donde tiene la app con las notificaciones push activadas.
+     *
+     * @return HasMany<PushToken, $this>
+     */
+    public function pushTokens(): HasMany
+    {
+        return $this->hasMany(PushToken::class);
+    }
+
+    /**
      * Si alguno de sus roles puede iniciar sesión en el cliente (ver Role::allowedForClient()).
      */
     public function hasRoleForClient(LoginClient $client): bool

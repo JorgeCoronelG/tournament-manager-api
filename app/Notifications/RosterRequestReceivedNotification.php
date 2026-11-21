@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\Registration;
 use App\Models\Tournament;
 use App\Models\User;
+use App\Notifications\Channels\ExpoPushChannel;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -20,7 +21,24 @@ class RosterRequestReceivedNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', ExpoPushChannel::class];
+    }
+
+    /**
+     * Aviso en el celular; al tocarlo, la app abre la pantalla donde se acepta o se rechaza.
+     *
+     * @return array{title: string, body: string, data: array<string, mixed>}
+     */
+    public function toExpoPush(User $notifiable): array
+    {
+        $team = $this->registration->team;
+        $teamName = $team === null ? 'Un equipo' : $team->name;
+
+        return [
+            'title' => "{$teamName} te invitó a su plantilla",
+            'body' => "Torneo {$this->tournament->name}. Toca para aceptar o rechazar.",
+            'data' => ['type' => 'roster_request', 'registration_id' => $this->registration->id],
+        ];
     }
 
     /**
