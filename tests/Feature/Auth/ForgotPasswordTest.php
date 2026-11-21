@@ -56,13 +56,12 @@ class ForgotPasswordTest extends TestCase
     public static function ineligibleUsers(): array
     {
         return [
-            'referee' => [[RoleEnum::REFEREE], true, true],
-            'manager' => [[RoleEnum::MANAGER], true, true],
-            'player' => [[RoleEnum::PLAYER], true, true],
             'sin roles' => [[], true, true],
             'administrador desactivado' => [[RoleEnum::LEAGUE_ADMIN], false, true],
             'administrador pendiente' => [[RoleEnum::LEAGUE_ADMIN], true, false],
             'superadmin desactivado' => [[RoleEnum::SUPERADMIN], false, true],
+            'jugador desactivado' => [[RoleEnum::PLAYER], false, true],
+            'árbitro pendiente' => [[RoleEnum::REFEREE], true, false],
         ];
     }
 
@@ -105,6 +104,33 @@ class ForgotPasswordTest extends TestCase
         }
 
         Notification::assertSentTo([$superadmin, $mixed], PasswordResetCodeNotification::class);
+    }
+
+    /**
+     * @return array<string, array{0: RoleEnum}>
+     */
+    public static function mobileRoles(): array
+    {
+        return [
+            'jugador' => [RoleEnum::PLAYER],
+            'delegado' => [RoleEnum::MANAGER],
+            'árbitro' => [RoleEnum::REFEREE],
+        ];
+    }
+
+    /**
+     * @dataProvider mobileRoles
+     */
+    public function test_mobile_users_receive_the_code(RoleEnum $role): void
+    {
+        Notification::fake();
+        $user = User::factory()->create(['email' => 'app@test.com']);
+        $user->roles()->attach($this->createRole($role));
+
+        $this->postJson('/api/forgot-password', ['email' => 'app@test.com'])->assertOk();
+
+        $this->assertNotNull(PasswordResetToken::query()->find('app@test.com'));
+        Notification::assertSentTo($user, PasswordResetCodeNotification::class);
     }
 
     public function test_requires_a_valid_email(): void
