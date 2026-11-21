@@ -76,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::MANAGER->value])->prefix('/manager')->group(function (): void {
     Route::get('/registrations', [ManagerRosterController::class, 'registrations']);
     Route::get('/registrations/{registration}/roster', [ManagerRosterController::class, 'roster'])->whereNumber('registration');
+    Route::get('/registrations/{registration}/summary', [ManagerRosterController::class, 'summary'])->whereNumber('registration');
     Route::post('/registrations/{registration}/roster', [ManagerRosterController::class, 'store'])
         ->whereNumber('registration')->middleware('throttle:referee-lookup');
     Route::patch('/registrations/{registration}/roster/{roster}/cancel', [ManagerRosterController::class, 'cancel'])
