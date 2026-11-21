@@ -46,7 +46,7 @@ class SignupService implements SignupServiceInterface
         $disk->put($path, $this->photoProcessor->process($data->photo));
 
         try {
-            $user = DB::transaction(function () use ($data, $disk, $path): User {
+            $user = DB::transaction(function () use ($data, $path): User {
                 $user = new User;
                 $user->fill([
                     'first_name' => $data->first_name,
@@ -55,7 +55,8 @@ class SignupService implements SignupServiceInterface
                     'phone' => $data->phone,
                     'user_code' => $this->userService->generateUserCode(),
                     'password' => Hash::make($data->password),
-                    'photo_url' => $disk->url($path),
+                    // Solo la ruta: el modelo arma la URL al leerla (ver User::photoUrl).
+                    'photo_url' => $path,
                     'is_active' => true,
                 ]);
                 // Él mismo eligió su contraseña: la cuenta no queda pendiente de invitación.

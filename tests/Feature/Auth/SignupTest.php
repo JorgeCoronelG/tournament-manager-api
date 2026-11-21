@@ -72,7 +72,10 @@ class SignupTest extends TestCase
         $files = Storage::disk('public')->files('users/photos');
         $this->assertCount(1, $files);
         $this->assertSame('webp-bytes', Storage::disk('public')->get($files[0]));
-        $this->assertStringEndsWith($files[0], (string) $user->photo_url);
+        // En la base queda la ruta y la respuesta trae la URL completa del servidor.
+        $this->assertSame($files[0], $user->getRawOriginal('photo_url'));
+        $this->assertSame(Storage::disk('public')->url($files[0]), $user->photo_url);
+        $response->assertJsonPath('user.photo_url', Storage::disk('public')->url($files[0]));
 
         // El token sirve para la app.
         $this->withToken($response->json('token'))->getJson('/api/user')->assertOk();
