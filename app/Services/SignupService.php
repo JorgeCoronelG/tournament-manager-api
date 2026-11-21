@@ -7,8 +7,8 @@ use App\Contracts\Services\PhotoProcessorInterface;
 use App\Contracts\Services\SignupServiceInterface;
 use App\Contracts\Services\UserServiceInterface;
 use App\Core\Enum\LoginClient;
-use App\Core\Enum\Role as RoleEnum;
 use App\Core\Enum\Message;
+use App\Core\Enum\Role as RoleEnum;
 use App\Data\Auth\BecomePlayerData;
 use App\Data\Auth\SignupData;
 use App\Exceptions\CustomErrorException;
@@ -109,7 +109,7 @@ class SignupService implements SignupServiceInterface
                 if ($data->phone !== null) {
                     $user->phone = $data->phone;
                 }
-                $user->photo_url = $path;
+                $user->fill(['photo_url' => $path]);
                 $user->save();
 
                 $user->roles()->syncWithoutDetaching([RoleEnum::PLAYER->value]);
