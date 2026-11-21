@@ -32,13 +32,13 @@ class ManagerTeamSummaryService implements ManagerTeamSummaryServiceInterface
 
         $tournament = Tournament::query()->findOrFail($registration->tournament_id);
 
-        $playerIds = array_map(self::int(...), DB::table('rosters')
+        $playerIds = array_values(array_map(self::int(...), DB::table('rosters')
             ->where('registration_id', $registration->id)
             ->whereIn('status', [RosterStatus::ACTIVE->value, RosterStatus::REMOVED->value])
             ->pluck('player_id')
             ->unique()
             ->values()
-            ->all());
+            ->all()));
 
         return [
             'players' => $this->players($registration, $tournament, $playerIds),
