@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Services\ManagerTeamSummaryServiceInterface;
 use App\Contracts\Services\RosterServiceInterface;
 use App\Core\BaseApiController;
 use App\Http\Requests\Rosters\PlayerCodeRequest;
@@ -23,7 +24,10 @@ use Illuminate\Http\Response;
  */
 class ManagerRosterController extends BaseApiController
 {
-    public function __construct(protected RosterServiceInterface $rosterService) {}
+    public function __construct(
+        protected RosterServiceInterface $rosterService,
+        protected ManagerTeamSummaryServiceInterface $summaryService,
+    ) {}
 
     public function registrations(Request $request): JsonResponse
     {
@@ -39,6 +43,14 @@ class ManagerRosterController extends BaseApiController
             ['data' => ManagerRosterResource::collection($this->rosterService->rosterForManager($registration, $this->actor($request)))],
             Response::HTTP_OK
         );
+    }
+
+    /**
+     * Goles, tarjetas y elegibilidad de cada jugador, y los partidos del equipo con su marcador.
+     */
+    public function summary(Request $request, Registration $registration): JsonResponse
+    {
+        return $this->successResponse($this->summaryService->summaryFor($registration, $this->actor($request)), Response::HTTP_OK);
     }
 
     public function lookup(PlayerCodeRequest $request): JsonResponse
