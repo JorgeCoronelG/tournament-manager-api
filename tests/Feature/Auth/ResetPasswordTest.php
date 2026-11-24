@@ -128,7 +128,6 @@ class ResetPasswordTest extends TestCase
     public static function ineligibleUsers(): array
     {
         return [
-            'sin rol de administrador' => [[RoleEnum::PLAYER], true, true],
             'sin roles' => [[], true, true],
             'desactivado' => [[RoleEnum::LEAGUE_ADMIN], false, true],
             'pendiente' => [[RoleEnum::LEAGUE_ADMIN], true, false],
@@ -180,6 +179,24 @@ class ResetPasswordTest extends TestCase
             'password' => 'NuevaPassword123',
             'password_confirmation' => 'NuevaPassword123',
         ])->assertOk();
+    }
+
+    public function test_resets_the_password_of_a_player_from_the_app(): void
+    {
+        $user = User::factory()->create();
+        $user->roles()->attach($this->createRole(RoleEnum::PLAYER));
+        $user->createToken('device');
+        $this->createCodeFor($user);
+
+        $this->postJson('/api/reset-password', [
+            'email' => $user->email,
+            'code' => '123456',
+            'password' => 'NuevaPassword123',
+            'password_confirmation' => 'NuevaPassword123',
+        ])->assertOk();
+
+        $this->assertTrue(Hash::check('NuevaPassword123', $user->fresh()->password));
+        $this->assertSame(0, $user->tokens()->count());
     }
 
     public function test_requires_code_email_and_matching_password_confirmation(): void
