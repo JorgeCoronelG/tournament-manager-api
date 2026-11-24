@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\MatchScheduleController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\PlayerProfileController;
 use App\Http\Controllers\Api\PlayerRosterRequestController;
 use App\Http\Controllers\Api\PlayoffController;
 use App\Http\Controllers\Api\PushTokenController;
@@ -82,8 +83,10 @@ Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::MANAGER->value])->pre
     Route::get('/player-lookup', [ManagerRosterController::class, 'lookup'])->middleware('throttle:referee-lookup');
 });
 
-// App móvil, rol Jugador: sus solicitudes de plantilla. El servicio comprueba que la solicitud sea suya (403).
+// App móvil, rol Jugador: su QR, equipos y próximos partidos ("Mi QR") y sus solicitudes de plantilla.
+// El servicio comprueba que la solicitud sea suya (403).
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::PLAYER->value])->prefix('/player')->group(function (): void {
+    Route::get('/me', [PlayerProfileController::class, 'show']);
     Route::get('/roster-requests', [PlayerRosterRequestController::class, 'index']);
     Route::post('/roster-requests/{roster}/accept', [PlayerRosterRequestController::class, 'accept'])->whereNumber('roster');
     Route::post('/roster-requests/{roster}/reject', [PlayerRosterRequestController::class, 'reject'])->whereNumber('roster');
