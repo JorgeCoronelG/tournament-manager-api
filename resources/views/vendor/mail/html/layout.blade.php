@@ -87,17 +87,6 @@ background-color: #599B6A !important;
 border-color: #599B6A !important;
 color: #000000 !important;
 }
-
-.logo-light {
-display: none !important;
-max-height: 0 !important;
-overflow: hidden !important;
-}
-
-.logo-dark {
-display: inline-block !important;
-max-height: none !important;
-}
 }
 </style>
 {!! $head ?? '' !!}
