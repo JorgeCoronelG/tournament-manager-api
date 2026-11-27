@@ -21,19 +21,16 @@ class MailLayoutTest extends TestCase
         ]);
     }
 
-    public function test_header_shows_both_logos_with_absolute_urls_based_on_app_url(): void
+    public function test_header_shows_the_isotype_with_an_absolute_url_based_on_app_url(): void
     {
         $html = $this->renderPasswordResetMail();
 
-        foreach (['logo-light', 'logo-dark'] as $logo) {
-            $this->assertMatchesRegularExpression(
-                '#<img src="https://api\.velto\.test/img/mail/'.$logo.'\.png" class="logo '.$logo.'" alt="Velto"#',
-                $html
-            );
-            $this->assertFileExists(public_path("img/mail/{$logo}.png"));
-        }
-
-        $this->assertStringNotContainsString('laravel.com/img/notification-logo', $html);
+        $this->assertStringContainsString(
+            '<img src="https://api.velto.test/img/mail/logo-isotipo.png" class="logo" alt="Velto"',
+            $html
+        );
+        $this->assertSame(1, substr_count($html, '<img '));
+        $this->assertFileExists(public_path('img/mail/logo-isotipo.png'));
     }
 
     public function test_header_logo_is_not_a_link_and_does_not_expose_the_panel_url(): void
@@ -44,11 +41,10 @@ class MailLayoutTest extends TestCase
         $this->assertStringNotContainsString('panel.velto.test', $html);
     }
 
-    public function test_dark_logo_is_hidden_by_default_and_dark_styles_survive_inlining(): void
+    public function test_dark_styles_survive_inlining(): void
     {
         $html = $this->renderPasswordResetMail();
 
-        $this->assertMatchesRegularExpression('#class="logo logo-dark"[^>]*style="[^"]*display: ?none#', $html);
         $this->assertStringContainsString('@media (prefers-color-scheme: dark)', $html);
         $this->assertStringContainsString('<meta name="color-scheme" content="light dark">', $html);
     }
