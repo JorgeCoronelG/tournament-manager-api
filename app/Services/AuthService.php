@@ -23,7 +23,9 @@ class AuthService implements AuthServiceInterface
      */
     public function login(LoginData $data): array
     {
-        $user = $this->authRepository->findByEmail($data->email);
+        $user = $data->email !== null
+            ? $this->authRepository->findByEmail($data->email)
+            : $this->authRepository->findByPhone((string) $data->phone);
 
         if ($user === null || ! Hash::check($data->password, $user->password)) {
             throw new CustomErrorException(Message::CREDENTIALS_INVALID, Response::HTTP_UNAUTHORIZED);

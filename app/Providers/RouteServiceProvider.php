@@ -33,7 +33,11 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
-            return Limit::perMinute(5)->by($request->string('email').'|'.$request->ip());
+            return Limit::perMinute(5)->by(($request->string('email')->toString() ?: $request->string('phone')->toString()).'|'.$request->ip());
+        });
+
+        RateLimiter::for('register', function (Request $request) {
+            return Limit::perHour(10)->by('register:'.$request->ip());
         });
 
         RateLimiter::for('forgot-password', function (Request $request) {
@@ -66,6 +70,11 @@ class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('referee-lookup', function (Request $request) {
             return Limit::perMinute(20)->by('referee-lookup:'.($request->user()?->id ?: $request->ip()));
+        });
+
+        // El celular del árbitro reintenta solo (al guardar, al recuperar señal y cada minuto); esto solo frena abusos.
+        RateLimiter::for('referee-sync', function (Request $request) {
+            return Limit::perMinute(60)->by('referee-sync:'.($request->user()?->id ?: $request->ip()));
         });
 
         $this->routes(function () {

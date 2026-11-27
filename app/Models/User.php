@@ -9,6 +9,7 @@ use App\Core\Enum\UserAccountStatus;
 use App\Core\Traits\AdvancedFilter;
 use App\Core\Traits\Sortable;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -71,6 +74,27 @@ class User extends Authenticatable
     ];
 
     /**
+     * Las fotos subidas se guardan como ruta relativa del disco `public` (users/photos/x.webp) y la URL
+     * se arma al leerla con APP_URL. Así no queda fija en la base la dirección del servidor, que cambia
+     * entre redes y entre ambientes. Las URL completas (placeholders, fotos externas) se devuelven igual.
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::get(function (mixed $value): ?string {
+            if (! is_string($value) || $value === '') {
+                return null;
+            }
+            if (Str::startsWith($value, ['http://', 'https://'])) {
+                return $value;
+            }
+
+            return Storage::disk('public')->url($value);
+        });
+    }
+
+    /**
      * @return BelongsToMany<Role, $this>
      */
     public function roles(): BelongsToMany
@@ -116,6 +140,16 @@ class User extends Authenticatable
     public function leagueReferees(): HasMany
     {
         return $this->hasMany(LeagueReferee::class);
+    }
+
+    /**
+     * Celulares donde tiene la app con las notificaciones push activadas.
+     *
+     * @return HasMany<PushToken, $this>
+     */
+    public function pushTokens(): HasMany
+    {
+        return $this->hasMany(PushToken::class);
     }
 
     /**

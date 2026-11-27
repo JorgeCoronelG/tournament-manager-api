@@ -4,22 +4,29 @@ use App\Core\Enum\Role as RoleEnum;
 use App\Http\Controllers\Api\AgendaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\Api\FieldController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\LeagueController;
+use App\Http\Controllers\Api\ManagerRosterController;
 use App\Http\Controllers\Api\MatchController;
 use App\Http\Controllers\Api\MatchScheduleController;
 use App\Http\Controllers\Api\MyLeagueController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PlayerController;
+use App\Http\Controllers\Api\PlayerProfileController;
+use App\Http\Controllers\Api\PlayerRosterRequestController;
 use App\Http\Controllers\Api\PlayoffController;
+use App\Http\Controllers\Api\PushTokenController;
 use App\Http\Controllers\Api\RefereeController;
+use App\Http\Controllers\Api\RefereeMatchController;
 use App\Http\Controllers\Api\RegistrationChangeController;
 use App\Http\Controllers\Api\RegistrationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\RosterController;
 use App\Http\Controllers\Api\ScheduleConfigController;
 use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\SignupController;
 use App\Http\Controllers\Api\StandingController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\TournamentController;
@@ -39,6 +46,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
+// Registro propio de jugadores desde la app móvil.
+Route::post('/register', [SignupController::class, 'store'])->middleware('throttle:register');
+
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->middleware('throttle:forgot-password');
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->middleware('throttle:reset-password');
 Route::post('/activate-account', [PasswordResetController::class, 'activateAccount'])->middleware('throttle:activate-account');
@@ -49,6 +59,51 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/user', [AuthController::class, 'me']);
 
     Route::put('/user/password', [AuthController::class, 'changePassword'])->middleware('throttle:change-password');
+
+    // App móvil: delegado o árbitro que también quiere jugar (teléfono, fecha, rama y selfie).
+    Route::post('/user/player-profile', [SignupController::class, 'becomePlayer'])
+        ->middleware(['permission:'.RoleEnum::MANAGER->value.','.RoleEnum::REFEREE->value, 'throttle:register']);
+
+    // App móvil: token de notificaciones push del celular (al entrar y al cerrar sesión).
+    Route::post('/push-tokens', [PushTokenController::class, 'store']);
+    Route::delete('/push-tokens', [PushTokenController::class, 'destroy']);
+
+    // App móvil, todos los roles: Inicio y Tabla. El servicio solo deja ver torneos de las ligas del usuario (404).
+    Route::prefix('/feed')->group(function (): void {
+        Route::get('/', [FeedController::class, 'home']);
+        Route::get('/results', [FeedController::class, 'results']);
+        Route::get('/matches/{match}', [FeedController::class, 'match'])->whereNumber('match');
+        Route::get('/tournaments/{tournament}/stats', [FeedController::class, 'stats'])->whereNumber('tournament');
+    });
+});
+
+// App móvil, rol Delegado: plantilla por solicitudes. El servicio comprueba que el equipo sea suyo (403).
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::MANAGER->value])->prefix('/manager')->group(function (): void {
+    Route::get('/registrations', [ManagerRosterController::class, 'registrations']);
+    Route::get('/registrations/{registration}/roster', [ManagerRosterController::class, 'roster'])->whereNumber('registration');
+    Route::get('/registrations/{registration}/summary', [ManagerRosterController::class, 'summary'])->whereNumber('registration');
+    Route::post('/registrations/{registration}/roster', [ManagerRosterController::class, 'store'])
+        ->whereNumber('registration')->middleware('throttle:referee-lookup');
+    Route::patch('/registrations/{registration}/roster/{roster}/cancel', [ManagerRosterController::class, 'cancel'])
+        ->whereNumber(['registration', 'roster'])->scopeBindings();
+    Route::get('/player-lookup', [ManagerRosterController::class, 'lookup'])->middleware('throttle:referee-lookup');
+});
+
+// App móvil, rol Jugador: su QR, equipos y próximos partidos ("Mi QR") y sus solicitudes de plantilla.
+// El servicio comprueba que la solicitud sea suya (403).
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::PLAYER->value])->prefix('/player')->group(function (): void {
+    Route::get('/me', [PlayerProfileController::class, 'show']);
+    Route::get('/roster-requests', [PlayerRosterRequestController::class, 'index']);
+    Route::post('/roster-requests/{roster}/accept', [PlayerRosterRequestController::class, 'accept'])->whereNumber('roster');
+    Route::post('/roster-requests/{roster}/reject', [PlayerRosterRequestController::class, 'reject'])->whereNumber('roster');
+});
+
+// App móvil, rol Árbitro: sus partidos, la plantilla para validar sin internet y el envío de lo registrado en la
+// cancha. El servicio comprueba que el partido sea suyo (403).
+Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::REFEREE->value])->prefix('/referee')->group(function (): void {
+    Route::get('/matches', [RefereeMatchController::class, 'index']);
+    Route::get('/matches/{match}/rosters', [RefereeMatchController::class, 'rosters'])->whereNumber('match');
+    Route::post('/matches/{match}/sync', [RefereeMatchController::class, 'sync'])->whereNumber('match')->middleware('throttle:referee-sync');
 });
 
 Route::middleware(['auth:sanctum', 'permission:'.RoleEnum::SUPERADMIN->value.','.RoleEnum::LEAGUE_ADMIN->value])->group(function (): void {

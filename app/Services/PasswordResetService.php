@@ -28,9 +28,10 @@ class PasswordResetService implements PasswordResetServiceInterface
     ) {}
 
     /**
-     * Solo para el panel web: usuario activo, con cuenta ya activada y con rol de administrador.
-     * No revela nada: si no cumple, simplemente no hace nada (sin código ni correo), igual que
-     * cuando el correo no existe. Los pendientes usan la invitación.
+     * Panel web y app móvil: usuario activo, con cuenta ya activada y con algún rol de los dos
+     * clientes (administradores, árbitros, delegados y jugadores). No revela nada: si no cumple,
+     * simplemente no hace nada (sin código ni correo), igual que cuando el correo no existe. Los
+     * pendientes usan la invitación.
      */
     public function forgotPassword(ForgotPasswordData $data): void
     {
@@ -101,7 +102,7 @@ class PasswordResetService implements PasswordResetServiceInterface
 
         return $user->is_active
             && $user->email_verified_at !== null
-            && $user->hasRoleForClient(LoginClient::WEB);
+            && ($user->hasRoleForClient(LoginClient::WEB) || $user->hasRoleForClient(LoginClient::MOBILE));
     }
 
     /**

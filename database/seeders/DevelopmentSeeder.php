@@ -130,6 +130,8 @@ class DevelopmentSeeder extends Seeder
         $this->seedRoleTestUsers($leagues);
         $this->seedDemoLeagues();
         $this->seedInactiveLeague();
+        $this->seedMobileRosterTestData($leagues);
+        $this->seedRefereeTestMatches($leagues);
     }
 
     /**
@@ -507,6 +509,48 @@ class DevelopmentSeeder extends Seeder
     }
 
     /**
+     * Datos para probar en la app las solicitudes de plantilla, con la contraseña «password»: el delegado
+     * delegado.prueba@example.com dirige «Halcones Prueba», inscrito en «Torneo Prueba App» (en planeación, mixto,
+     * sin límite de edad, máximo 15). Dos jugadores libres para invitar por clave: PRUEBA01 (varonil) y
+     * PRUEBA02 (femenil). No hace nada si ya existen.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedMobileRosterTestData(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+
+        if ($league === null || User::query()->where('email', 'delegado.prueba@example.com')->exists()) {
+            return;
+        }
+
+        $manager = User::factory()->create([
+            'email' => 'delegado.prueba@example.com', 'first_name' => 'Delegado', 'last_name' => 'Prueba',
+            'user_code' => 'DELPRUEB', 'phone' => $this->phone(),
+        ]);
+        $manager->roles()->sync([RoleEnum::MANAGER->value]);
+
+        $team = Team::factory()->create(['league_id' => $league->id, 'manager_user_id' => $manager->id, 'name' => 'Halcones Prueba']);
+        $tournament = Tournament::factory()->status(TournamentStatus::PLANNING)->create([
+            'league_id' => $league->id,
+            'name' => 'Torneo Prueba App',
+            'gender' => TournamentGender::MIXED,
+            'max_roster_size' => 15,
+            'start_date' => now()->addMonth()->toDateString(),
+        ]);
+        Registration::factory()->create(['tournament_id' => $tournament->id, 'team_id' => $team->id]);
+
+        foreach ([['PRUEBA01', 'Pedro', PlayerGender::MALE], ['PRUEBA02', 'Paula', PlayerGender::FEMALE]] as [$code, $name, $gender]) {
+            $user = User::factory()->create([
+                'email' => strtolower($code).'@example.com', 'first_name' => $name, 'last_name' => 'Prueba',
+                'user_code' => $code, 'phone' => $this->phone(),
+            ]);
+            $user->roles()->sync([RoleEnum::PLAYER->value]);
+            Player::factory()->gender($gender)->create(['user_id' => $user->id, 'birth_date' => '1998-03-15']);
+        }
+    }
+
+    /**
      * Usuarios para probar los 403 por rol, con la contraseña «password»: un árbitro activo de la primera liga
      * (arbitro.prueba@example.com) y un jugador con plantilla activa en su primer torneo (jugador.prueba@example.com).
      * No hace nada si ya existen.
@@ -547,6 +591,39 @@ class DevelopmentSeeder extends Seeder
             'requested_at' => now()->subDays(10),
             'responded_at' => now()->subDays(9),
         ])->save();
+    }
+
+    /**
+     * Partidos de «Torneo Impar» para probar el modo árbitro de la app: arbitro.prueba@example.com pita hoy dos (en una
+     * hora y en tres, el primero con el equipo de jugador.prueba) y uno mañana, en la primera cancha de la liga. Las
+     * horas salen del momento en que se corre el seeder. No hace nada si el árbitro ya tiene partidos.
+     *
+     * @param  list<League>  $leagues
+     */
+    private function seedRefereeTestMatches(array $leagues): void
+    {
+        $league = $leagues[0] ?? null;
+        $referee = User::query()->where('email', 'arbitro.prueba@example.com')->first();
+        $tournament = $league?->tournaments()->where('name', 'Torneo Impar')->first();
+
+        if ($league === null || $referee === null || $tournament === null
+            || GameMatch::query()->where('referee_user_id', $referee->id)->exists()) {
+            return;
+        }
+
+        $first = (int) $tournament->registrations()->orderBy('id')->value('id');
+        $free = fn () => GameMatch::query()->where('tournament_id', $tournament->id)->whereNull('match_datetime')->orderBy('matchday')->orderBy('id');
+        $matches = $free()->where(fn ($q) => $q->where('home_registration_id', $first)->orWhere('away_registration_id', $first))->take(1)->get()
+            ->concat($free()->where('home_registration_id', '!=', $first)->where('away_registration_id', '!=', $first)->take(2)->get())
+            ->values();
+
+        $start = now()->addHour()->startOfHour();
+        $times = [$start, $start->copy()->addHours(2), $start->copy()->addDay()];
+        $fieldId = $league->fields()->orderBy('id')->value('id');
+
+        foreach ($matches as $index => $match) {
+            $match->forceFill(['referee_user_id' => $referee->id, 'match_datetime' => $times[$index], 'field_id' => $fieldId])->save();
+        }
     }
 
     /**

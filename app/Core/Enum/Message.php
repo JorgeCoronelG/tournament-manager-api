@@ -90,6 +90,8 @@ class Message
 
     public const PLAYER_NOT_FOUND = 'No existe el registro.';
 
+    public const PLAYER_PROFILE_EXISTS = 'Tu cuenta ya tiene perfil de jugador.';
+
     public const REGISTRATION_TOURNAMENT_NOT_PLANNING = 'Solo se pueden inscribir equipos en un torneo en planeación.';
 
     public const REGISTRATION_REMOVE_ONLY_PLANNING = 'Solo se puede quitar la inscripción de un torneo en planeación.';
@@ -276,6 +278,14 @@ class Message
     public const MATCH_PENALTIES_ONLY_ON_DRAW = 'Los penales solo se capturan cuando hay empate.';
 
     public const MATCH_NEXT_ROUND_HAS_RESULTS = 'No se puede modificar: ya hay resultados posteriores.';
+
+    public const REFEREE_EVENT_TEAM_NOT_IN_MATCH = 'El equipo del evento no juega este partido.';
+
+    public const REFEREE_EVENT_PLAYER_NOT_IN_TEAM = 'El jugador del evento no pertenece a ese equipo.';
+
+    public const REFEREE_RESULT_ALREADY_RECORDED = 'El encargado de la liga ya capturó otro marcador para este partido.';
+
+    public const REFEREE_SYNC_UUID_TAKEN = 'Uno de los registros ya pertenece a otro partido.';
 
     public const MATCH_TOURNAMENT_FINISHED = 'El torneo ya terminó: no se pueden modificar resultados.';
 
