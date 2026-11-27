@@ -14,9 +14,7 @@ use Illuminate\Support\Facades\Storage;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', fn () => response()->json(['message' => 'Hello world!']));
 
 // Escudos de equipos por Laravel (no por /storage, que el servidor entrega directo) para que lleven los headers CORS.
 Route::get('/media/{path}', function (string $path) {
