@@ -1,3 +1,9 @@
+/*
+ * Los colores de marca vienen del tema del front (primary-600 = #0E7A3D en claro,
+ * primary-400 = #599B6A en oscuro). Si cambian allá, hay que actualizarlos aquí
+ * y en el bloque de modo oscuro de ../layout.blade.php.
+ */
+
 /* Base */
 
 body,
@@ -112,11 +118,11 @@ img {
 /* Logo */
 
 .logo {
-    height: 75px;
+    height: auto;
     margin-top: 15px;
     margin-bottom: 10px;
-    max-height: 75px;
-    width: 75px;
+    max-width: 100%;
+    width: 160px;
 }
 
 /* Body */
@@ -148,6 +154,8 @@ img {
 }
 
 .inner-body a {
+    color: #0E7A3D;
+    text-decoration: underline;
     word-break: break-all;
 }
 
@@ -237,13 +245,20 @@ img {
     text-decoration: none;
 }
 
+/* Más específico que `.inner-body a`, para que el botón no tome el color de los enlaces. */
+.inner-body a.button {
+    -webkit-text-fill-color: #ffffff;
+    color: #ffffff;
+    text-decoration: none;
+}
+
 .button-blue,
 .button-primary {
-    background-color: #18181b;
-    border-bottom: 8px solid #18181b;
-    border-left: 18px solid #18181b;
-    border-right: 18px solid #18181b;
-    border-top: 8px solid #18181b;
+    background-color: #0E7A3D;
+    border-bottom: 8px solid #0E7A3D;
+    border-left: 18px solid #0E7A3D;
+    border-right: 18px solid #0E7A3D;
+    border-top: 8px solid #0E7A3D;
 }
 
 .button-green,
@@ -267,7 +282,7 @@ img {
 /* Panels */
 
 .panel {
-    border-left: #18181b solid 4px;
+    border-left: #0E7A3D solid 4px;
     margin: 21px 0;
 }
 
